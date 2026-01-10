@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Device Configuration Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .nav {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        
+        .nav button {
+            padding: 10px 20px;
+            border: none;
+            background: #f0f0f0;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+            font-size: 14px;
+        }
+        
+        .nav button.active {
+            background: #007bff;
+            color: white;
+        }
+        
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .device-list {
+            margin-top: 20px;
+        }
+        
+        .device-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .device-item.success {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+        
+        .device-item.error {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        
+        .device-info {
+            flex: 1;
+        }
+        
+        .device-status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .status-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status-error {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .checkbox-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        
+        .checkbox-item {
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+        }
+        
+        .job-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .device-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .device-card.running {
+            border-color: #ffc107;
+            background: #fffbf0;
+        }
+        
+        .device-card.success {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+        
+        .device-card.failed {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        
+        .log-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin-top: 10px;
+        }
+        
+        .diff-output {
+            background: #f8f8f8;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin-top: 10px;
+        }
+        
+        .diff-output .diff-add {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .diff-output .diff-remove {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .error-text {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .warning-text {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        
+        .info-text {
+            color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Network Device Configuration Manager</h1>
+        <p style="color: #666; margin-bottom: 20px;">Multi-device SSH configuration management tool</p>
+        
+        <div class="nav">
+            <button onclick="showPage('devices')" class="active" id="nav-devices">Device Import</button>
+            <button onclick="showPage('job-create')" id="nav-job-create">Create Job</button>
+            <button onclick="showPage('job-monitor')" id="nav-job-monitor">Monitor Jobs</button>
+        </div>
+        
+        <!-- Device Import Page -->
+        <div id="page-devices" class="page active">
+            <h2>Import Devices</h2>
+            <p style="margin: 10px 0; color: #666;">
+                Paste CSV with columns: host, port (optional), device_type, username, password, name (optional), verify_cmds (optional)
+            </p>
+            
+            <div class="form-group">
+                <label>CSV Content:</label>
+                <textarea id="csv-input" rows="10" placeholder="host,port,device_type,username,password,name,verify_cmds&#10;192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp"></textarea>
+            </div>
+            
+            <button onclick="importDevices()">Import and Validate Devices</button>
+            
+            <div id="device-results" class="device-list"></div>
+        </div>
+        
+        <!-- Job Create Page -->
+        <div id="page-job-create" class="page">
+            <h2>Create Configuration Job</h2>
+            
+            <div class="form-group">
+                <label>Job Name (optional):</label>
+                <input type="text" id="job-name" placeholder="My Config Job">
+            </div>
+            
+            <div class="form-group">
+                <label>Creator (optional):</label>
+                <input type="text" id="job-creator" placeholder="Admin">
+            </div>
+            
+            <div class="form-group">
+                <label>Select Devices:</label>
+                <div id="device-selector" class="checkbox-list">
+                    <p style="color: #999; padding: 20px; text-align: center;">No devices imported yet</p>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Canary Device:</label>
+                <select id="canary-selector">
+                    <option value="">Select canary device...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Verification Commands (one per line, optional):</label>
+                <textarea id="verify-commands" rows="3" placeholder="show running-config | section snmp&#10;show ip interface brief"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Configuration Commands (required):</label>
+                <textarea id="config-commands" rows="8" placeholder="snmp-server community public RO&#10;snmp-server location DataCenter1&#10;snmp-server contact admin@example.com"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Verify Mode:</label>
+                <select id="verify-mode">
+                    <option value="canary">Canary only</option>
+                    <option value="all">All devices</option>
+                    <option value="none">None</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Concurrency Limit:</label>
+                <input type="number" id="concurrency-limit" value="5" min="1" max="20">
+            </div>
+            
+            <div class="form-group">
+                <label>Stagger Delay (seconds):</label>
+                <input type="number" id="stagger-delay" value="1.0" min="0" max="10" step="0.1">
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="stop-on-error" checked>
+                    Stop on Error
+                </label>
+            </div>
+            
+            <button onclick="createJob()">Create and Execute Job</button>
+        </div>
+        
+        <!-- Job Monitor Page -->
+        <div id="page-job-monitor" class="page">
+            <h2>Job Monitor</h2>
+            <div id="job-monitor-content">
+                <p style="color: #999; padding: 20px; text-align: center;">No active job</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
