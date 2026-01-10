@@ -123,8 +123,6 @@ Real-time monitoring with:
 - Pre/post configuration diffs
 - Error reporting
 
-**Note**: Replace placeholder images above with actual screenshots after running the application.
-
 ## 🔌 API Documentation
 
 ### POST /api/devices/import
