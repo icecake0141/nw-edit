@@ -52,3 +52,7 @@ build/
 
 # Docker
 *.log
+
+# CSV files (may contain sensitive data)
+*.csv
+!sample_devices.csv

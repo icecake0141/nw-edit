@@ -1,0 +1,23 @@
+# Sample CSV for Network Device Configuration Manager
+
+# This is a sample CSV file showing the format for importing devices
+# Copy the content below (excluding comment lines) and paste into the Device Import page
+
+host,port,device_type,username,password,name,verify_cmds
+192.168.1.1,22,cisco_ios,admin,cisco123,Core-Router-01,show running-config | section snmp;show ip interface brief
+192.168.1.2,22,cisco_ios,admin,cisco123,Core-Router-02,show running-config | section snmp;show ip interface brief
+192.168.1.10,22,cisco_ios,admin,cisco123,Access-Switch-01,show vlan brief
+192.168.1.11,22,cisco_ios,admin,cisco123,Access-Switch-02,show vlan brief
+10.0.0.1,2222,cisco_ios,admin,admin123,Test-Device,show running-config
+
+# Column descriptions:
+# - host: IP address or hostname (required)
+# - port: SSH port (optional, default: 22)
+# - device_type: Netmiko device type (required) - see https://github.com/ktbyers/netmiko
+# - username: SSH username (required)
+# - password: SSH password (required)
+# - name: Friendly device name (optional)
+# - verify_cmds: Semicolon-separated verification commands (optional)
+
+# Security Warning:
+# This CSV contains plaintext passwords. Keep this file secure and do not commit to version control.
