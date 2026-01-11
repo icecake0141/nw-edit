@@ -56,7 +56,7 @@ def parse_csv_devices(csv_content: str) -> List[DeviceInput]:
 
         device = DeviceInput(
             host=row["host"].strip(),
-            port=int(row.get("port", "22")),
+            port=int(row.get("port", "").strip() or "22"),
             device_type=row["device_type"].strip(),
             username=row["username"].strip(),
             password=row["password"].strip(),
