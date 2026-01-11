@@ -95,7 +95,7 @@ tests/
 All required endpoints implemented:
 
 ### POST /api/devices/import
-- ✅ Accepts CSV (text/plain or JSON)
+- ✅ Accepts CSV (text/plain)
 - ✅ Returns devices with connection_ok status
 - ✅ Lightweight connection test (auth only)
 - ✅ Only connection_ok=true devices stored
