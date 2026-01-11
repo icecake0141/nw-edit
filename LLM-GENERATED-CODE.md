@@ -40,7 +40,7 @@ LLMによって生成されたコード、または LLM の支援を受けたコ
 <!--
   Copyright 2026 icecake0141
   SPDX-License-Identifier: Apache-2.0
-  
+
   This file may contain code generated with the assistance of a Large Language Model (LLM).
 -->
 ```
