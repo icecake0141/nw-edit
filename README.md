@@ -12,6 +12,12 @@ This application provides a simple, web-based interface for managing network dev
 - **Concurrent execution**: Configurable concurrency with stagger delays
 - **Error handling**: Automatic retry on connection errors, stop-on-error capability
 
+### Workflow Overview
+
+![Workflow Overview](docs/screenshots/00_overview.png)
+
+The diagram above illustrates the complete workflow from device import to deployment, including the canary deployment pattern that ensures safe configuration changes.
+
 ## ⚠️ Security Notice
 
 **IMPORTANT**: This application handles device credentials in plaintext and stores them in process memory only. 
