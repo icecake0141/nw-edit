@@ -54,6 +54,9 @@ def parse_csv_devices(csv_content: str) -> List[DeviceInput]:
         ):
             continue
 
+        port_value = row.get("port", "")
+        port = int(port_value) if port_value and port_value.strip() else 22
+
         device = DeviceInput(
             host=row["host"].strip(),
             port=int(row.get("port", "").strip() or "22"),
