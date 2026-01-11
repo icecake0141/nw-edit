@@ -10,6 +10,6 @@ snmp-server contact admin@example.com
 snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
 snmp-server host 192.168.100.10 version 2c public
 
-# ACL for SNMP (optional - be careful with this on production)
+# ACL for SNMP (optional - be careful with this in production.)
 access-list 99 permit 192.168.100.0 0.0.0.255
 snmp-server community public RO 99
