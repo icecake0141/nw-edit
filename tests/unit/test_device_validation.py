@@ -37,6 +37,17 @@ def test_parse_csv_missing_port():
     assert devices[0].port == 22  # default
 
 
+def test_parse_csv_blank_port_value():
+    """Test CSV parsing with blank port value."""
+    csv_content = """host,port,device_type,username,password
+192.168.1.1,,cisco_ios,admin,password123"""
+
+    devices = parse_csv_devices(csv_content)
+
+    assert len(devices) == 1
+    assert devices[0].port == 22
+
+
 def test_parse_csv_missing_required_fields():
     """Test CSV parsing with missing required fields."""
     csv_content = """host,device_type
