@@ -1,3 +1,22 @@
+<!--
+Copyright 2026 icecake0141
+SPDX-License-Identifier: Apache-2.0
+
+This file was created or modified with the assistance of an AI (Large Language Model).
+Please review for correctness and security.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
 # Network Device Configuration Manager
 
 A minimal single-process web application (MVP) for applying multi-line configuration commands to multiple network devices over SSH.
@@ -44,8 +63,11 @@ The diagram above illustrates the complete workflow from device import to deploy
 git clone https://github.com/icecake0141/nw-edit.git
 cd nw-edit
 
-# Start all services
+# Start services (backend, frontend)
 docker-compose up -d
+
+# Optional: start mock SSH server for testing
+docker-compose --profile test up -d mock-ssh
 
 # Access the application
 # Frontend: http://localhost:3000
@@ -228,8 +250,8 @@ pytest tests/unit -v
 ### Run Integration Tests
 
 ```bash
-# Start mock SSH server
-docker-compose up -d mock-ssh
+# Start mock SSH server (test profile only)
+docker-compose --profile test up -d mock-ssh
 
 # Run integration tests
 pytest tests/integration -v -m integration
@@ -270,7 +292,7 @@ pytest tests/unit -v --cov=backend/app
 docker build -t nw-edit:latest .
 
 # Integration
-docker-compose up -d mock-ssh
+docker-compose --profile test up -d mock-ssh
 pytest tests/integration -v -m integration
 docker-compose down
 ```

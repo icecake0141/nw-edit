@@ -1,3 +1,22 @@
+<!--
+Copyright 2026 icecake0141
+SPDX-License-Identifier: Apache-2.0
+
+This file was created or modified with the assistance of an AI (Large Language Model).
+Please review for correctness and security.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
 # Quick Start Guide
 
 This guide will help you get the Network Device Configuration Manager up and running quickly.
@@ -16,8 +35,11 @@ This guide will help you get the Network Device Configuration Manager up and run
 git clone https://github.com/icecake0141/nw-edit.git
 cd nw-edit
 
-# Start services (backend, frontend, mock SSH server)
+# Start services (backend, frontend)
 docker-compose up -d
+
+# Optional: start mock SSH server for testing
+docker-compose --profile test up -d mock-ssh
 
 # Or use the start script
 ./start.sh
@@ -115,7 +137,7 @@ For testing without real devices, use the included mock SSH server:
 
 ```bash
 # Start mock SSH server
-docker-compose up -d mock-ssh
+docker-compose --profile test up -d mock-ssh
 
 # Connection details:
 # Host: localhost
