@@ -1,3 +1,23 @@
+/*
+ * Copyright 2026 icecake0141
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * This file was created or modified with the assistance of an AI (Large Language Model).
+ * Review required for correctness, security, and licensing.
+ */
+
 // API base URL
 const API_BASE = 'http://localhost:8000';
 const WS_BASE = 'ws://localhost:8000';
@@ -6,6 +26,7 @@ const WS_BASE = 'ws://localhost:8000';
 let devices = [];
 let currentJobId = null;
 let ws = null;
+let currentJobStatus = null;
 
 // Page navigation
 function showPage(pageName) {
@@ -221,6 +242,7 @@ async function startJobMonitoring(jobId) {
 
 function displayJobMonitor(job) {
     const container = document.getElementById('job-monitor-content');
+    currentJobStatus = job.status;
     
     const deviceCards = Object.entries(job.device_results).map(([key, result]) => {
         const statusClass = result.status.toLowerCase();
@@ -248,15 +270,22 @@ function displayJobMonitor(job) {
     container.innerHTML = `
         <div class="job-card">
             <h3>${job.job_name || 'Job'} (${job.job_id})</h3>
-            <p><strong>Status:</strong> ${job.status}</p>
+            <p><strong>Status:</strong> <span id="job-status-text">${job.status}</span></p>
             <p><strong>Creator:</strong> ${job.creator || 'N/A'}</p>
             <p><strong>Created:</strong> ${new Date(job.created_at).toLocaleString()}</p>
             ${job.completed_at ? `<p><strong>Completed:</strong> ${new Date(job.completed_at).toLocaleString()}</p>` : ''}
+            <div class="job-actions">
+                <button onclick="pauseJob()" id="pause-job-btn">Pause</button>
+                <button onclick="resumeJob()" id="resume-job-btn">Resume</button>
+                <button onclick="terminateJob()" id="terminate-job-btn" class="danger">Terminate</button>
+            </div>
         </div>
         
         <h3>Device Results:</h3>
         ${deviceCards}
     `;
+
+    updateJobControls(job.status);
 }
 
 function formatDiff(diffText) {
@@ -337,6 +366,8 @@ function handleWebSocketMessage(message) {
         if (currentJobId) {
             fetchJobDetails(currentJobId);
         }
+    } else if (message.type === 'job_status') {
+        updateJobStatus(message.status);
     }
 }
 
@@ -347,6 +378,87 @@ async function fetchJobDetails(jobId) {
         displayJobMonitor(job);
     } catch (error) {
         console.error('Error fetching job details:', error);
+    }
+}
+
+function updateJobStatus(status) {
+    currentJobStatus = status;
+    const statusText = document.getElementById('job-status-text');
+    if (statusText) {
+        statusText.textContent = status;
+    }
+    updateJobControls(status);
+}
+
+function updateJobControls(status) {
+    const pauseButton = document.getElementById('pause-job-btn');
+    const resumeButton = document.getElementById('resume-job-btn');
+    const terminateButton = document.getElementById('terminate-job-btn');
+    if (!pauseButton || !resumeButton || !terminateButton) {
+        return;
+    }
+
+    const isRunning = status === 'running';
+    const isPaused = status === 'paused';
+    const isTerminal = ['completed', 'failed', 'cancelled'].includes(status);
+
+    pauseButton.disabled = !isRunning;
+    resumeButton.disabled = !isPaused;
+    terminateButton.disabled = isTerminal;
+}
+
+async function pauseJob() {
+    if (!currentJobId) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs/${currentJobId}/pause`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to pause job');
+        }
+        const result = await response.json();
+        updateJobStatus(result.status);
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function resumeJob() {
+    if (!currentJobId) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs/${currentJobId}/resume`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to resume job');
+        }
+        const result = await response.json();
+        updateJobStatus(result.status);
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function terminateJob() {
+    if (!currentJobId) return;
+    const confirmed = confirm('Terminate this job and cancel pending tasks?');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs/${currentJobId}/terminate`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to terminate job');
+        }
+        const result = await response.json();
+        updateJobStatus(result.status);
+        fetchJobDetails(currentJobId);
+    } catch (error) {
+        alert(`Error: ${error.message}`);
     }
 }
 

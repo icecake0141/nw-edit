@@ -1,3 +1,20 @@
+# Copyright 2026 icecake0141
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This file was created or modified with the assistance of an AI (Large Language Model).
+# Review required for correctness, security, and licensing.
 """Main FastAPI application."""
 
 import csv
@@ -13,6 +30,7 @@ from .models import (
     JobCreate,
     JobResponse,
     Job,
+    CanaryDevice,
 )
 from .job_manager import job_manager
 from .ssh_executor import validate_device_connection
@@ -152,11 +170,11 @@ async def create_job(job_create: JobCreate):
 
     # If no devices specified, use all
     if not job_create.devices:
-        job_create.devices = [{"host": d.host, "port": d.port} for d in devices]
+        job_create.devices = [CanaryDevice(host=d.host, port=d.port) for d in devices]
 
     # Validate canary is in device list
     canary_key = f"{job_create.canary.host}:{job_create.canary.port}"
-    device_keys = [f"{d['host']}:{d['port']}" for d in job_create.devices]
+    device_keys = [f"{d.host}:{d.port}" for d in job_create.devices]
 
     if canary_key not in device_keys:
         raise HTTPException(
@@ -179,6 +197,48 @@ async def get_job(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+
+@app.post("/api/jobs/{job_id}/pause", response_model=JobResponse)
+async def pause_job(job_id: str):
+    """Pause a running job."""
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job_manager.pause_job(job_id):
+        raise HTTPException(status_code=409, detail="Job is not running")
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobResponse(job_id=job_id, status=job.status)
+
+
+@app.post("/api/jobs/{job_id}/resume", response_model=JobResponse)
+async def resume_job(job_id: str):
+    """Resume a paused job."""
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job_manager.resume_job(job_id):
+        raise HTTPException(status_code=409, detail="Job is not paused")
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobResponse(job_id=job_id, status=job.status)
+
+
+@app.post("/api/jobs/{job_id}/terminate", response_model=JobResponse)
+async def terminate_job(job_id: str):
+    """Terminate a running job and clean up remaining tasks."""
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job_manager.terminate_job(job_id):
+        raise HTTPException(status_code=409, detail="Job already completed")
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobResponse(job_id=job_id, status=job.status)
 
 
 @app.websocket("/ws/jobs/{job_id}")

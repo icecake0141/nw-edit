@@ -1,3 +1,22 @@
+<!--
+  Copyright 2026 icecake0141
+  SPDX-License-Identifier: Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  This file was created or modified with the assistance of an AI (Large Language Model).
+  Review required for correctness, security, and licensing.
+-->
 # Network Device Configuration Manager
 
 A minimal single-process web application (MVP) for applying multi-line configuration commands to multiple network devices over SSH.
@@ -128,6 +147,7 @@ Real-time monitoring with:
 - Live log streaming
 - Pre/post configuration diffs
 - Error reporting
+- Pause, resume, and terminate controls for in-flight jobs (works in Docker deployments as well)
 
 ## 🔌 API Documentation
 
@@ -196,6 +216,42 @@ Create and execute a configuration job.
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
   "status": "queued"
+}
+```
+
+### POST /api/jobs/{job_id}/pause
+
+Pause a running job. New devices will not start until the job is resumed.
+
+**Response**:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "paused"
+}
+```
+
+### POST /api/jobs/{job_id}/resume
+
+Resume a paused job.
+
+**Response**:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "running"
+}
+```
+
+### POST /api/jobs/{job_id}/terminate
+
+Terminate a running job and cancel pending devices. Active device sessions are asked to stop at the next safe checkpoint.
+
+**Response**:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "cancelled"
 }
 ```
 
