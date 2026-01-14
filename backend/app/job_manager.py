@@ -1,10 +1,27 @@
+# Copyright 2026 icecake0141
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This file was created or modified with the assistance of an AI (Large Language Model).
+# Review required for correctness, security, and licensing.
 """Job manager for orchestrating device configuration tasks."""
 
 import asyncio
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, cast
 from concurrent.futures import ThreadPoolExecutor, Future
 import threading
 
@@ -20,6 +37,14 @@ from .models import (
 from .ssh_executor import execute_device_commands
 
 
+class JobControl:
+    """Control flags for running jobs."""
+
+    def __init__(self):
+        self.pause_event = threading.Event()
+        self.cancel_event = threading.Event()
+
+
 class JobManager:
     """Manages jobs and device execution in memory."""
 
@@ -28,6 +53,8 @@ class JobManager:
         self.devices: List[Device] = []
         self.lock = threading.Lock()
         self.ws_callbacks: Dict[str, List] = {}  # job_id -> list of callback functions
+        self.job_controls: Dict[str, JobControl] = {}
+        self.job_threads: Dict[str, threading.Thread] = {}
 
     def add_devices(self, devices: List[Device]):
         """Add validated devices to in-memory storage."""
@@ -79,6 +106,7 @@ class JobManager:
 
         with self.lock:
             self.jobs[job_id] = job
+            self.job_controls[job_id] = JobControl()
 
         return job
 
@@ -114,6 +142,84 @@ class JobManager:
             except Exception:
                 pass
 
+    def pause_job(self, job_id: str) -> bool:
+        """Pause a running job."""
+        with self.lock:
+            job = self.jobs.get(job_id)
+            control = self.job_controls.get(job_id)
+
+            if not job or not control:
+                return False
+            if job.status != JobStatus.RUNNING:
+                return False
+            job.status = JobStatus.PAUSED
+            control.pause_event.set()
+
+        asyncio.run(
+            self.send_ws_message(
+                job_id, {"type": "job_status", "job_id": job_id, "status": "paused"}
+            )
+        )
+        return True
+
+    def resume_job(self, job_id: str) -> bool:
+        """Resume a paused job."""
+        with self.lock:
+            job = self.jobs.get(job_id)
+            control = self.job_controls.get(job_id)
+
+            if not job or not control:
+                return False
+            if job.status != JobStatus.PAUSED:
+                return False
+            job.status = JobStatus.RUNNING
+            control.pause_event.clear()
+
+        asyncio.run(
+            self.send_ws_message(
+                job_id, {"type": "job_status", "job_id": job_id, "status": "running"}
+            )
+        )
+        return True
+
+    def terminate_job(self, job_id: str) -> bool:
+        """Terminate a running or queued job."""
+        with self.lock:
+            job = self.jobs.get(job_id)
+            control = self.job_controls.get(job_id)
+
+            if not job or not control:
+                return False
+            if job.status in {
+                JobStatus.COMPLETED,
+                JobStatus.FAILED,
+                JobStatus.CANCELLED,
+            }:
+                return False
+            control.cancel_event.set()
+            control.pause_event.clear()
+            job.status = JobStatus.CANCELLED
+            job.completed_at = datetime.utcnow().isoformat()
+            for dr in job.device_results.values():
+                if dr.status == DeviceStatus.QUEUED:
+                    dr.status = DeviceStatus.CANCELLED
+
+        asyncio.run(
+            self.send_ws_message(
+                job_id,
+                {"type": "job_status", "job_id": job_id, "status": "cancelled"},
+            )
+        )
+        return True
+
+    def _wait_if_paused(self, job_id: str, control: JobControl) -> bool:
+        """Block while a job is paused. Returns False if cancellation is requested."""
+        while control.pause_event.is_set():
+            if control.cancel_event.is_set():
+                return False
+            time.sleep(0.2)
+        return not control.cancel_event.is_set()
+
     def execute_job(self, job_id: str):
         """Execute a job in a background thread."""
         job = self.get_job(job_id)
@@ -124,11 +230,32 @@ class JobManager:
         thread = threading.Thread(target=self._run_job, args=(job_id,))
         thread.daemon = True
         thread.start()
+        with self.lock:
+            self.job_threads[job_id] = thread
 
     def _run_job(self, job_id: str):
         """Run job execution (blocking, runs in thread)."""
         job = self.get_job(job_id)
         if not job:
+            return
+        control = self.job_controls.get(job_id)
+        if not control:
+            return
+
+        if control.cancel_event.is_set():
+            with self.lock:
+                job.status = JobStatus.CANCELLED
+                job.completed_at = datetime.utcnow().isoformat()
+            asyncio.run(
+                self.send_ws_message(
+                    job_id,
+                    {
+                        "type": "job_complete",
+                        "job_id": job_id,
+                        "status": "cancelled",
+                    },
+                )
+            )
             return
 
         # Update job status
@@ -147,10 +274,12 @@ class JobManager:
         commands = [cmd.strip() for cmd in job.commands.split("\n") if cmd.strip()]
 
         # Get device parameters
-        device_params_map = {}
+        device_params_map: Dict[str, Dict[str, Any]] = {}
         for device in self.devices:
             key = f"{device.host}:{device.port}"
-            verify_cmds = job.verify_cmds if job.verify_cmds else device.verify_cmds
+            verify_cmds = (
+                list(job.verify_cmds) if job.verify_cmds else list(device.verify_cmds)
+            )
             device_params_map[key] = {
                 "host": device.host,
                 "port": device.port,
@@ -216,23 +345,38 @@ class JobManager:
             )
         )
 
+        if not self._wait_if_paused(job_id, control):
+            with self.lock:
+                job.status = JobStatus.CANCELLED
+                job.completed_at = datetime.utcnow().isoformat()
+            asyncio.run(
+                self.send_ws_message(
+                    job_id,
+                    {"type": "job_complete", "job_id": job_id, "status": "cancelled"},
+                )
+            )
+            return
+
         # Execute canary (no retry)
+        canary_verify_cmds = cast(List[str], canary_params["verify_cmds"])
         canary_result = execute_device_commands(
             device_params=canary_params,
             commands=commands,
-            verify_cmds=canary_params["verify_cmds"],
+            verify_cmds=canary_verify_cmds,
             is_canary=True,
             retry_on_connection_error=False,
+            cancel_event=control.cancel_event,
         )
 
         # Update canary result
         with self.lock:
             dr = job.device_results[canary_key]
-            dr.status = (
-                DeviceStatus.SUCCESS
-                if canary_result["status"] == "success"
-                else DeviceStatus.FAILED
-            )
+            if canary_result["status"] == "success":
+                dr.status = DeviceStatus.SUCCESS
+            elif canary_result["status"] == "cancelled":
+                dr.status = DeviceStatus.CANCELLED
+            else:
+                dr.status = DeviceStatus.FAILED
             dr.error = canary_result["error"]
             dr.pre_output = canary_result["pre_output"]
             dr.apply_output = canary_result["apply_output"]
@@ -275,13 +419,21 @@ class JobManager:
         if canary_result["status"] != "success":
             # Canary failed - abort job
             with self.lock:
-                job.status = JobStatus.FAILED
+                job.status = (
+                    JobStatus.CANCELLED
+                    if canary_result["status"] == "cancelled"
+                    else JobStatus.FAILED
+                )
                 job.completed_at = datetime.utcnow().isoformat()
 
             asyncio.run(
                 self.send_ws_message(
                     job_id,
-                    {"type": "job_complete", "job_id": job_id, "status": "failed"},
+                    {
+                        "type": "job_complete",
+                        "job_id": job_id,
+                        "status": job.status.value,
+                    },
                 )
             )
             return
@@ -312,8 +464,12 @@ class JobManager:
 
         def execute_device_wrapper(device_key: str, device_params: dict):
             """Wrapper for device execution."""
-            if stop_flag.is_set():
+            if stop_flag.is_set() or control.cancel_event.is_set():
                 # Job stopped, mark as cancelled
+                with self.lock:
+                    job.device_results[device_key].status = DeviceStatus.CANCELLED
+                return
+            if not self._wait_if_paused(job_id, control):
                 with self.lock:
                     job.device_results[device_key].status = DeviceStatus.CANCELLED
                 return
@@ -339,22 +495,25 @@ class JobManager:
             )
 
             # Execute device
+            verify_cmds = cast(List[str], device_params["verify_cmds"])
             result = execute_device_commands(
                 device_params=device_params,
                 commands=commands,
-                verify_cmds=device_params["verify_cmds"],
+                verify_cmds=verify_cmds,
                 is_canary=False,
                 retry_on_connection_error=True,
+                cancel_event=control.cancel_event,
             )
 
             # Update device result
             with self.lock:
                 dr = job.device_results[device_key]
-                dr.status = (
-                    DeviceStatus.SUCCESS
-                    if result["status"] == "success"
-                    else DeviceStatus.FAILED
-                )
+                if result["status"] == "success":
+                    dr.status = DeviceStatus.SUCCESS
+                elif result["status"] == "cancelled":
+                    dr.status = DeviceStatus.CANCELLED
+                else:
+                    dr.status = DeviceStatus.FAILED
                 dr.error = result["error"]
                 dr.pre_output = result["pre_output"]
                 dr.apply_output = result["apply_output"]
@@ -402,8 +561,12 @@ class JobManager:
         futures: List[Future] = []
 
         for device_key, device_params in remaining_devices:
-            if stop_flag.is_set():
+            if stop_flag.is_set() or control.cancel_event.is_set():
                 # Mark remaining as cancelled
+                with self.lock:
+                    job.device_results[device_key].status = DeviceStatus.CANCELLED
+                continue
+            if not self._wait_if_paused(job_id, control):
                 with self.lock:
                     job.device_results[device_key].status = DeviceStatus.CANCELLED
                 continue
@@ -422,6 +585,22 @@ class JobManager:
         executor.shutdown(wait=True)
 
         # Determine final job status
+        if control.cancel_event.is_set():
+            with self.lock:
+                job.status = JobStatus.CANCELLED
+                job.completed_at = datetime.utcnow().isoformat()
+            asyncio.run(
+                self.send_ws_message(
+                    job_id,
+                    {
+                        "type": "job_complete",
+                        "job_id": job_id,
+                        "status": "cancelled",
+                    },
+                )
+            )
+            return
+
         all_success = all(
             dr.status == DeviceStatus.SUCCESS for dr in job.device_results.values()
         )

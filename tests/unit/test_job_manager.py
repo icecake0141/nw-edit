@@ -1,7 +1,24 @@
+# Copyright 2026 icecake0141
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This file was created or modified with the assistance of an AI (Large Language Model).
+# Review required for correctness, security, and licensing.
 """Unit tests for job manager."""
 
 from backend.app.job_manager import JobManager
-from backend.app.models import JobCreate, CanaryDevice, Device
+from backend.app.models import JobCreate, CanaryDevice, Device, JobStatus, DeviceStatus
 
 
 def test_job_manager_add_devices():
@@ -146,3 +163,65 @@ def test_job_manager_get_job():
 
     # Test non-existent job
     assert jm.get_job("nonexistent") is None
+
+
+def test_job_manager_pause_resume():
+    """Test pausing and resuming a job."""
+    jm = JobManager()
+
+    jm.add_devices(
+        [
+            Device(
+                host="192.168.1.1",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            )
+        ]
+    )
+
+    job_create = JobCreate(
+        canary=CanaryDevice(host="192.168.1.1", port=22), commands="test", devices=[]
+    )
+
+    job = jm.create_job(job_create)
+    with jm.lock:
+        job.status = JobStatus.RUNNING
+
+    assert jm.pause_job(job.job_id) is True
+    assert job.status == JobStatus.PAUSED
+    assert jm.resume_job(job.job_id) is True
+    assert job.status == JobStatus.RUNNING
+
+
+def test_job_manager_terminate_job_marks_cancelled():
+    """Test terminating a job marks queued devices as cancelled."""
+    jm = JobManager()
+
+    jm.add_devices(
+        [
+            Device(
+                host="192.168.1.1",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            )
+        ]
+    )
+
+    job_create = JobCreate(
+        canary=CanaryDevice(host="192.168.1.1", port=22), commands="test", devices=[]
+    )
+
+    job = jm.create_job(job_create)
+    with jm.lock:
+        job.status = JobStatus.RUNNING
+
+    assert jm.terminate_job(job.job_id) is True
+    assert job.status == JobStatus.CANCELLED
+    for result in job.device_results.values():
+        assert result.status == DeviceStatus.CANCELLED
