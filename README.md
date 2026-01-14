@@ -150,6 +150,7 @@ Real-time monitoring with:
 - Live log streaming
 - Pre/post configuration diffs
 - Error reporting
+- Pause, resume, and terminate controls for in-flight jobs (works in Docker deployments as well)
 
 ## 🔌 API Documentation
 
@@ -218,6 +219,42 @@ Create and execute a configuration job.
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
   "status": "queued"
+}
+```
+
+### POST /api/jobs/{job_id}/pause
+
+Pause a running job. New devices will not start until the job is resumed.
+
+**Response**:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "paused"
+}
+```
+
+### POST /api/jobs/{job_id}/resume
+
+Resume a paused job.
+
+**Response**:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "running"
+}
+```
+
+### POST /api/jobs/{job_id}/terminate
+
+Terminate a running job and cancel pending devices. Active device sessions are asked to stop at the next safe checkpoint.
+
+**Response**:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "cancelled"
 }
 ```
 

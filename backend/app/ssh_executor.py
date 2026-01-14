@@ -1,10 +1,31 @@
+# Copyright 2026 icecake0141
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This file was created or modified with the assistance of an AI (Large Language Model).
+# Review required for correctness, security, and licensing.
 """SSH executor using Netmiko for network device operations."""
 
 import time
 import difflib
-from typing import List, Tuple, Optional
-from netmiko import ConnectHandler
-from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
+from typing import List, Tuple, Optional, Any, Dict
+import threading
+from netmiko import ConnectHandler  # type: ignore[import-untyped]
+from netmiko.exceptions import (  # type: ignore[import-untyped]
+    NetmikoTimeoutException,
+    NetmikoAuthenticationException,
+)
 
 # Error patterns to detect command failures
 ERROR_PATTERNS = [
@@ -119,6 +140,7 @@ def execute_device_commands(
     verify_cmds: List[str],
     is_canary: bool = False,
     retry_on_connection_error: bool = True,
+    cancel_event: Optional[threading.Event] = None,
 ) -> dict:
     """
     Execute commands on a device with pre/post verification.
@@ -133,7 +155,7 @@ def execute_device_commands(
     Returns:
         Dictionary with status, outputs, diff, logs, and error info
     """
-    result = {
+    result: Dict[str, Any] = {
         "status": "success",
         "error": None,
         "pre_output": None,
@@ -149,8 +171,24 @@ def execute_device_commands(
     def add_log(msg: str):
         logs.append(msg)
 
+    def should_cancel() -> bool:
+        return cancel_event.is_set() if cancel_event else False
+
+    def handle_cancel() -> dict:
+        result["status"] = "cancelled"
+        result["error"] = "Job was cancelled by user request"
+        add_log("Execution cancelled by user request")
+        all_logs = "\n".join(logs)
+        trimmed_logs, was_trimmed = trim_log(all_logs)
+        result["logs"] = trimmed_logs.split("\n") if trimmed_logs else logs
+        result["log_trimmed"] = was_trimmed
+        return result
+
+    if should_cancel():
+        return handle_cancel()
+
     # Attempt connection with retry logic
-    connection = None
+    connection: Optional[Any] = None
     retry_count = 0
     max_retries = 0 if is_canary else 1
 
@@ -159,6 +197,8 @@ def execute_device_commands(
             add_log(
                 f"Connecting to {device_params['host']}:{device_params.get('port', 22)}..."
             )
+            if should_cancel():
+                return handle_cancel()
             connection = ConnectHandler(
                 device_type=device_params["device_type"],
                 host=device_params["host"],
@@ -187,10 +227,17 @@ def execute_device_commands(
 
     try:
         # Pre-verification
+        if connection is None:
+            raise RuntimeError("Connection was not established")
+
         if verify_cmds:
             add_log("Running pre-verification commands...")
             pre_outputs = []
             for cmd in verify_cmds:
+                if should_cancel():
+                    if connection:
+                        connection.disconnect()
+                    return handle_cancel()
                 add_log(f"  > {cmd}")
                 output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
                 pre_outputs.append(output)
@@ -200,6 +247,10 @@ def execute_device_commands(
         # Apply configuration commands
         add_log("Applying configuration commands...")
         for cmd in commands:
+            if should_cancel():
+                if connection:
+                    connection.disconnect()
+                return handle_cancel()
             add_log(f"  > {cmd}")
 
         apply_output = connection.send_config_set(
@@ -223,6 +274,10 @@ def execute_device_commands(
             add_log("Running post-verification commands...")
             post_outputs = []
             for cmd in verify_cmds:
+                if should_cancel():
+                    if connection:
+                        connection.disconnect()
+                    return handle_cancel()
                 add_log(f"  > {cmd}")
                 output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
                 post_outputs.append(output)
@@ -230,7 +285,9 @@ def execute_device_commands(
             add_log("Post-verification complete")
 
             # Create diff
-            if result["pre_output"] and result["post_output"]:
+            if isinstance(result["pre_output"], str) and isinstance(
+                result["post_output"], str
+            ):
                 diff = create_unified_diff(result["pre_output"], result["post_output"])
                 result["diff"] = diff
                 add_log("Diff created")
