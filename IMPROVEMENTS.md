@@ -60,11 +60,13 @@ Below are improvement proposals that can be added without modifying existing fun
 **Overview**: Add automatic backup before configuration changes and change history storage
 
 **Implementation**:
-- Add new endpoint `POST /api/jobs/{job_id}/backup`
+- Backups are automatically created during job execution (in the pre-verification phase)
+- Add manual backup endpoint `POST /api/devices/{host}:{port}/backup` for on-demand backups
 - Automatically save pre-change device configurations to filesystem
 - Manage backup files with timestamps (e.g., `backups/{device_id}/{timestamp}/running-config`)
 - Add backup list retrieval API `GET /api/backups?device={host}:{port}`
-- Add "Restore from Backup" button in WebUI (creates restoration job)
+- Add backup retrieval API `GET /api/backups/{backup_id}` to view specific backup content
+- Add "Create Backup" and "Restore from Backup" buttons in WebUI (restore creates restoration job)
 
 **Benefits**:
 - Enables manual rollback

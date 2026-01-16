@@ -60,11 +60,13 @@ limitations under the License.
 **概要**: 設定変更前の自動バックアップと変更履歴の保存機能を追加
 
 **実装内容**:
-- 新しいエンドポイント `POST /api/jobs/{job_id}/backup` を追加
+- ジョブ実行時（事前検証フェーズ）に自動的にバックアップを作成
+- オンデマンドバックアップ用のエンドポイント `POST /api/devices/{host}:{port}/backup` を追加
 - 各デバイスの変更前設定を自動的にファイルシステムに保存
 - タイムスタンプ付きでバックアップファイルを管理（例: `backups/{device_id}/{timestamp}/running-config`）
 - バックアップ一覧取得API `GET /api/backups?device={host}:{port}` を追加
-- WebUIに「バックアップから復元」ボタンを追加（復元用のジョブを作成）
+- 特定バックアップ取得API `GET /api/backups/{backup_id}` でバックアップ内容を表示
+- WebUIに「バックアップ作成」と「バックアップから復元」ボタンを追加（復元用のジョブを作成）
 
 **メリット**:
 - 手動ロールバックが可能になる
