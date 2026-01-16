@@ -436,3 +436,4 @@ docker-compose down
 - [Netmikoドキュメント](https://github.com/ktbyers/netmiko)
 - [FastAPIドキュメント](https://fastapi.tiangolo.com/)
 - [English README](README.md)
+- [改良提案](IMPROVEMENTS.ja.md) - 将来の機能拡張案
