@@ -13,7 +13,7 @@ This document summarizes the complete implementation of the network device confi
 - ✅ **No persistent database or secrets storage** - All data in-memory only
 - ✅ **Authentication** - Minimal auth ready (environment variable configurable)
 - ✅ **Device passwords from CSV** - Plain text in memory only
-- ✅ **Python 3.11+, FastAPI, Netmiko, ThreadPoolExecutor** - Exact stack used
+- ✅ **Python 3.12+, FastAPI, Netmiko, ThreadPoolExecutor** - Exact stack used
 - ✅ **WebSocket for real-time logs** - Path `/ws/jobs/{job_id}` implemented
 - ✅ **Canary behavior** - User selects canary, executes first with no retry
 - ✅ **Concurrency rules** - ThreadPoolExecutor with configurable max_workers and stagger_delay
@@ -212,7 +212,7 @@ jobs:
 ```
 
 ✅ All jobs configured
-✅ Python 3.11
+✅ Python 3.12
 ✅ Coverage artifact upload
 ✅ Docker image build validation
 ✅ Integration test with mock SSH server

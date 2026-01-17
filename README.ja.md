@@ -53,7 +53,7 @@ SSH経由で複数のネットワークデバイスに対して複数行の設�
 ### 前提条件
 
 - Docker および Docker Compose
-- Python 3.11+（ローカル開発用）
+- Python 3.12+（ローカル開発用）
 - SSH経由でアクセス可能なネットワークデバイス（またはテスト用のモックSSHサーバー）
 
 ### Docker Composeで実行
@@ -338,7 +338,7 @@ docker-compose down
 
 ### コンポーネント
 
-- **バックエンド**: FastAPIアプリケーション（Python 3.11+）
+- **バックエンド**: FastAPIアプリケーション（Python 3.12+）
   - `app/main.py`: FastAPIアプリケーションとAPIエンドポイント
   - `app/models.py`: データ検証用のPydanticモデル
   - `app/ssh_executor.py`: NetmikoベースのSSH操作

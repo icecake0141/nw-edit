@@ -53,7 +53,7 @@ The diagram above illustrates the complete workflow from device import to deploy
 ### Prerequisites
 
 - Docker and Docker Compose
-- Python 3.11+ (for local development)
+- Python 3.12+ (for local development)
 - Network devices accessible via SSH (or use mock SSH server for testing)
 
 ### Run with Docker Compose
@@ -338,7 +338,7 @@ docker-compose down
 
 ### Components
 
-- **Backend**: FastAPI application (Python 3.11+)
+- **Backend**: FastAPI application (Python 3.12+)
   - `app/main.py`: FastAPI application and API endpoints
   - `app/models.py`: Pydantic models for data validation
   - `app/ssh_executor.py`: Netmiko-based SSH operations
