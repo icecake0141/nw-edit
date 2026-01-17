@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -56,7 +56,7 @@ jobs:
         pytest tests/unit -v --cov=backend/app --cov-report=xml --cov-report=term
     
     - name: Upload coverage
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: coverage-report
         path: coverage.xml
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     
     - name: Build Docker image
       run: |
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     
     - name: Set up Python
       uses: actions/setup-python@v4
