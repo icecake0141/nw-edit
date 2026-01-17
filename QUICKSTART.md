@@ -24,7 +24,7 @@ This guide will help you get the Network Device Configuration Manager up and run
 ## Prerequisites
 
 - Docker and Docker Compose installed
-- OR Python 3.11+ for local development
+- OR Python 3.12+ for local development
 
 ## Option 1: Docker Compose (Recommended)
 

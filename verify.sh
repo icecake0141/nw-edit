@@ -39,11 +39,11 @@ warn() {
 
 # Check Python version
 check "Python version"
-if python3 --version | grep -q "Python 3.1[1-9]"; then
+if python3 --version | grep -q "Python 3.1[2-9]"; then
     pass
 else
     warn
-    echo "  Python 3.11+ recommended but not required for verification"
+    echo "  Python 3.12+ recommended but not required for verification"
 fi
 
 # Check file structure
