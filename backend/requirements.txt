@@ -4,4 +4,4 @@ uvicorn[standard]==0.40.0
 pydantic-settings==2.1.0
 netmiko==4.6.0
 websockets==16.0
-python-multipart==0.0.6
+python-multipart==0.0.21
