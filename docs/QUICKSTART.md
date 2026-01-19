@@ -182,7 +182,7 @@ localhost,2222,cisco_ios,admin,admin123,Mock-Device,show running-config
 
 ## Next Steps
 
-- Read the full [README.md](README.md) for detailed documentation
+- Read the full [README.md](../README.md) for detailed documentation
 - Check [API Documentation](http://localhost:8000/docs) (when running)
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
 - Review sample files: `sample_devices.csv` and `sample_commands.txt`

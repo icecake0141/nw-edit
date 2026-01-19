@@ -78,11 +78,13 @@ tests/
 │   └── workflows/
 │       └── ci.yml       # CI/CD pipeline
 ├── docs/
-│   └── screenshots/     # Placeholder images
+│   ├── screenshots/         # Placeholder images
+│   ├── QUICKSTART.md        # Quick start guide
+│   ├── CONTRIBUTING.md      # Contribution guidelines
+│   ├── IMPLEMENTATION.md    # Implementation summary (this file)
+│   └── LLM-GENERATED-CODE.md # LLM-generated code policy
 ├── README.md            # English documentation
 ├── README.ja.md         # Japanese documentation
-├── QUICKSTART.md        # Quick start guide
-├── CONTRIBUTING.md      # Contribution guidelines
 ├── sample_devices.csv   # Sample device import
 ├── sample_commands.txt  # Sample configuration commands
 └── start.sh            # Startup script
@@ -241,8 +243,10 @@ jobs:
 - ✅ Same structure and content
 
 ### Additional Docs
-- ✅ QUICKSTART.md - Step-by-step guide
-- ✅ CONTRIBUTING.md - Development guidelines
+- ✅ docs/QUICKSTART.md - Step-by-step guide
+- ✅ docs/CONTRIBUTING.md - Development guidelines
+- ✅ docs/IMPLEMENTATION.md - Implementation summary (this file)
+- ✅ docs/LLM-GENERATED-CODE.md - LLM-generated code policy
 - ✅ sample_devices.csv - Example device import
 - ✅ sample_commands.txt - Example configurations
 
