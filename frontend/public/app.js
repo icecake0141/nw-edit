@@ -251,7 +251,7 @@ function displayJobMonitor(job) {
         return `
             <div class="device-card ${statusClass}" id="device-${key}">
                 <h3>${result.host}:${result.port} ${isCanary ? '(CANARY)' : ''}</h3>
-                <p><strong>Status:</strong> <span class="status-badge">${result.status}</span></p>
+                <p><strong>Status:</strong> <span class="status-badge status-${statusClass}">${result.status}</span></p>
                 ${result.error ? `<p class="error-text">Error: ${result.error}</p>` : ''}
                 ${result.log_trimmed ? '<p class="warning-text">⚠️ Log was trimmed due to size limit</p>' : ''}
                 
@@ -284,7 +284,7 @@ function displayJobMonitor(job) {
     container.innerHTML = `
         <div class="job-card">
             <h3>${job.job_name || 'Job'} (${job.job_id})</h3>
-            <p><strong>Status:</strong> <span id="job-status-text">${job.status}</span></p>
+            <p><strong>Status:</strong> <span id="job-status-text" class="status-${job.status.toLowerCase()}">${job.status}</span></p>
             <p><strong>Creator:</strong> ${job.creator || 'N/A'}</p>
             <p><strong>Created:</strong> ${new Date(job.created_at).toLocaleString()}</p>
             ${job.completed_at ? `<p><strong>Completed:</strong> ${new Date(job.completed_at).toLocaleString()}</p>` : ''}
@@ -363,6 +363,7 @@ function handleWebSocketMessage(message) {
             const statusBadge = deviceCard.querySelector('.status-badge');
             if (statusBadge) {
                 statusBadge.textContent = message.status;
+                statusBadge.className = `status-badge status-${message.status.toLowerCase()}`;
             }
             if (message.error) {
                 const existingError = deviceCard.querySelector('.error-text');
@@ -400,6 +401,7 @@ function updateJobStatus(status) {
     const statusText = document.getElementById('job-status-text');
     if (statusText) {
         statusText.textContent = status;
+        statusText.className = `status-${status.toLowerCase()}`;
     }
     updateJobControls(status);
 }
