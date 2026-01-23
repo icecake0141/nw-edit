@@ -84,23 +84,22 @@ class JobManager:
         # Create device results and capture device parameters snapshot
         device_results = {}
         device_params = {}
-        
+
         # Build lookup map from current devices for metadata
-        device_metadata_map = {
-            f"{d.host}:{d.port}": d for d in self.devices
-        }
-        
+        device_metadata_map = {f"{d.host}:{d.port}": d for d in self.devices}
+
         for dev in device_list:
             key = f"{dev.host}:{dev.port}"
             device_results[key] = DeviceResult(
                 host=dev.host, port=dev.port, status=DeviceStatus.QUEUED
             )
-            
+
             # Capture device metadata snapshot at job creation time
             device_meta = device_metadata_map.get(key)
             if device_meta:
                 verify_cmds = (
-                    list(job_create.verify_cmds) if job_create.verify_cmds 
+                    list(job_create.verify_cmds)
+                    if job_create.verify_cmds
                     else list(device_meta.verify_cmds)
                 )
                 device_params[key] = DeviceParams(

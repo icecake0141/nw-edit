@@ -349,9 +349,6 @@ def test_job_params_immutable_after_creation():
     )
     job = jm.create_job(job_create)
 
-    # Get reference to params
-    original_params = job.device_params["192.168.1.1:22"]
-
     # Clear all devices
     jm.devices = []
 
