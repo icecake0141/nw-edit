@@ -327,6 +327,99 @@
         .verify-post {
             border-left: 3px solid #28a745;
         }
+
+        /* Job status styling enhancements */
+        #job-status-text {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        #job-status-text.status-running {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+            animation: blink-status 1.5s ease-in-out infinite;
+        }
+
+        #job-status-text.status-completed {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+            font-weight: bold;
+        }
+
+        #job-status-text.status-failed {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+            font-weight: bold;
+        }
+
+        #job-status-text.status-paused {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 2px solid #17a2b8;
+        }
+
+        #job-status-text.status-cancelled {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 2px solid #6c757d;
+        }
+
+        /* Device status badge enhancements */
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .status-badge.status-running {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+            animation: blink-status 1.5s ease-in-out infinite;
+        }
+
+        .status-badge.status-success,
+        .status-badge.status-completed {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+            font-weight: bold;
+        }
+
+        .status-badge.status-failed {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+            font-weight: bold;
+        }
+
+        .status-badge.status-queued {
+            background: #e7f3ff;
+            color: #004085;
+            border: 2px solid #b8daff;
+        }
+
+        .status-badge.status-cancelled {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 2px solid #6c757d;
+        }
+
+        /* Blinking animation for running status */
+        @keyframes blink-status {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
     </style>
 </head>
 <body>
