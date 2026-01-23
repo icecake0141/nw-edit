@@ -31,6 +31,7 @@ from .models import (
     JobStatus,
     DeviceStatus,
     DeviceResult,
+    DeviceParams,
     CanaryDevice,
     Device,
 )
@@ -72,7 +73,7 @@ class JobManager:
         """Create a new job."""
         job_id = str(uuid.uuid4())
 
-        # Determine which devices to use
+        # Determine which devices to use and capture their metadata
         if job_create.devices:
             # Use specified devices
             device_list = job_create.devices
@@ -80,13 +81,36 @@ class JobManager:
             # Use all current devices
             device_list = [CanaryDevice(host=d.host, port=d.port) for d in self.devices]
 
-        # Create device results
+        # Create device results and capture device parameters snapshot
         device_results = {}
+        device_params = {}
+        
+        # Build lookup map from current devices for metadata
+        device_metadata_map = {
+            f"{d.host}:{d.port}": d for d in self.devices
+        }
+        
         for dev in device_list:
             key = f"{dev.host}:{dev.port}"
             device_results[key] = DeviceResult(
                 host=dev.host, port=dev.port, status=DeviceStatus.QUEUED
             )
+            
+            # Capture device metadata snapshot at job creation time
+            device_meta = device_metadata_map.get(key)
+            if device_meta:
+                verify_cmds = (
+                    list(job_create.verify_cmds) if job_create.verify_cmds 
+                    else list(device_meta.verify_cmds)
+                )
+                device_params[key] = DeviceParams(
+                    host=device_meta.host,
+                    port=device_meta.port,
+                    device_type=device_meta.device_type,
+                    username=device_meta.username,
+                    password=device_meta.password,
+                    verify_cmds=verify_cmds,
+                )
 
         job = Job(
             job_id=job_id,
@@ -101,6 +125,7 @@ class JobManager:
             stagger_delay=job_create.stagger_delay,
             stop_on_error=job_create.stop_on_error,
             device_results=device_results,
+            device_params=device_params,
             created_at=datetime.utcnow().isoformat(),
         )
 
@@ -273,20 +298,17 @@ class JobManager:
         # Parse commands
         commands = [cmd.strip() for cmd in job.commands.split("\n") if cmd.strip()]
 
-        # Get device parameters
+        # Use job-specific device parameters snapshot instead of self.devices
+        # This prevents issues when devices are reimported during job execution
         device_params_map: Dict[str, Dict[str, Any]] = {}
-        for device in self.devices:
-            key = f"{device.host}:{device.port}"
-            verify_cmds = (
-                list(job.verify_cmds) if job.verify_cmds else list(device.verify_cmds)
-            )
+        for key, params in job.device_params.items():
             device_params_map[key] = {
-                "host": device.host,
-                "port": device.port,
-                "device_type": device.device_type,
-                "username": device.username,
-                "password": device.password,
-                "verify_cmds": verify_cmds,
+                "host": params.host,
+                "port": params.port,
+                "device_type": params.device_type,
+                "username": params.username,
+                "password": params.password,
+                "verify_cmds": list(params.verify_cmds),
             }
 
         # Execute canary first
