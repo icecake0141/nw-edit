@@ -259,6 +259,20 @@ function displayJobMonitor(job) {
                     ${result.logs.join('\n') || 'No logs yet...'}
                 </div>
                 
+                ${result.pre_output ? `
+                    <div class="verify-output verify-pre">
+                        <h4>Pre-Verification Output</h4>
+                        <pre class="verify-output-content">${escapeHtml(result.pre_output)}</pre>
+                    </div>
+                ` : ''}
+                
+                ${result.post_output ? `
+                    <div class="verify-output verify-post">
+                        <h4>Post-Verification Output</h4>
+                        <pre class="verify-output-content">${escapeHtml(result.post_output)}</pre>
+                    </div>
+                ` : ''}
+                
                 ${result.diff ? `
                     <h4 style="margin-top: 15px;">Pre/Post Diff:</h4>
                     <div class="diff-output">${formatDiff(result.diff)}</div>
