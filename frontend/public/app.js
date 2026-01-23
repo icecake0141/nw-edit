@@ -36,6 +36,13 @@ function showPage(pageName) {
     document.getElementById(`page-${pageName}`).classList.add('active');
     document.getElementById(`nav-${pageName}`).classList.add('active');
     
+    // Clean up WebSocket when navigating away from job monitor
+    if (ws && pageName !== 'job-monitor') {
+        ws.close();
+        ws = null;
+        currentJobId = null;
+    }
+    
     if (pageName === 'job-create') {
         loadDevicesForJobCreate();
     }
@@ -121,7 +128,7 @@ async function loadDevicesForJobCreate() {
         
         selector.innerHTML = validDevices.map(device => `
             <div class="checkbox-item">
-                <input type="checkbox" id="device-${device.host}-${device.port}" value="${device.host}:${device.port}" checked>
+                <input type="checkbox" id="device-${device.host}-${device.port}" value="${device.host}:${device.port}">
                 <label for="device-${device.host}-${device.port}">
                     ${device.name || device.host} (${device.host}:${device.port}) - ${device.device_type}
                 </label>
@@ -216,12 +223,33 @@ async function createJob() {
         const result = await response.json();
         currentJobId = result.job_id;
         
+        // Reset form after successful job creation to prevent data contamination
+        resetJobForm();
+        
         // Switch to monitor page
         showPage('job-monitor');
         startJobMonitoring(result.job_id);
     } catch (error) {
         alert(`Error: ${error.message}`);
     }
+}
+
+function resetJobForm() {
+    // Reset all form fields to default values
+    document.getElementById('job-name').value = '';
+    document.getElementById('job-creator').value = '';
+    document.getElementById('config-commands').value = '';
+    document.getElementById('verify-commands').value = '';
+    document.getElementById('verify-mode').value = 'canary';
+    document.getElementById('concurrency-limit').value = '5';
+    document.getElementById('stagger-delay').value = '1.0';
+    document.getElementById('stop-on-error').checked = true;
+    document.getElementById('canary-selector').selectedIndex = 0;
+    
+    // Uncheck all device checkboxes
+    document.querySelectorAll('#device-selector input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
 }
 
 // Job monitoring

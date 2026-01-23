@@ -133,6 +133,17 @@ class DeviceResult(BaseModel):
     completed_at: Optional[str] = None
 
 
+class DeviceParams(BaseModel):
+    """Device connection parameters snapshot for job execution."""
+
+    host: str
+    port: int
+    device_type: str
+    username: str
+    password: str
+    verify_cmds: List[str] = Field(default_factory=list)
+
+
 class Job(BaseModel):
     """Job model."""
 
@@ -148,6 +159,7 @@ class Job(BaseModel):
     stagger_delay: float = 1.0
     stop_on_error: bool = True
     device_results: Dict[str, DeviceResult] = Field(default_factory=dict)
+    device_params: Dict[str, DeviceParams] = Field(default_factory=dict)
     created_at: str
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
