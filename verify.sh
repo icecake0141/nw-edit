@@ -72,7 +72,7 @@ fi
 
 check "Documentation"
 if [ -f "README.md" ] && [ -f "README.ja.md" ] && \
-   [ -f "QUICKSTART.md" ] && [ -f "CONTRIBUTING.md" ]; then
+   [ -f "docs/QUICKSTART.md" ] && [ -f "docs/CONTRIBUTING.md" ]; then
     pass
 else
     fail
