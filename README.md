@@ -129,7 +129,7 @@ host,port,device_type,username,password,name,verify_cmds
 
 ![Device Import](docs/screenshots/01_devices.png)
 
-Paste CSV content to import and validate devices. The application performs a lightweight connection test (authentication only) for each device.
+Paste CSV content to import and validate devices. The application performs a lightweight connection test (authentication only) for each device and now shows validation progress during import.
 
 ### 2. Job Create Screen
 

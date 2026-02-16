@@ -21,6 +21,7 @@
 // API base URL
 const API_BASE = 'http://localhost:8000';
 const WS_BASE = 'ws://localhost:8000';
+const IMPORT_PROGRESS_HIDE_DELAY_MS = 1500;
 
 // Global state
 let devices = [];
@@ -49,8 +50,21 @@ function showPage(pageName) {
 }
 
 // Device Import
+function updateImportProgress(processed, total) {
+    const progressContainer = document.getElementById('import-progress');
+    const progressText = document.getElementById('import-progress-text');
+    const progressFill = document.getElementById('import-progress-fill');
+    const safeTotal = total || 0;
+    const percent = safeTotal > 0 ? (processed / safeTotal) * 100 : 0;
+    progressContainer.style.display = 'block';
+    progressText.textContent = `Validating devices... ${processed}/${safeTotal}`;
+    progressFill.style.width = `${percent}%`;
+}
+
 async function importDevices() {
     const csvContent = document.getElementById('csv-input').value.trim();
+    const importButton = document.getElementById('import-button');
+    const progressContainer = document.getElementById('import-progress');
     
     if (!csvContent) {
         alert('Please enter CSV content');
@@ -58,7 +72,10 @@ async function importDevices() {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/api/devices/import`, {
+        importButton.disabled = true;
+        updateImportProgress(0, 0);
+
+        const response = await fetch(`${API_BASE}/api/devices/import/progress`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'text/plain',
@@ -67,16 +84,80 @@ async function importDevices() {
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to import devices');
+            let detail = 'Failed to import devices';
+            try {
+                const error = await response.json();
+                detail = error.detail || detail;
+            } catch (_) {
+                const errorText = await response.text();
+                if (errorText) {
+                    detail = errorText;
+                }
+            }
+            throw new Error(detail);
         }
-        
-        const data = await response.json();
-        devices = data.devices;
-        
+
+        let total = 0;
+        let processed = 0;
+        let finalDevices = null;
+        if (!response.body) {
+            throw new Error('Failed to read import progress stream');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.trim()) {
+                    continue;
+                }
+                const event = JSON.parse(line);
+                if (event.type === 'start') {
+                    total = event.total || 0;
+                    updateImportProgress(0, total);
+                } else if (event.type === 'progress') {
+                    processed = event.processed || processed;
+                    total = event.total || total;
+                    updateImportProgress(processed, total);
+                } else if (event.type === 'complete') {
+                    finalDevices = event.devices || [];
+                    updateImportProgress(event.processed || processed, event.total || total);
+                } else if (event.type === 'error') {
+                    throw new Error(event.detail || 'Failed to import devices');
+                }
+            }
+        }
+
+        if (buffer.trim()) {
+            const event = JSON.parse(buffer);
+            if (event.type === 'complete') {
+                finalDevices = event.devices || [];
+                updateImportProgress(event.processed || processed, event.total || total);
+            } else if (event.type === 'error') {
+                throw new Error(event.detail || 'Failed to import devices');
+            }
+        }
+
+        devices = finalDevices || [];
         displayDeviceResults(devices);
     } catch (error) {
         alert(`Error: ${error.message}`);
+    } finally {
+        importButton.disabled = false;
+        if (progressContainer) {
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, IMPORT_PROGRESS_HIDE_DELAY_MS);
+        }
     }
 }
 
