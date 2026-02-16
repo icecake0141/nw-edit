@@ -111,6 +111,27 @@
         .device-list {
             margin-top: 20px;
         }
+
+        .import-progress {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .import-progress-bar {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            background: #e9ecef;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .import-progress-fill {
+            width: 0;
+            height: 100%;
+            background: #007bff;
+            transition: width 0.2s ease;
+        }
         
         .device-item {
             padding: 15px;
@@ -420,7 +441,13 @@
                 <textarea id="csv-input" rows="10" placeholder="host,port,device_type,username,password,name,verify_cmds&#10;192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp"></textarea>
             </div>
             
-            <button onclick="importDevices()">Import and Validate Devices</button>
+            <button id="import-button" onclick="importDevices()">Import and Validate Devices</button>
+            <div id="import-progress" class="import-progress">
+                <div id="import-progress-text">Validating devices... 0/0</div>
+                <div class="import-progress-bar">
+                    <div id="import-progress-fill" class="import-progress-fill"></div>
+                </div>
+            </div>
             
             <div id="device-results" class="device-list"></div>
         </div>

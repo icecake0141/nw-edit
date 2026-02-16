@@ -19,9 +19,11 @@
 
 import csv
 import io
-from typing import List
+import json
+from typing import List, Callable, Optional
 from fastapi import FastAPI, HTTPException, WebSocket, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from .models import (
     Device,
@@ -86,6 +88,54 @@ def parse_csv_devices(csv_content: str) -> List[DeviceInput]:
     return devices
 
 
+def validate_devices_for_import(
+    device_inputs: List[DeviceInput],
+    progress_callback: Optional[Callable[[int, int, Device], None]] = None,
+) -> List[Device]:
+    """Validate imported devices and optionally report progress."""
+    validated_devices: List[Device] = []
+    total = len(device_inputs)
+
+    for index, device_input in enumerate(device_inputs, start=1):
+        device_params = {
+            "host": device_input.host,
+            "port": device_input.port,
+            "device_type": device_input.device_type,
+            "username": device_input.username,
+            "password": device_input.password,
+        }
+
+        # Test connection
+        success, error_message = validate_device_connection(device_params)
+
+        # Parse verify_cmds
+        verify_cmds = []
+        if device_input.verify_cmds:
+            verify_cmds = [
+                cmd.strip()
+                for cmd in device_input.verify_cmds.split(";")
+                if cmd.strip()
+            ]
+
+        device = Device(
+            host=device_input.host,
+            port=device_input.port,
+            device_type=device_input.device_type,
+            username=device_input.username,
+            password=device_input.password,
+            name=device_input.name,
+            verify_cmds=verify_cmds,
+            connection_ok=success,
+            error_message=error_message,
+        )
+        validated_devices.append(device)
+
+        if progress_callback:
+            progress_callback(index, total, device)
+
+    return validated_devices
+
+
 @app.post("/api/devices/import", response_model=DeviceImportResponse)
 async def import_devices(csv_content: str = Body(..., media_type="text/plain")):
     """
@@ -102,42 +152,7 @@ async def import_devices(csv_content: str = Body(..., media_type="text/plain")):
             raise HTTPException(status_code=400, detail="No valid devices found in CSV")
 
         # Validate each device with connection test
-        validated_devices = []
-
-        for device_input in device_inputs:
-            device_params = {
-                "host": device_input.host,
-                "port": device_input.port,
-                "device_type": device_input.device_type,
-                "username": device_input.username,
-                "password": device_input.password,
-            }
-
-            # Test connection
-            success, error_message = validate_device_connection(device_params)
-
-            # Parse verify_cmds
-            verify_cmds = []
-            if device_input.verify_cmds:
-                verify_cmds = [
-                    cmd.strip()
-                    for cmd in device_input.verify_cmds.split(";")
-                    if cmd.strip()
-                ]
-
-            device = Device(
-                host=device_input.host,
-                port=device_input.port,
-                device_type=device_input.device_type,
-                username=device_input.username,
-                password=device_input.password,
-                name=device_input.name,
-                verify_cmds=verify_cmds,
-                connection_ok=success,
-                error_message=error_message,
-            )
-
-            validated_devices.append(device)
+        validated_devices = validate_devices_for_import(device_inputs)
 
         # Add validated devices to job manager
         job_manager.add_devices(validated_devices)
@@ -146,6 +161,55 @@ async def import_devices(csv_content: str = Body(..., media_type="text/plain")):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/devices/import/progress")
+async def import_devices_with_progress(
+    csv_content: str = Body(..., media_type="text/plain")
+):
+    """Import devices from CSV and stream validation progress as NDJSON."""
+
+    def generate_progress_stream():
+        try:
+            device_inputs = parse_csv_devices(csv_content)
+            if not device_inputs:
+                yield json.dumps(
+                    {"type": "error", "detail": "No valid devices found in CSV"}
+                ) + "\n"
+                return
+
+            total = len(device_inputs)
+            yield json.dumps({"type": "start", "total": total}) + "\n"
+            validated_devices: List[Device] = []
+            for processed, device_input in enumerate(device_inputs, start=1):
+                validated_device = validate_devices_for_import([device_input])[0]
+                validated_devices.append(validated_device)
+                yield json.dumps(
+                    {
+                        "type": "progress",
+                        "processed": processed,
+                        "total": total,
+                        "host": validated_device.host,
+                        "port": validated_device.port,
+                        "connection_ok": validated_device.connection_ok,
+                    }
+                ) + "\n"
+
+            job_manager.add_devices(validated_devices)
+            yield json.dumps(
+                {
+                    "type": "complete",
+                    "processed": total,
+                    "total": total,
+                    "devices": [device.model_dump() for device in validated_devices],
+                }
+            ) + "\n"
+        except Exception as e:
+            yield json.dumps({"type": "error", "detail": str(e)}) + "\n"
+
+    return StreamingResponse(
+        generate_progress_stream(), media_type="application/x-ndjson"
+    )
 
 
 @app.get("/api/devices", response_model=List[Device])
