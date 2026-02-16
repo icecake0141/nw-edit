@@ -126,7 +126,12 @@ async function loadDevicesForJobCreate() {
         // Only show devices that passed connection test
         const validDevices = deviceList.filter(d => d.connection_ok);
         
-        selector.innerHTML = validDevices.map(device => `
+        selector.innerHTML = `
+            <div class="checkbox-item">
+                <input type="checkbox" id="select-all-devices" aria-label="Select all devices">
+                <label for="select-all-devices"><strong>Select All</strong></label>
+            </div>
+        ` + validDevices.map(device => `
             <div class="checkbox-item">
                 <input type="checkbox" id="device-${device.host}-${device.port}" value="${device.host}:${device.port}">
                 <label for="device-${device.host}-${device.port}">
@@ -134,6 +139,30 @@ async function loadDevicesForJobCreate() {
                 </label>
             </div>
         `).join('');
+
+        const selectAllCheckbox = document.getElementById('select-all-devices');
+        const deviceCheckboxes = selector.querySelectorAll('input[type="checkbox"]:not(#select-all-devices)');
+        const updateSelectAllState = () => {
+            const checkedCount = Array.from(deviceCheckboxes).filter(cb => cb.checked).length;
+            selectAllCheckbox.checked = checkedCount === deviceCheckboxes.length && deviceCheckboxes.length > 0;
+            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < deviceCheckboxes.length;
+        };
+
+        selector.onchange = (event) => {
+            if (event.target.id === 'select-all-devices') {
+                deviceCheckboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+                selectAllCheckbox.indeterminate = false;
+                return;
+            }
+
+            if (event.target.matches('input[type="checkbox"]:not(#select-all-devices)')) {
+                updateSelectAllState();
+            }
+        };
+
+        updateSelectAllState();
         
         canarySelector.innerHTML = '<option value="">Select canary device...</option>' +
             validDevices.map(device => `
@@ -164,7 +193,7 @@ async function createJob() {
     
     // Get selected devices
     const selectedDevices = [];
-    document.querySelectorAll('#device-selector input[type="checkbox"]:checked').forEach(checkbox => {
+    document.querySelectorAll('#device-selector input[type="checkbox"]:not(#select-all-devices):checked').forEach(checkbox => {
         const [host, port] = checkbox.value.split(':');
         selectedDevices.push({ host, port: parseInt(port) });
     });
