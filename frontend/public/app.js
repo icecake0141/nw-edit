@@ -148,16 +148,19 @@ async function loadDevicesForJobCreate() {
             selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < deviceCheckboxes.length;
         };
 
-        selectAllCheckbox.addEventListener('change', () => {
-            deviceCheckboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
-            });
-            selectAllCheckbox.indeterminate = false;
-        });
+        selector.onchange = (event) => {
+            if (event.target.id === 'select-all-devices') {
+                deviceCheckboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+                selectAllCheckbox.indeterminate = false;
+                return;
+            }
 
-        deviceCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateSelectAllState);
-        });
+            if (event.target.matches('input[type="checkbox"]:not(#select-all-devices)')) {
+                updateSelectAllState();
+            }
+        };
 
         updateSelectAllState();
         
