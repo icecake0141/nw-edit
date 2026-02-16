@@ -21,6 +21,7 @@
 // API base URL
 const API_BASE = 'http://localhost:8000';
 const WS_BASE = 'ws://localhost:8000';
+const IMPORT_PROGRESS_HIDE_DELAY_MS = 1500;
 
 // Global state
 let devices = [];
@@ -155,7 +156,7 @@ async function importDevices() {
         if (progressContainer) {
             setTimeout(() => {
                 progressContainer.style.display = 'none';
-            }, 1500);
+            }, IMPORT_PROGRESS_HIDE_DELAY_MS);
         }
     }
 }

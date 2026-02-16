@@ -20,7 +20,7 @@
 import csv
 import io
 import json
-from typing import List, Callable, Optional
+from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -88,52 +88,37 @@ def parse_csv_devices(csv_content: str) -> List[DeviceInput]:
     return devices
 
 
-def validate_devices_for_import(
-    device_inputs: List[DeviceInput],
-    progress_callback: Optional[Callable[[int, int, Device], None]] = None,
-) -> List[Device]:
-    """Validate imported devices and optionally report progress."""
-    validated_devices: List[Device] = []
-    total = len(device_inputs)
+def validate_single_device_for_import(device_input: DeviceInput) -> Device:
+    """Validate a single imported device with connection test."""
+    device_params = {
+        "host": device_input.host,
+        "port": device_input.port,
+        "device_type": device_input.device_type,
+        "username": device_input.username,
+        "password": device_input.password,
+    }
 
-    for index, device_input in enumerate(device_inputs, start=1):
-        device_params = {
-            "host": device_input.host,
-            "port": device_input.port,
-            "device_type": device_input.device_type,
-            "username": device_input.username,
-            "password": device_input.password,
-        }
+    # Test connection
+    success, error_message = validate_device_connection(device_params)
 
-        # Test connection
-        success, error_message = validate_device_connection(device_params)
+    # Parse verify_cmds
+    verify_cmds = []
+    if device_input.verify_cmds:
+        verify_cmds = [
+            cmd.strip() for cmd in device_input.verify_cmds.split(";") if cmd.strip()
+        ]
 
-        # Parse verify_cmds
-        verify_cmds = []
-        if device_input.verify_cmds:
-            verify_cmds = [
-                cmd.strip()
-                for cmd in device_input.verify_cmds.split(";")
-                if cmd.strip()
-            ]
-
-        device = Device(
-            host=device_input.host,
-            port=device_input.port,
-            device_type=device_input.device_type,
-            username=device_input.username,
-            password=device_input.password,
-            name=device_input.name,
-            verify_cmds=verify_cmds,
-            connection_ok=success,
-            error_message=error_message,
-        )
-        validated_devices.append(device)
-
-        if progress_callback:
-            progress_callback(index, total, device)
-
-    return validated_devices
+    return Device(
+        host=device_input.host,
+        port=device_input.port,
+        device_type=device_input.device_type,
+        username=device_input.username,
+        password=device_input.password,
+        name=device_input.name,
+        verify_cmds=verify_cmds,
+        connection_ok=success,
+        error_message=error_message,
+    )
 
 
 @app.post("/api/devices/import", response_model=DeviceImportResponse)
@@ -152,7 +137,10 @@ async def import_devices(csv_content: str = Body(..., media_type="text/plain")):
             raise HTTPException(status_code=400, detail="No valid devices found in CSV")
 
         # Validate each device with connection test
-        validated_devices = validate_devices_for_import(device_inputs)
+        validated_devices = [
+            validate_single_device_for_import(device_input)
+            for device_input in device_inputs
+        ]
 
         # Add validated devices to job manager
         job_manager.add_devices(validated_devices)
@@ -181,13 +169,13 @@ async def import_devices_with_progress(
             total = len(device_inputs)
             yield json.dumps({"type": "start", "total": total}) + "\n"
             validated_devices: List[Device] = []
-            for processed, device_input in enumerate(device_inputs, start=1):
-                validated_device = validate_devices_for_import([device_input])[0]
+            for index, device_input in enumerate(device_inputs, start=1):
+                validated_device = validate_single_device_for_import(device_input)
                 validated_devices.append(validated_device)
                 yield json.dumps(
                     {
                         "type": "progress",
-                        "processed": processed,
+                        "processed": index,
                         "total": total,
                         "host": validated_device.host,
                         "port": validated_device.port,
