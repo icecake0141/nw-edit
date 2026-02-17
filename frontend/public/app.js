@@ -46,6 +46,8 @@ function showPage(pageName) {
     
     if (pageName === 'job-create') {
         loadDevicesForJobCreate();
+    } else if (pageName === 'status-command') {
+        loadDevicesForStatusCommand();
     }
 }
 
@@ -253,6 +255,75 @@ async function loadDevicesForJobCreate() {
             `).join('');
     } catch (error) {
         console.error('Error loading devices:', error);
+    }
+}
+
+async function loadDevicesForStatusCommand() {
+    const selector = document.getElementById('status-device-selector');
+    if (!selector) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/devices`);
+        const deviceList = await response.json();
+        const validDevices = (deviceList || []).filter(d => d.connection_ok);
+
+        selector.innerHTML = '<option value="">Select a managed device...</option>' +
+            validDevices.map(device => `
+                <option value="${device.host}:${device.port}">
+                    ${device.name || device.host} (${device.host}:${device.port})
+                </option>
+            `).join('');
+    } catch (error) {
+        console.error('Error loading devices for status command:', error);
+    }
+}
+
+async function runStatusCommand() {
+    const selectedDevice = document.getElementById('status-device-selector').value;
+    const commands = document.getElementById('status-commands').value.trim();
+    const runButton = document.getElementById('status-command-button');
+    const output = document.getElementById('status-command-output');
+
+    if (!selectedDevice) {
+        alert('Please select a target device');
+        return;
+    }
+    if (!commands) {
+        alert('Please enter at least one command');
+        return;
+    }
+
+    const [host, port] = selectedDevice.split(':');
+    runButton.disabled = true;
+    output.textContent = 'Running status command...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/commands/exec`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                host,
+                port: parseInt(port),
+                commands,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to execute status command');
+        }
+
+        const result = await response.json();
+        output.textContent = result.output || 'No output returned';
+    } catch (error) {
+        output.textContent = `Error: ${error.message}`;
+        alert(`Error: ${error.message}`);
+    } finally {
+        runButton.disabled = false;
     }
 }
 
