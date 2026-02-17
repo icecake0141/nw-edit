@@ -172,6 +172,20 @@ class JobResponse(BaseModel):
     status: JobStatus
 
 
+class StatusCommandRequest(BaseModel):
+    """Request to execute read-only status commands on a managed device."""
+
+    host: str
+    port: int = 22
+    commands: str
+
+
+class StatusCommandResponse(BaseModel):
+    """Response for status command execution."""
+
+    output: str
+
+
 class WSMessage(BaseModel):
     """WebSocket message base."""
 

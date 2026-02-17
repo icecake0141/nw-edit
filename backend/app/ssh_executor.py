@@ -19,6 +19,7 @@
 
 import time
 import difflib
+import re
 from typing import List, Tuple, Optional, Any, Dict
 import threading
 from netmiko import ConnectHandler  # type: ignore[import-untyped]
@@ -41,6 +42,16 @@ MAX_LOG_SIZE = 1024 * 1024  # 1 MiB
 CONNECTION_TIMEOUT = 10
 COMMAND_TIMEOUT = 20
 DEVICE_TIMEOUT = 180
+DANGEROUS_STATUS_COMMAND_PATTERNS = [
+    r"^\s*conf(?:igure)?(?:\s+terminal)?\b",
+    r"^\s*reload\b",
+    r"^\s*write\b",
+    r"^\s*copy\s+running-config\b",
+    r"^\s*erase\b",
+    r"^\s*delete\b",
+    r"^\s*format\b",
+    r"^\s*shutdown\b",
+]
 
 
 def validate_device_connection(device_params: dict) -> Tuple[bool, Optional[str]]:
@@ -132,6 +143,63 @@ def create_unified_diff(
     )
 
     return "".join(diff)
+
+
+def run_status_command(device_params: dict, commands: str) -> str:
+    """
+    Execute read-only status commands on a device in exec mode.
+
+    Args:
+        device_params: Device connection parameters
+        commands: Newline-separated commands
+
+    Returns:
+        Combined command output string
+    """
+    command_list = [cmd.strip() for cmd in commands.splitlines() if cmd.strip()]
+    if not command_list:
+        raise ValueError("Commands cannot be empty")
+
+    blocked = [
+        cmd
+        for cmd in command_list
+        if any(
+            re.search(pattern, cmd, re.IGNORECASE)
+            for pattern in DANGEROUS_STATUS_COMMAND_PATTERNS
+        )
+    ]
+    if blocked:
+        raise ValueError(
+            f"Potentially disruptive commands are not allowed: {', '.join(blocked)}"
+        )
+
+    connection: Optional[Any] = None
+    try:
+        connection = ConnectHandler(
+            device_type=device_params["device_type"],
+            host=device_params["host"],
+            port=device_params.get("port", 22),
+            username=device_params["username"],
+            password=device_params["password"],
+            timeout=CONNECTION_TIMEOUT,
+        )
+        outputs = []
+        for cmd in command_list:
+            output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
+            outputs.append(f"$ {cmd}\n{output}")
+        return "\n\n".join(outputs)
+    except NetmikoAuthenticationException as e:
+        raise RuntimeError(f"Authentication failed: {str(e)}") from e
+    except NetmikoTimeoutException as e:
+        raise RuntimeError(f"Command execution timeout: {str(e)}") from e
+    except Exception as e:
+        raise RuntimeError(f"SSH execution error: {str(e)}") from e
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
 
 
 def execute_device_commands(

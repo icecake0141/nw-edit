@@ -152,6 +152,11 @@ Real-time monitoring with:
 - Error reporting
 - Pause, resume, and terminate controls for in-flight jobs (works in Docker deployments as well)
 
+### 4. Status Command Screen
+
+Run read-only status/check commands against an imported device without creating a configuration job.
+The backend blocks commonly disruptive commands on a best-effort basis.
+
 ## 🔌 API Documentation
 
 ### POST /api/devices/import
@@ -211,6 +216,26 @@ Create and execute a configuration job.
   "concurrency_limit": 5,
   "stagger_delay": 1.0,
   "stop_on_error": true
+}
+```
+
+### POST /api/commands/exec
+
+Execute read-only status commands on a managed device.
+
+**Request**:
+```json
+{
+  "host": "192.168.1.1",
+  "port": 22,
+  "commands": "show ip interface brief\nshow running-config | section snmp"
+}
+```
+
+**Response**:
+```json
+{
+  "output": "$ show ip interface brief\n...\n\n$ show running-config | section snmp\n..."
 }
 ```
 

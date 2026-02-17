@@ -427,6 +427,7 @@
             <button onclick="showPage('devices')" class="active" id="nav-devices">Device Import</button>
             <button onclick="showPage('job-create')" id="nav-job-create">Create Job</button>
             <button onclick="showPage('job-monitor')" id="nav-job-monitor">Monitor Jobs</button>
+            <button onclick="showPage('status-command')" id="nav-status-command">Status Command</button>
         </div>
         
         <!-- Device Import Page -->
@@ -524,6 +525,33 @@
             <h2>Job Monitor</h2>
             <div id="job-monitor-content">
                 <p style="color: #999; padding: 20px; text-align: center;">No active job</p>
+            </div>
+        </div>
+
+        <!-- Status Command Page -->
+        <div id="page-status-command" class="page">
+            <h2>Status Command (Read-Only)</h2>
+            <p style="margin: 10px 0; color: #666;">
+                Use this for confirmation/check commands only. Config/disruptive commands are blocked on a best-effort basis.
+            </p>
+
+            <div class="form-group">
+                <label>Target Device:</label>
+                <select id="status-device-selector">
+                    <option value="">Select a managed device...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Status Commands (one per line):</label>
+                <textarea id="status-commands" rows="6" placeholder="show ip interface brief&#10;show running-config | section snmp"></textarea>
+            </div>
+
+            <button id="status-command-button" onclick="runStatusCommand()">Run Status Command</button>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label>Output:</label>
+                <div id="status-command-output" class="log-output">No output yet...</div>
             </div>
         </div>
     </div>

@@ -20,6 +20,7 @@
 import csv
 import io
 import json
+import logging
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,10 +34,14 @@ from .models import (
     JobResponse,
     Job,
     CanaryDevice,
+    StatusCommandRequest,
+    StatusCommandResponse,
 )
 from .job_manager import job_manager
-from .ssh_executor import validate_device_connection
+from .ssh_executor import validate_device_connection, run_status_command
 from .ws import websocket_endpoint
+
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -204,6 +209,52 @@ async def import_devices_with_progress(
 async def get_devices():
     """Get all imported devices."""
     return job_manager.get_devices()
+
+
+@app.post("/api/commands/exec", response_model=StatusCommandResponse)
+async def execute_status_command(request: StatusCommandRequest):
+    """Execute read-only status commands on a managed device."""
+    target_device = next(
+        (
+            d
+            for d in job_manager.get_devices()
+            if d.host == request.host and d.port == request.port
+        ),
+        None,
+    )
+    if not target_device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    command_count = len(
+        [
+            command.strip()
+            for command in request.commands.splitlines()
+            if command.strip()
+        ]
+    )
+    logger.info(
+        "Status command request for %s:%s with %s command(s)",
+        request.host,
+        request.port,
+        command_count,
+    )
+
+    try:
+        output = run_status_command(
+            {
+                "host": target_device.host,
+                "port": target_device.port,
+                "device_type": target_device.device_type,
+                "username": target_device.username,
+                "password": target_device.password,
+            },
+            request.commands,
+        )
+        return StatusCommandResponse(output=output)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @app.post("/api/jobs", response_model=JobResponse)
