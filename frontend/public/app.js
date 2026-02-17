@@ -320,7 +320,7 @@ async function runStatusCommand() {
         const result = await response.json();
         output.textContent = result.output || 'No output returned';
     } catch (error) {
-        output.textContent = '';
+        output.textContent = `Error: ${error.message}`;
         alert(`Error: ${error.message}`);
     } finally {
         runButton.disabled = false;

@@ -219,6 +219,14 @@ Create and execute a configuration job.
 }
 ```
 
+**Response**:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "queued"
+}
+```
+
 ### POST /api/commands/exec
 
 Execute read-only status commands on a managed device.
@@ -236,14 +244,6 @@ Execute read-only status commands on a managed device.
 ```json
 {
   "output": "$ show ip interface brief\n...\n\n$ show running-config | section snmp\n..."
-}
-```
-
-**Response**:
-```json
-{
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "queued"
 }
 ```
 

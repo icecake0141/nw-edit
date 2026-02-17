@@ -43,10 +43,10 @@ CONNECTION_TIMEOUT = 10
 COMMAND_TIMEOUT = 20
 DEVICE_TIMEOUT = 180
 DANGEROUS_STATUS_COMMAND_PATTERNS = [
-    r"^\s*conf(?:igure)?(?:\s+terminal)?\b",
+    r"^\s*conf(?:ig(?:ure)?)?(?:\s+(?:t|term(?:inal)?|replace))?\b",
     r"^\s*reload\b",
     r"^\s*write\b",
-    r"^\s*copy\s+running-config\b",
+    r"^\s*copy\s+running-config\s+startup-config\b",
     r"^\s*erase\b",
     r"^\s*delete\b",
     r"^\s*format\b",

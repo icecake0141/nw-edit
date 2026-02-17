@@ -68,6 +68,25 @@ def test_run_status_command_blocks_disruptive_commands():
         assert "Potentially disruptive commands" in str(error)
 
 
+def test_run_status_command_blocks_common_config_variants():
+    """Status command runner should block abbreviated and save config commands."""
+    for command in ["conf t", "copy running-config startup-config"]:
+        try:
+            run_status_command(
+                {
+                    "host": "192.168.1.1",
+                    "port": 22,
+                    "device_type": "cisco_ios",
+                    "username": "admin",
+                    "password": "password",
+                },
+                command,
+            )
+            raise AssertionError("Expected ValueError for disruptive command")
+        except ValueError as error:
+            assert "Potentially disruptive commands" in str(error)
+
+
 def test_status_command_api_success(monkeypatch):
     """Status command API should execute commands on managed device."""
     client = TestClient(app)
