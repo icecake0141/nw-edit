@@ -312,6 +312,32 @@
             background: #c82333;
         }
 
+        .active-job-banner {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            border-radius: 4px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .active-job-banner.hidden {
+            display: none;
+        }
+
+        .active-job-banner button {
+            background: #17a2b8;
+        }
+
+        .active-job-banner button:hover {
+            background: #138496;
+        }
+
         .verify-output {
             margin-top: 10px;
             border: 1px solid #ddd;
@@ -393,7 +419,8 @@
         }
 
         /* Paused status - blue */
-        #job-status-text.status-paused {
+        #job-status-text.status-paused,
+        .status-badge.status-paused {
             background: #d1ecf1;
             color: #0c5460;
             border: 2px solid #17a2b8;
@@ -416,6 +443,54 @@
                 opacity: 0.5;
             }
         }
+
+        .history-layout {
+            display: grid;
+            grid-template-columns: minmax(260px, 340px) 1fr;
+            gap: 20px;
+        }
+
+        .history-list {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            max-height: 600px;
+            overflow-y: auto;
+            background: #fafafa;
+        }
+
+        .history-entry {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e6e6e6;
+            cursor: pointer;
+        }
+
+        .history-entry:last-child {
+            border-bottom: none;
+        }
+
+        .history-entry.active {
+            background: #eef5ff;
+        }
+
+        .history-entry h4 {
+            margin-bottom: 6px;
+        }
+
+        .history-meta {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .history-detail {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            background: #fff;
+        }
+
+        .history-detail .log-output {
+            max-height: 220px;
+        }
     </style>
 </head>
 <body>
@@ -427,6 +502,7 @@
             <button onclick="showPage('devices')" class="active" id="nav-devices">Device Import</button>
             <button onclick="showPage('job-create')" id="nav-job-create">Create Job</button>
             <button onclick="showPage('job-monitor')" id="nav-job-monitor">Monitor Jobs</button>
+            <button onclick="showPage('job-history')" id="nav-job-history">Task History</button>
             <button onclick="showPage('status-command')" id="nav-status-command">Status Command</button>
         </div>
         
@@ -456,6 +532,13 @@
         <!-- Job Create Page -->
         <div id="page-job-create" class="page">
             <h2>Create Configuration Job</h2>
+
+            <div id="active-job-banner" class="active-job-banner hidden">
+                <span id="active-job-banner-text">A job is currently running.</span>
+                <div>
+                    <button type="button" onclick="viewActiveJob()">View Running Job</button>
+                </div>
+            </div>
             
             <div class="form-group">
                 <label>Job Name (optional):</label>
@@ -517,7 +600,7 @@
                 </label>
             </div>
             
-            <button onclick="createJob()">Create and Execute Job</button>
+            <button id="create-job-button" onclick="createJob()">Create and Execute Job</button>
         </div>
         
         <!-- Job Monitor Page -->
@@ -525,6 +608,19 @@
             <h2>Job Monitor</h2>
             <div id="job-monitor-content">
                 <p style="color: #999; padding: 20px; text-align: center;">No active job</p>
+            </div>
+        </div>
+
+        <!-- Task History Page -->
+        <div id="page-job-history" class="page">
+            <h2>Task History</h2>
+            <div class="history-layout">
+                <div id="task-history-list" class="history-list">
+                    <p style="color: #999; padding: 20px; text-align: center;">No task history yet</p>
+                </div>
+                <div id="task-history-detail" class="history-detail">
+                    <p style="color: #999; padding: 20px; text-align: center;">Select a task run to view details</p>
+                </div>
             </div>
         </div>
 

@@ -172,6 +172,27 @@ class JobResponse(BaseModel):
     status: JobStatus
 
 
+class JobHistoryEntry(BaseModel):
+    """Summary entry for job history views."""
+
+    job_id: str
+    job_name: Optional[str] = None
+    creator: Optional[str] = None
+    status: JobStatus
+    created_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    duration_seconds: Optional[float] = None
+    exit_code: Optional[int] = None
+
+
+class ActiveJobResponse(BaseModel):
+    """Response for active job lock state."""
+
+    active: bool
+    job: Optional[JobHistoryEntry] = None
+
+
 class StatusCommandRequest(BaseModel):
     """Request to execute read-only status commands on a managed device."""
 
