@@ -37,6 +37,9 @@ from .models import (
 )
 from .ssh_executor import execute_device_commands
 
+DEFAULT_HISTORY_LIMIT = 20
+ACTIVE_JOB_STATUSES = {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}
+
 
 class JobControl:
     """Control flags for running jobs."""
@@ -49,13 +52,15 @@ class JobControl:
 class JobManager:
     """Manages jobs and device execution in memory."""
 
-    def __init__(self):
+    def __init__(self, history_limit: int = DEFAULT_HISTORY_LIMIT):
         self.jobs: Dict[str, Job] = {}
         self.devices: List[Device] = []
         self.lock = threading.Lock()
         self.ws_callbacks: Dict[str, List] = {}  # job_id -> list of callback functions
         self.job_controls: Dict[str, JobControl] = {}
         self.job_threads: Dict[str, threading.Thread] = {}
+        self.job_history: List[str] = []
+        self.history_limit = max(history_limit, 1)
 
     def add_devices(self, devices: List[Device]):
         """Add validated devices to in-memory storage."""
@@ -131,6 +136,8 @@ class JobManager:
         with self.lock:
             self.jobs[job_id] = job
             self.job_controls[job_id] = JobControl()
+            self.job_history.append(job_id)
+            self._trim_history_locked()
 
         return job
 
@@ -138,6 +145,24 @@ class JobManager:
         """Get job by ID."""
         with self.lock:
             return self.jobs.get(job_id)
+
+    def list_jobs(self) -> List[Job]:
+        """Get jobs in history order."""
+        with self.lock:
+            return [
+                self.jobs[job_id]
+                for job_id in reversed(self.job_history)
+                if job_id in self.jobs
+            ]
+
+    def get_active_job(self) -> Optional[Job]:
+        """Return the currently active job if one exists."""
+        with self.lock:
+            for job_id in reversed(self.job_history):
+                job = self.jobs.get(job_id)
+                if job and job.status in ACTIVE_JOB_STATUSES:
+                    return job
+        return None
 
     def register_ws_callback(self, job_id: str, callback):
         """Register a WebSocket callback for job updates."""
@@ -235,6 +260,19 @@ class JobManager:
             )
         )
         return True
+
+    def _trim_history_locked(self):
+        """Trim job history to the configured limit (lock must be held)."""
+        while len(self.job_history) > self.history_limit:
+            job_id = self.job_history[0]
+            job = self.jobs.get(job_id)
+            if job and job.status in ACTIVE_JOB_STATUSES:
+                break
+            self.job_history.pop(0)
+            self.jobs.pop(job_id, None)
+            self.job_controls.pop(job_id, None)
+            self.job_threads.pop(job_id, None)
+            self.ws_callbacks.pop(job_id, None)
 
     def _wait_if_paused(self, job_id: str, control: JobControl) -> bool:
         """Block while a job is paused. Returns False if cancellation is requested."""

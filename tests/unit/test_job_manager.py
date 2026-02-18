@@ -225,3 +225,70 @@ def test_job_manager_terminate_job_marks_cancelled():
     assert job.status == JobStatus.CANCELLED
     for result in job.device_results.values():
         assert result.status == DeviceStatus.CANCELLED
+
+
+def test_job_manager_active_job_detection():
+    """Test active job detection."""
+    jm = JobManager()
+
+    jm.add_devices(
+        [
+            Device(
+                host="192.168.1.1",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            )
+        ]
+    )
+
+    job_create = JobCreate(
+        canary=CanaryDevice(host="192.168.1.1", port=22), commands="test", devices=[]
+    )
+
+    job = jm.create_job(job_create)
+    with jm.lock:
+        job.status = JobStatus.RUNNING
+
+    active_job = jm.get_active_job()
+    assert active_job is not None
+    assert active_job.job_id == job.job_id
+
+
+def test_job_manager_history_limit_trims_oldest():
+    """Test history limit trimming oldest completed jobs."""
+    jm = JobManager(history_limit=2)
+
+    jm.add_devices(
+        [
+            Device(
+                host="192.168.1.1",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            )
+        ]
+    )
+
+    job_create = JobCreate(
+        canary=CanaryDevice(host="192.168.1.1", port=22), commands="test", devices=[]
+    )
+
+    job_one = jm.create_job(job_create)
+    with jm.lock:
+        job_one.status = JobStatus.COMPLETED
+
+    job_two = jm.create_job(job_create)
+    with jm.lock:
+        job_two.status = JobStatus.COMPLETED
+
+    job_three = jm.create_job(job_create)
+    with jm.lock:
+        job_three.status = JobStatus.COMPLETED
+
+    history_ids = [job.job_id for job in jm.list_jobs()]
+    assert history_ids == [job_three.job_id, job_two.job_id]
