@@ -28,6 +28,9 @@ let devices = [];
 let currentJobId = null;
 let ws = null;
 let currentJobStatus = null;
+let taskHistory = [];
+let activeJob = null;
+let selectedHistoryId = null;
 
 // Page navigation
 function showPage(pageName) {
@@ -46,7 +49,164 @@ function showPage(pageName) {
     
     if (pageName === 'job-create') {
         loadDevicesForJobCreate();
+        refreshActiveJobState();
+    } else if (pageName === 'status-command') {
+        loadDevicesForStatusCommand();
+    } else if (pageName === 'job-history') {
+        loadTaskHistory();
     }
+}
+
+async function refreshActiveJobState() {
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs/active`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch active job');
+        }
+        const result = await response.json();
+        activeJob = result.active ? result.job : null;
+    } catch (error) {
+        console.error('Error fetching active job:', error);
+        activeJob = null;
+    }
+    updateActiveJobBanner();
+}
+
+function updateActiveJobBanner() {
+    const banner = document.getElementById('active-job-banner');
+    const bannerText = document.getElementById('active-job-banner-text');
+    const createButton = document.getElementById('create-job-button');
+    if (!banner || !bannerText || !createButton) {
+        return;
+    }
+
+    const isActive = activeJob && ['running', 'queued', 'paused'].includes(activeJob.status);
+    if (!isActive) {
+        banner.classList.add('hidden');
+        createButton.disabled = false;
+        return;
+    }
+
+    banner.classList.remove('hidden');
+    const label = activeJob.job_name || activeJob.job_id;
+    bannerText.textContent = `Job "${label}" is ${activeJob.status}. Starting another job is blocked until it finishes or is cancelled.`;
+    createButton.disabled = true;
+}
+
+function viewActiveJob() {
+    if (!activeJob) {
+        return;
+    }
+    showPage('job-monitor');
+    startJobMonitoring(activeJob.job_id);
+}
+
+function formatDuration(durationSeconds) {
+    if (durationSeconds === null || durationSeconds === undefined) {
+        return '—';
+    }
+    if (durationSeconds < 60) {
+        return `${durationSeconds.toFixed(1)}s`;
+    }
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    return `${minutes}m ${seconds.toFixed(0)}s`;
+}
+
+async function loadTaskHistory() {
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch task history');
+        }
+        taskHistory = await response.json();
+        if (taskHistory.length > 0) {
+            const hasSelection = taskHistory.some(entry => entry.job_id === selectedHistoryId);
+            if (!hasSelection) {
+                selectedHistoryId = taskHistory[0].job_id;
+                await selectHistoryEntry(selectedHistoryId);
+                return;
+            }
+        }
+        renderTaskHistory();
+    } catch (error) {
+        console.error('Error loading task history:', error);
+    }
+}
+
+function renderTaskHistory() {
+    const listContainer = document.getElementById('task-history-list');
+    if (!listContainer) {
+        return;
+    }
+
+    if (!taskHistory || taskHistory.length === 0) {
+        listContainer.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">No task history yet</p>';
+        return;
+    }
+
+    listContainer.innerHTML = taskHistory.map(entry => {
+        const isActive = entry.job_id === selectedHistoryId;
+        const createdLabel = entry.created_at ? new Date(entry.created_at).toLocaleString() : 'Unknown';
+        const durationLabel = formatDuration(entry.duration_seconds);
+        const exitCode = entry.exit_code === null || entry.exit_code === undefined ? '—' : entry.exit_code;
+        return `
+            <div class="history-entry ${isActive ? 'active' : ''}" onclick="selectHistoryEntry('${entry.job_id}')">
+                <h4>${entry.job_name || 'Job'} <span class="status-badge status-${entry.status.toLowerCase()}">${entry.status}</span></h4>
+                <div class="history-meta">Created: ${createdLabel}</div>
+                <div class="history-meta">Duration: ${durationLabel} | Exit code: ${exitCode}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function selectHistoryEntry(jobId) {
+    selectedHistoryId = jobId;
+    renderTaskHistory();
+    try {
+        const response = await fetch(`${API_BASE}/api/jobs/${jobId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch job details');
+        }
+        const job = await response.json();
+        const summary = (taskHistory || []).find(entry => entry.job_id === jobId) || null;
+        renderHistoryDetail(job, summary);
+    } catch (error) {
+        console.error('Error loading job detail:', error);
+    }
+}
+
+function renderHistoryDetail(job, summary) {
+    const detailContainer = document.getElementById('task-history-detail');
+    if (!detailContainer) {
+        return;
+    }
+
+    const durationLabel = summary ? formatDuration(summary.duration_seconds) : '—';
+    const exitCode = summary && summary.exit_code !== null && summary.exit_code !== undefined ? summary.exit_code : '—';
+    const deviceCards = buildDeviceCards(job);
+
+    detailContainer.innerHTML = `
+        <div class="job-card">
+            <h3>${job.job_name || 'Job'} (${job.job_id})</h3>
+            <p><strong>Status:</strong> <span class="status-badge status-${job.status.toLowerCase()}">${job.status}</span></p>
+            <p><strong>Creator:</strong> ${job.creator || 'N/A'}</p>
+            <p><strong>Created:</strong> ${job.created_at ? new Date(job.created_at).toLocaleString() : 'N/A'}</p>
+            ${job.started_at ? `<p><strong>Started:</strong> ${new Date(job.started_at).toLocaleString()}</p>` : ''}
+            ${job.completed_at ? `<p><strong>Completed:</strong> ${new Date(job.completed_at).toLocaleString()}</p>` : ''}
+            <p><strong>Duration:</strong> ${durationLabel}</p>
+            <p><strong>Exit Code:</strong> ${exitCode}</p>
+            <p><strong>Verify Mode:</strong> ${job.verify_only}</p>
+            <p><strong>Verify Commands:</strong> ${job.verify_cmds && job.verify_cmds.length ? job.verify_cmds.join(', ') : 'None'}</p>
+            <p><strong>Concurrency Limit:</strong> ${job.concurrency_limit}</p>
+            <p><strong>Stagger Delay:</strong> ${job.stagger_delay}s</p>
+            <p><strong>Stop on Error:</strong> ${job.stop_on_error ? 'Yes' : 'No'}</p>
+            <h4 style="margin-top: 15px;">Commands</h4>
+            <div class="log-output">${escapeHtml(job.commands || '')}</div>
+        </div>
+        <h3>Device Results:</h3>
+        ${deviceCards}
+    `;
 }
 
 // Device Import
@@ -256,8 +416,84 @@ async function loadDevicesForJobCreate() {
     }
 }
 
+async function loadDevicesForStatusCommand() {
+    const selector = document.getElementById('status-device-selector');
+    if (!selector) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/devices`);
+        const deviceList = await response.json();
+        const validDevices = (deviceList || []).filter(d => d.connection_ok);
+
+        selector.innerHTML = '<option value="">Select a managed device...</option>' +
+            validDevices.map(device => `
+                <option value="${device.host}:${device.port}">
+                    ${device.name || device.host} (${device.host}:${device.port})
+                </option>
+            `).join('');
+    } catch (error) {
+        console.error('Error loading devices for status command:', error);
+    }
+}
+
+async function runStatusCommand() {
+    const selectedDevice = document.getElementById('status-device-selector').value;
+    const commands = document.getElementById('status-commands').value.trim();
+    const runButton = document.getElementById('status-command-button');
+    const output = document.getElementById('status-command-output');
+
+    if (!selectedDevice) {
+        alert('Please select a target device');
+        return;
+    }
+    if (!commands) {
+        alert('Please enter at least one command');
+        return;
+    }
+
+    const [host, port] = selectedDevice.split(':');
+    runButton.disabled = true;
+    output.textContent = 'Running status command...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/commands/exec`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                host,
+                port: parseInt(port),
+                commands,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to execute status command');
+        }
+
+        const result = await response.json();
+        output.textContent = result.output || 'No output returned';
+    } catch (error) {
+        output.textContent = `Error: ${error.message}`;
+        alert(`Error: ${error.message}`);
+    } finally {
+        runButton.disabled = false;
+    }
+}
+
 // Create job
 async function createJob() {
+    await refreshActiveJobState();
+    if (activeJob && ['running', 'queued', 'paused'].includes(activeJob.status)) {
+        const label = activeJob.job_name || activeJob.job_id;
+        alert(`Job "${label}" is currently ${activeJob.status}. Please wait for it to finish or cancel it before starting another job.`);
+        return;
+    }
+
     const commands = document.getElementById('config-commands').value.trim();
     if (!commands) {
         alert('Configuration commands are required');
@@ -339,6 +575,7 @@ async function createJob() {
         // Switch to monitor page
         showPage('job-monitor');
         startJobMonitoring(result.job_id);
+        refreshActiveJobState();
     } catch (error) {
         alert(`Error: ${error.message}`);
     }
@@ -378,14 +615,11 @@ async function startJobMonitoring(jobId) {
     }
 }
 
-function displayJobMonitor(job) {
-    const container = document.getElementById('job-monitor-content');
-    currentJobStatus = job.status;
-    
-    const deviceCards = Object.entries(job.device_results).map(([key, result]) => {
+function buildDeviceCards(job) {
+    return Object.entries(job.device_results).map(([key, result]) => {
         const statusClass = result.status.toLowerCase();
         const isCanary = key === `${job.canary.host}:${job.canary.port}`;
-        
+
         return `
             <div class="device-card ${statusClass}" id="device-${key}">
                 <h3>${result.host}:${result.port} ${isCanary ? '(CANARY)' : ''}</h3>
@@ -418,6 +652,13 @@ function displayJobMonitor(job) {
             </div>
         `;
     }).join('');
+}
+
+function displayJobMonitor(job) {
+    const container = document.getElementById('job-monitor-content');
+    currentJobStatus = job.status;
+    
+    const deviceCards = buildDeviceCards(job);
     
     container.innerHTML = `
         <div class="job-card">
@@ -519,8 +760,11 @@ function handleWebSocketMessage(message) {
         if (currentJobId) {
             fetchJobDetails(currentJobId);
         }
+        refreshActiveJobState();
+        loadTaskHistory();
     } else if (message.type === 'job_status') {
         updateJobStatus(message.status);
+        refreshActiveJobState();
     }
 }
 
@@ -619,4 +863,5 @@ async function terminateJob() {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     console.log('App initialized');
+    refreshActiveJobState();
 });

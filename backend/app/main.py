@@ -20,6 +20,8 @@
 import csv
 import io
 import json
+import logging
+from datetime import datetime
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,11 +34,49 @@ from .models import (
     JobCreate,
     JobResponse,
     Job,
+    JobStatus,
     CanaryDevice,
+    StatusCommandRequest,
+    StatusCommandResponse,
+    JobHistoryEntry,
+    ActiveJobResponse,
 )
 from .job_manager import job_manager
-from .ssh_executor import validate_device_connection
+from .ssh_executor import validate_device_connection, run_status_command
 from .ws import websocket_endpoint
+
+logger = logging.getLogger(__name__)
+
+
+def build_job_history_entry(job: Job) -> JobHistoryEntry:
+    """Build a history entry summary from a job."""
+    duration_seconds = None
+    if job.started_at:
+        end_time = job.completed_at or datetime.utcnow().isoformat()
+        duration_seconds = (
+            datetime.fromisoformat(end_time) - datetime.fromisoformat(job.started_at)
+        ).total_seconds()
+
+    exit_code = None
+    if job.status == JobStatus.COMPLETED:
+        exit_code = 0
+    elif job.status == JobStatus.FAILED:
+        exit_code = 1
+    elif job.status == JobStatus.CANCELLED:
+        exit_code = 130
+
+    return JobHistoryEntry(
+        job_id=job.job_id,
+        job_name=job.job_name,
+        creator=job.creator,
+        status=job.status,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        duration_seconds=duration_seconds,
+        exit_code=exit_code,
+    )
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -206,6 +246,67 @@ async def get_devices():
     return job_manager.get_devices()
 
 
+@app.post("/api/commands/exec", response_model=StatusCommandResponse)
+async def execute_status_command(request: StatusCommandRequest):
+    """Execute read-only status commands on a managed device."""
+    target_device = next(
+        (
+            d
+            for d in job_manager.get_devices()
+            if d.host == request.host and d.port == request.port
+        ),
+        None,
+    )
+    if not target_device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    command_count = len(
+        [
+            command.strip()
+            for command in request.commands.splitlines()
+            if command.strip()
+        ]
+    )
+    logger.info(
+        "Status command request for %s:%s with %s command(s)",
+        request.host,
+        request.port,
+        command_count,
+    )
+
+    try:
+        output = run_status_command(
+            {
+                "host": target_device.host,
+                "port": target_device.port,
+                "device_type": target_device.device_type,
+                "username": target_device.username,
+                "password": target_device.password,
+            },
+            request.commands,
+        )
+        return StatusCommandResponse(output=output)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.get("/api/jobs", response_model=List[JobHistoryEntry])
+async def list_jobs():
+    """List job history entries for the current session."""
+    return [build_job_history_entry(job) for job in job_manager.list_jobs()]
+
+
+@app.get("/api/jobs/active", response_model=ActiveJobResponse)
+async def get_active_job():
+    """Get the active job lock state."""
+    active_job = job_manager.get_active_job()
+    if not active_job:
+        return ActiveJobResponse(active=False)
+    return ActiveJobResponse(active=True, job=build_job_history_entry(active_job))
+
+
 @app.post("/api/jobs", response_model=JobResponse)
 async def create_job(job_create: JobCreate):
     """
@@ -216,6 +317,17 @@ async def create_job(job_create: JobCreate):
     # Validate commands
     if not job_create.commands or not job_create.commands.strip():
         raise HTTPException(status_code=400, detail="Commands cannot be empty")
+
+    active_job = job_manager.get_active_job()
+    if active_job:
+        active_label = active_job.job_name or active_job.job_id
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Job '{active_label}' is already {active_job.status.value}. "
+                "Wait for it to finish or cancel it before starting another job."
+            ),
+        )
 
     # Get devices
     devices = job_manager.get_devices()

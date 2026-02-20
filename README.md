@@ -27,9 +27,11 @@ This application provides a simple, web-based interface for managing network dev
 
 - **Canary deployment pattern**: Test configuration on a canary device before rolling out to all devices
 - **Real-time monitoring**: WebSocket-based live log streaming and status updates
+- **In-app task history**: Review recent runs and drill into past outputs during the session
 - **Pre/post verification**: Capture and diff device state before and after changes
 - **Concurrent execution**: Configurable concurrency with stagger delays
 - **Error handling**: Automatic retry on connection errors, stop-on-error capability
+- **Single-job lock**: Prevents overlapping configuration runs to reduce contention
 
 ### Workflow Overview
 
@@ -140,6 +142,7 @@ Paste CSV content to import and validate devices. The application performs a lig
 - Enter configuration commands
 - Configure verification commands
 - Set concurrency and error handling options
+- The UI highlights when a job is already running and blocks additional starts
 
 ### 3. Job Monitor Screen
 
@@ -151,6 +154,15 @@ Real-time monitoring with:
 - Pre/post configuration diffs
 - Error reporting
 - Pause, resume, and terminate controls for in-flight jobs (works in Docker deployments as well)
+
+### 4. Task History Screen
+
+Review recent task executions from the current session, select a run, and inspect command output and device results.
+
+### 5. Status Command Screen
+
+Run read-only status/check commands against an imported device without creating a configuration job.
+The backend blocks commonly disruptive commands on a best-effort basis.
 
 ## 🔌 API Documentation
 
@@ -191,6 +203,14 @@ Get all imported devices.
 
 **Response**: Array of device objects.
 
+### GET /api/jobs
+
+List job history entries for the current session.
+
+### GET /api/jobs/active
+
+Get the active job lock state.
+
 ### POST /api/jobs
 
 Create and execute a configuration job.
@@ -219,6 +239,26 @@ Create and execute a configuration job.
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
   "status": "queued"
+}
+```
+
+### POST /api/commands/exec
+
+Execute read-only status commands on a managed device.
+
+**Request**:
+```json
+{
+  "host": "192.168.1.1",
+  "port": 22,
+  "commands": "show ip interface brief\nshow running-config | section snmp"
+}
+```
+
+**Response**:
+```json
+{
+  "output": "$ show ip interface brief\n...\n\n$ show running-config | section snmp\n..."
 }
 ```
 
