@@ -18,6 +18,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 # Network Device Configuration Manager
+[![CI](https://github.com/icecake0141/nw-edit/actions/workflows/ci.yml/badge.svg)](https://github.com/icecake0141/nw-edit/actions/workflows/ci.yml)
+[![Dependabot Updates](https://github.com/icecake0141/nw-edit/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/icecake0141/nw-edit/actions/workflows/dependabot/dependabot-updates)
 
 A minimal single-process web application (MVP) for applying multi-line configuration commands to multiple network devices over SSH.
 
