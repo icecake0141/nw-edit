@@ -1,5 +1,5 @@
 fastapi==0.132.0
-pydantic-settings==2.13.0
+pydantic-settings==2.13.1
 pydantic==2.12.5
 uvicorn[standard]==0.41.0
 netmiko==4.6.0
