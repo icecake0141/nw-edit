@@ -19,7 +19,7 @@
 
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict, Set
+from typing import Awaitable, Callable, Dict, Set
 
 from .job_manager import job_manager
 
@@ -31,6 +31,7 @@ class ConnectionManager:
 
     def __init__(self):
         self.active_connections: Dict[str, Set[WebSocket]] = {}
+        self.job_callbacks: Dict[str, Callable[[dict], Awaitable[None]]] = {}
 
     async def connect(self, job_id: str, websocket: WebSocket):
         """Accept and register a WebSocket connection."""
@@ -39,11 +40,13 @@ class ConnectionManager:
             self.active_connections[job_id] = set()
         self.active_connections[job_id].add(websocket)
 
-        # Register callback with job manager
-        async def callback(message: dict):
-            await self.send_message(job_id, message)
+        # Register one callback per job_id to avoid duplicate broadcasts.
+        if job_id not in self.job_callbacks:
+            async def callback(message: dict):
+                await self.send_message(job_id, message)
 
-        job_manager.register_ws_callback(job_id, callback)
+            self.job_callbacks[job_id] = callback
+            job_manager.register_ws_callback(job_id, callback)
 
     async def disconnect(self, job_id: str, websocket: WebSocket):
         """Disconnect and unregister a WebSocket connection."""
@@ -51,6 +54,9 @@ class ConnectionManager:
             self.active_connections[job_id].discard(websocket)
             if not self.active_connections[job_id]:
                 del self.active_connections[job_id]
+                callback = self.job_callbacks.pop(job_id, None)
+                if callback is not None:
+                    job_manager.unregister_ws_callback(job_id, callback)
 
     async def send_message(self, job_id: str, message: dict):
         """Send a message to all connections for a job."""

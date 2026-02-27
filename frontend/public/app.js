@@ -141,23 +141,44 @@ function renderTaskHistory() {
     }
 
     if (!taskHistory || taskHistory.length === 0) {
-        listContainer.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">No task history yet</p>';
+        const empty = document.createElement('p');
+        empty.style.color = '#999';
+        empty.style.padding = '20px';
+        empty.style.textAlign = 'center';
+        empty.textContent = 'No task history yet';
+        listContainer.replaceChildren(empty);
         return;
     }
 
-    listContainer.innerHTML = taskHistory.map(entry => {
+    listContainer.textContent = '';
+    taskHistory.forEach(entry => {
         const isActive = entry.job_id === selectedHistoryId;
         const createdLabel = entry.created_at ? new Date(entry.created_at).toLocaleString() : 'Unknown';
         const durationLabel = formatDuration(entry.duration_seconds);
         const exitCode = entry.exit_code === null || entry.exit_code === undefined ? '—' : entry.exit_code;
-        return `
-            <div class="history-entry ${isActive ? 'active' : ''}" onclick="selectHistoryEntry('${entry.job_id}')">
-                <h4>${entry.job_name || 'Job'} <span class="status-badge status-${entry.status.toLowerCase()}">${entry.status}</span></h4>
-                <div class="history-meta">Created: ${createdLabel}</div>
-                <div class="history-meta">Duration: ${durationLabel} | Exit code: ${exitCode}</div>
-            </div>
-        `;
-    }).join('');
+
+        const item = document.createElement('div');
+        item.className = `history-entry${isActive ? ' active' : ''}`;
+        item.addEventListener('click', () => selectHistoryEntry(entry.job_id));
+
+        const title = document.createElement('h4');
+        title.append(document.createTextNode(`${entry.job_name || 'Job'} `));
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `status-badge status-${sanitizeClassToken(entry.status)}`;
+        statusBadge.textContent = String(entry.status || 'unknown');
+        title.append(statusBadge);
+
+        const createdMeta = document.createElement('div');
+        createdMeta.className = 'history-meta';
+        createdMeta.textContent = `Created: ${createdLabel}`;
+
+        const durationMeta = document.createElement('div');
+        durationMeta.className = 'history-meta';
+        durationMeta.textContent = `Duration: ${durationLabel} | Exit code: ${exitCode}`;
+
+        item.append(title, createdMeta, durationMeta);
+        listContainer.appendChild(item);
+    });
 }
 
 async function selectHistoryEntry(jobId) {
@@ -185,21 +206,27 @@ function renderHistoryDetail(job, summary) {
     const durationLabel = summary ? formatDuration(summary.duration_seconds) : '—';
     const exitCode = summary && summary.exit_code !== null && summary.exit_code !== undefined ? summary.exit_code : '—';
     const deviceCards = buildDeviceCards(job);
+    const statusClass = sanitizeClassToken(job.status);
+    const statusText = escapeHtml(job.status || 'unknown');
+    const createdAt = job.created_at ? new Date(job.created_at).toLocaleString() : 'N/A';
+    const startedAt = job.started_at ? new Date(job.started_at).toLocaleString() : null;
+    const completedAt = job.completed_at ? new Date(job.completed_at).toLocaleString() : null;
+    const verifyCommands = job.verify_cmds && job.verify_cmds.length ? job.verify_cmds.join(', ') : 'None';
 
     detailContainer.innerHTML = `
         <div class="job-card">
-            <h3>${job.job_name || 'Job'} (${job.job_id})</h3>
-            <p><strong>Status:</strong> <span class="status-badge status-${job.status.toLowerCase()}">${job.status}</span></p>
-            <p><strong>Creator:</strong> ${job.creator || 'N/A'}</p>
-            <p><strong>Created:</strong> ${job.created_at ? new Date(job.created_at).toLocaleString() : 'N/A'}</p>
-            ${job.started_at ? `<p><strong>Started:</strong> ${new Date(job.started_at).toLocaleString()}</p>` : ''}
-            ${job.completed_at ? `<p><strong>Completed:</strong> ${new Date(job.completed_at).toLocaleString()}</p>` : ''}
-            <p><strong>Duration:</strong> ${durationLabel}</p>
-            <p><strong>Exit Code:</strong> ${exitCode}</p>
-            <p><strong>Verify Mode:</strong> ${job.verify_only}</p>
-            <p><strong>Verify Commands:</strong> ${job.verify_cmds && job.verify_cmds.length ? job.verify_cmds.join(', ') : 'None'}</p>
-            <p><strong>Concurrency Limit:</strong> ${job.concurrency_limit}</p>
-            <p><strong>Stagger Delay:</strong> ${job.stagger_delay}s</p>
+            <h3>${escapeHtml(job.job_name || 'Job')} (${escapeHtml(job.job_id)})</h3>
+            <p><strong>Status:</strong> <span class="status-badge status-${statusClass}">${statusText}</span></p>
+            <p><strong>Creator:</strong> ${escapeHtml(job.creator || 'N/A')}</p>
+            <p><strong>Created:</strong> ${escapeHtml(createdAt)}</p>
+            ${startedAt ? `<p><strong>Started:</strong> ${escapeHtml(startedAt)}</p>` : ''}
+            ${completedAt ? `<p><strong>Completed:</strong> ${escapeHtml(completedAt)}</p>` : ''}
+            <p><strong>Duration:</strong> ${escapeHtml(durationLabel)}</p>
+            <p><strong>Exit Code:</strong> ${escapeHtml(exitCode)}</p>
+            <p><strong>Verify Mode:</strong> ${escapeHtml(job.verify_only)}</p>
+            <p><strong>Verify Commands:</strong> ${escapeHtml(verifyCommands)}</p>
+            <p><strong>Concurrency Limit:</strong> ${escapeHtml(job.concurrency_limit)}</p>
+            <p><strong>Stagger Delay:</strong> ${escapeHtml(job.stagger_delay)}s</p>
             <p><strong>Stop on Error:</strong> ${job.stop_on_error ? 'Yes' : 'No'}</p>
             <h4 style="margin-top: 15px;">Commands</h4>
             <div class="log-output">${escapeHtml(job.commands || '')}</div>
@@ -325,27 +352,48 @@ function displayDeviceResults(deviceList) {
     const container = document.getElementById('device-results');
     
     if (!deviceList || deviceList.length === 0) {
-        container.innerHTML = '<p style="color: #999; padding: 20px;">No devices found</p>';
+        const empty = document.createElement('p');
+        empty.style.color = '#999';
+        empty.style.padding = '20px';
+        empty.textContent = 'No devices found';
+        container.replaceChildren(empty);
         return;
     }
     
-    container.innerHTML = deviceList.map(device => {
+    container.textContent = '';
+    deviceList.forEach(device => {
         const statusClass = device.connection_ok ? 'success' : 'error';
         const statusText = device.connection_ok ? 'Connected' : 'Failed';
         const statusBadgeClass = device.connection_ok ? 'status-success' : 'status-error';
-        
-        return `
-            <div class="device-item ${statusClass}">
-                <div class="device-info">
-                    <strong>${device.name || device.host}</strong> (${device.host}:${device.port})
-                    <br>
-                    <small>Type: ${device.device_type} | User: ${device.username}</small>
-                    ${device.error_message ? `<br><span class="error-text">${device.error_message}</span>` : ''}
-                </div>
-                <div class="device-status ${statusBadgeClass}">${statusText}</div>
-            </div>
-        `;
-    }).join('');
+
+        const item = document.createElement('div');
+        item.className = `device-item ${statusClass}`;
+
+        const info = document.createElement('div');
+        info.className = 'device-info';
+        const name = document.createElement('strong');
+        name.textContent = String(device.name || device.host || '');
+        info.append(name, document.createTextNode(` (${device.host}:${device.port})`));
+        info.append(document.createElement('br'));
+        const small = document.createElement('small');
+        small.textContent = `Type: ${device.device_type} | User: ${device.username}`;
+        info.append(small);
+
+        if (device.error_message) {
+            info.append(document.createElement('br'));
+            const error = document.createElement('span');
+            error.className = 'error-text';
+            error.textContent = String(device.error_message);
+            info.append(error);
+        }
+
+        const status = document.createElement('div');
+        status.className = `device-status ${statusBadgeClass}`;
+        status.textContent = statusText;
+
+        item.append(info, status);
+        container.appendChild(item);
+    });
 }
 
 // Load devices for job creation
@@ -359,27 +407,56 @@ async function loadDevicesForJobCreate() {
         const canarySelector = document.getElementById('canary-selector');
         
         if (!deviceList || deviceList.length === 0) {
-            selector.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">No devices imported yet</p>';
-            canarySelector.innerHTML = '<option value="">No devices available</option>';
+            const empty = document.createElement('p');
+            empty.style.color = '#999';
+            empty.style.padding = '20px';
+            empty.style.textAlign = 'center';
+            empty.textContent = 'No devices imported yet';
+            selector.replaceChildren(empty);
+
+            const noOption = document.createElement('option');
+            noOption.value = '';
+            noOption.textContent = 'No devices available';
+            canarySelector.replaceChildren(noOption);
             return;
         }
         
         // Only show devices that passed connection test
         const validDevices = deviceList.filter(d => d.connection_ok);
-        
-        selector.innerHTML = `
-            <div class="checkbox-item">
-                <input type="checkbox" id="select-all-devices" aria-label="Select all devices">
-                <label for="select-all-devices"><strong>Select All</strong></label>
-            </div>
-        ` + validDevices.map(device => `
-            <div class="checkbox-item">
-                <input type="checkbox" id="device-${device.host}-${device.port}" value="${device.host}:${device.port}">
-                <label for="device-${device.host}-${device.port}">
-                    ${device.name || device.host} (${device.host}:${device.port}) - ${device.device_type}
-                </label>
-            </div>
-        `).join('');
+
+        selector.textContent = '';
+        const selectAllItem = document.createElement('div');
+        selectAllItem.className = 'checkbox-item';
+        const selectAllInput = document.createElement('input');
+        selectAllInput.type = 'checkbox';
+        selectAllInput.id = 'select-all-devices';
+        selectAllInput.setAttribute('aria-label', 'Select all devices');
+        const selectAllLabel = document.createElement('label');
+        selectAllLabel.setAttribute('for', 'select-all-devices');
+        const strong = document.createElement('strong');
+        strong.textContent = 'Select All';
+        selectAllLabel.append(strong);
+        selectAllItem.append(selectAllInput, selectAllLabel);
+        selector.appendChild(selectAllItem);
+
+        validDevices.forEach((device, index) => {
+            const item = document.createElement('div');
+            item.className = 'checkbox-item';
+            const checkboxId = `device-option-${index}`;
+            const value = `${device.host}:${device.port}`;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = checkboxId;
+            checkbox.value = value;
+
+            const label = document.createElement('label');
+            label.setAttribute('for', checkboxId);
+            label.textContent = `${device.name || device.host} (${device.host}:${device.port}) - ${device.device_type}`;
+
+            item.append(checkbox, label);
+            selector.appendChild(item);
+        });
 
         const selectAllCheckbox = document.getElementById('select-all-devices');
         const deviceCheckboxes = selector.querySelectorAll('input[type="checkbox"]:not(#select-all-devices)');
@@ -404,13 +481,19 @@ async function loadDevicesForJobCreate() {
         };
 
         updateSelectAllState();
-        
-        canarySelector.innerHTML = '<option value="">Select canary device...</option>' +
-            validDevices.map(device => `
-                <option value="${device.host}:${device.port}">
-                    ${device.name || device.host} (${device.host}:${device.port})
-                </option>
-            `).join('');
+
+        canarySelector.textContent = '';
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Select canary device...';
+        canarySelector.appendChild(defaultOption);
+
+        validDevices.forEach(device => {
+            const option = document.createElement('option');
+            option.value = `${device.host}:${device.port}`;
+            option.textContent = `${device.name || device.host} (${device.host}:${device.port})`;
+            canarySelector.appendChild(option);
+        });
     } catch (error) {
         console.error('Error loading devices:', error);
     }
@@ -427,12 +510,18 @@ async function loadDevicesForStatusCommand() {
         const deviceList = await response.json();
         const validDevices = (deviceList || []).filter(d => d.connection_ok);
 
-        selector.innerHTML = '<option value="">Select a managed device...</option>' +
-            validDevices.map(device => `
-                <option value="${device.host}:${device.port}">
-                    ${device.name || device.host} (${device.host}:${device.port})
-                </option>
-            `).join('');
+        selector.textContent = '';
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Select a managed device...';
+        selector.appendChild(defaultOption);
+
+        validDevices.forEach(device => {
+            const option = document.createElement('option');
+            option.value = `${device.host}:${device.port}`;
+            option.textContent = `${device.name || device.host} (${device.host}:${device.port})`;
+            selector.appendChild(option);
+        });
     } catch (error) {
         console.error('Error loading devices for status command:', error);
     }
@@ -617,18 +706,22 @@ async function startJobMonitoring(jobId) {
 
 function buildDeviceCards(job) {
     return Object.entries(job.device_results).map(([key, result]) => {
-        const statusClass = result.status.toLowerCase();
+        const statusClass = sanitizeClassToken(result.status);
         const isCanary = key === `${job.canary.host}:${job.canary.port}`;
+        const resultTitle = `${result.host}:${result.port} ${isCanary ? '(CANARY)' : ''}`.trim();
+        const deviceId = `device-${domIdFromDeviceKey(key)}`;
+        const logId = `log-${domIdFromDeviceKey(key)}`;
+        const logs = Array.isArray(result.logs) ? result.logs.join('\n') : String(result.logs || '');
 
         return `
-            <div class="device-card ${statusClass}" id="device-${key}">
-                <h3>${result.host}:${result.port} ${isCanary ? '(CANARY)' : ''}</h3>
-                <p><strong>Status:</strong> <span class="status-badge status-${statusClass}">${result.status}</span></p>
-                ${result.error ? `<p class="error-text">Error: ${result.error}</p>` : ''}
+            <div class="device-card ${statusClass}" id="${deviceId}">
+                <h3>${escapeHtml(resultTitle)}</h3>
+                <p><strong>Status:</strong> <span class="status-badge status-${statusClass}">${escapeHtml(result.status || 'unknown')}</span></p>
+                ${result.error ? `<p class="error-text">Error: ${escapeHtml(result.error)}</p>` : ''}
                 ${result.log_trimmed ? '<p class="warning-text">⚠️ Log was trimmed due to size limit</p>' : ''}
                 
-                <div class="log-output" id="log-${key}">
-                    ${result.logs.join('\n') || 'No logs yet...'}
+                <div class="log-output" id="${logId}">
+                    ${escapeHtml(logs || 'No logs yet...')}
                 </div>
                 
                 ${result.pre_output ? `
@@ -659,14 +752,15 @@ function displayJobMonitor(job) {
     currentJobStatus = job.status;
     
     const deviceCards = buildDeviceCards(job);
+    const statusClass = sanitizeClassToken(job.status);
     
     container.innerHTML = `
         <div class="job-card">
-            <h3>${job.job_name || 'Job'} (${job.job_id})</h3>
-            <p><strong>Status:</strong> <span id="job-status-text" class="status-${job.status.toLowerCase()}">${job.status}</span></p>
-            <p><strong>Creator:</strong> ${job.creator || 'N/A'}</p>
-            <p><strong>Created:</strong> ${new Date(job.created_at).toLocaleString()}</p>
-            ${job.completed_at ? `<p><strong>Completed:</strong> ${new Date(job.completed_at).toLocaleString()}</p>` : ''}
+            <h3>${escapeHtml(job.job_name || 'Job')} (${escapeHtml(job.job_id)})</h3>
+            <p><strong>Status:</strong> <span id="job-status-text" class="status-${statusClass}">${escapeHtml(job.status || 'unknown')}</span></p>
+            <p><strong>Creator:</strong> ${escapeHtml(job.creator || 'N/A')}</p>
+            <p><strong>Created:</strong> ${escapeHtml(new Date(job.created_at).toLocaleString())}</p>
+            ${job.completed_at ? `<p><strong>Completed:</strong> ${escapeHtml(new Date(job.completed_at).toLocaleString())}</p>` : ''}
             <div class="job-actions">
                 <button onclick="pauseJob()" id="pause-job-btn">Pause</button>
                 <button onclick="resumeJob()" id="resume-job-btn">Resume</button>
@@ -697,8 +791,17 @@ function formatDiff(diffText) {
 
 function escapeHtml(text) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text === null || text === undefined ? '' : String(text);
     return div.innerHTML;
+}
+
+function sanitizeClassToken(value) {
+    const token = String(value || 'unknown').toLowerCase();
+    return /^[a-z0-9_-]+$/.test(token) ? token : 'unknown';
+}
+
+function domIdFromDeviceKey(key) {
+    return encodeURIComponent(String(key || ''));
 }
 
 function connectWebSocket(jobId) {
@@ -730,19 +833,20 @@ function handleWebSocketMessage(message) {
     console.log('WS message:', message);
     
     if (message.type === 'log') {
-        const logElement = document.getElementById(`log-${message.device}`);
+        const logElement = document.getElementById(`log-${domIdFromDeviceKey(message.device)}`);
         if (logElement) {
             logElement.textContent += '\n' + message.data;
             logElement.scrollTop = logElement.scrollHeight;
         }
     } else if (message.type === 'device_status') {
-        const deviceCard = document.getElementById(`device-${message.device}`);
+        const deviceCard = document.getElementById(`device-${domIdFromDeviceKey(message.device)}`);
         if (deviceCard) {
-            deviceCard.className = `device-card ${message.status.toLowerCase()}`;
+            const safeStatusClass = sanitizeClassToken(message.status);
+            deviceCard.className = `device-card ${safeStatusClass}`;
             const statusBadge = deviceCard.querySelector('.status-badge');
             if (statusBadge) {
                 statusBadge.textContent = message.status;
-                statusBadge.className = `status-badge status-${message.status.toLowerCase()}`;
+                statusBadge.className = `status-badge status-${safeStatusClass}`;
             }
             if (message.error) {
                 const existingError = deviceCard.querySelector('.error-text');
@@ -783,7 +887,7 @@ function updateJobStatus(status) {
     const statusText = document.getElementById('job-status-text');
     if (statusText) {
         statusText.textContent = status;
-        statusText.className = `status-${status.toLowerCase()}`;
+        statusText.className = `status-${sanitizeClassToken(status)}`;
     }
     updateJobControls(status);
 }
