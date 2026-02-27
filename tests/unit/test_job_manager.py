@@ -17,8 +17,18 @@
 # Review required for correctness, security, and licensing.
 """Unit tests for job manager."""
 
+import pytest
+from pydantic import ValidationError
+
 from backend.app.job_manager import JobManager
-from backend.app.models import JobCreate, CanaryDevice, Device, JobStatus, DeviceStatus
+from backend.app.models import (
+    JobCreate,
+    CanaryDevice,
+    Device,
+    JobStatus,
+    DeviceStatus,
+    VerifyMode,
+)
 
 
 def test_job_manager_add_devices():
@@ -292,3 +302,148 @@ def test_job_manager_history_limit_trims_oldest():
 
     history_ids = [job.job_id for job in jm.list_jobs()]
     assert history_ids == [job_three.job_id, job_two.job_id]
+
+
+def test_job_create_rejects_invalid_concurrency_limit():
+    """Test JobCreate rejects non-positive concurrency limits."""
+    with pytest.raises(ValidationError):
+        JobCreate(
+            canary=CanaryDevice(host="192.168.1.1", port=22),
+            commands="test",
+            devices=[],
+            concurrency_limit=0,
+        )
+
+
+def test_job_create_rejects_negative_stagger_delay():
+    """Test JobCreate rejects negative stagger delays."""
+    with pytest.raises(ValidationError):
+        JobCreate(
+            canary=CanaryDevice(host="192.168.1.1", port=22),
+            commands="test",
+            devices=[],
+            stagger_delay=-0.1,
+        )
+
+
+@pytest.mark.parametrize(
+    ("verify_mode", "expected_canary_verify", "expected_other_verify"),
+    [
+        (VerifyMode.NONE, [], []),
+        (VerifyMode.CANARY, ["show version"], []),
+        (VerifyMode.ALL, ["show version"], ["show version"]),
+    ],
+)
+def test_job_manager_applies_verify_mode_when_executing_devices(
+    monkeypatch, verify_mode, expected_canary_verify, expected_other_verify
+):
+    """Test verify_only mode controls verify command execution targets."""
+    jm = JobManager()
+    jm.add_devices(
+        [
+            Device(
+                host="192.168.1.1",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            ),
+            Device(
+                host="192.168.1.2",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            ),
+        ]
+    )
+    job = jm.create_job(
+        JobCreate(
+            canary=CanaryDevice(host="192.168.1.1", port=22),
+            commands="show clock",
+            devices=[],
+            verify_only=verify_mode,
+            verify_cmds=["show version"],
+        )
+    )
+
+    calls = []
+
+    def fake_execute_device_commands(
+        device_params,
+        commands,
+        verify_cmds,
+        is_canary,
+        retry_on_connection_error,
+        cancel_event,
+    ):
+        calls.append(
+            {
+                "device": f"{device_params['host']}:{device_params['port']}",
+                "verify_cmds": list(verify_cmds),
+                "is_canary": is_canary,
+            }
+        )
+        return {
+            "status": "success",
+            "error": None,
+            "pre_output": None,
+            "apply_output": "ok",
+            "post_output": None,
+            "diff": None,
+            "logs": [],
+            "log_trimmed": False,
+        }
+
+    monkeypatch.setattr(
+        "backend.app.job_manager.execute_device_commands", fake_execute_device_commands
+    )
+
+    jm._run_job(job.job_id)
+
+    canary_call = next(call for call in calls if call["is_canary"])
+    other_call = next(call for call in calls if not call["is_canary"])
+    assert canary_call["device"] == "192.168.1.1:22"
+    assert canary_call["verify_cmds"] == expected_canary_verify
+    assert other_call["device"] == "192.168.1.2:22"
+    assert other_call["verify_cmds"] == expected_other_verify
+
+
+def test_run_job_exception_marks_job_failed(monkeypatch):
+    """Test unhandled execution exceptions transition job to FAILED."""
+    jm = JobManager()
+    jm.add_devices(
+        [
+            Device(
+                host="192.168.1.1",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            )
+        ]
+    )
+    job = jm.create_job(
+        JobCreate(
+            canary=CanaryDevice(host="192.168.1.1", port=22),
+            commands="test",
+            devices=[],
+        )
+    )
+
+    def raise_unexpected_error(*args, **kwargs):
+        raise RuntimeError("unexpected failure")
+
+    monkeypatch.setattr(
+        "backend.app.job_manager.execute_device_commands", raise_unexpected_error
+    )
+
+    jm._run_job(job.job_id)
+
+    updated = jm.get_job(job.job_id)
+    assert updated is not None
+    assert updated.status == JobStatus.FAILED
+    assert updated.completed_at is not None

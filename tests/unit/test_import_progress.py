@@ -64,4 +64,41 @@ def test_import_devices_with_progress_streams_events(monkeypatch):
     assert events[3]["type"] == "complete"
     assert events[3]["processed"] == 2
     assert events[3]["total"] == 2
+    assert events[3]["skipped"] == 0
+    assert events[3]["failed_rows"] == []
     assert len(events[3]["devices"]) == 2
+
+
+def test_import_devices_with_progress_includes_failed_rows(monkeypatch):
+    """Progress endpoint should include invalid CSV rows in the final event."""
+
+    def mock_validate(_device_params):
+        return True, None
+
+    monkeypatch.setattr("backend.app.main.validate_device_connection", mock_validate)
+
+    csv_content = (
+        "host,port,device_type,username,password\n"
+        "192.168.1.1,22,cisco_ios,admin,pass\n"
+        "192.168.1.2,abc,cisco_ios,admin,pass\n"
+        "192.168.1.3,22,cisco_ios,admin,pass"
+    )
+
+    response = client.post(
+        "/api/devices/import/progress",
+        data=csv_content,
+        headers={"Content-Type": "text/plain"},
+    )
+
+    assert response.status_code == 200
+
+    lines = [line for line in response.text.strip().splitlines() if line.strip()]
+    events = [json.loads(line) for line in lines]
+
+    assert events[-1]["type"] == "complete"
+    assert events[-1]["processed"] == 2
+    assert events[-1]["total"] == 2
+    assert events[-1]["skipped"] == 1
+    assert len(events[-1]["failed_rows"]) == 1
+    assert events[-1]["failed_rows"][0]["row_number"] == 3
+    assert events[-1]["failed_rows"][0]["error"] == "Invalid port value: abc"

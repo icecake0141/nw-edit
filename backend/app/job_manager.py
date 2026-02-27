@@ -34,6 +34,7 @@ from .models import (
     DeviceParams,
     CanaryDevice,
     Device,
+    VerifyMode,
 )
 from .ssh_executor import execute_device_commands
 
@@ -282,6 +283,17 @@ class JobManager:
             time.sleep(0.2)
         return not control.cancel_event.is_set()
 
+    @staticmethod
+    def _resolve_verify_cmds(
+        verify_mode: VerifyMode, is_canary: bool, verify_cmds: List[str]
+    ) -> List[str]:
+        """Resolve verify commands for a device based on verify mode."""
+        if verify_mode == VerifyMode.NONE:
+            return []
+        if verify_mode == VerifyMode.CANARY and not is_canary:
+            return []
+        return list(verify_cmds)
+
     def execute_job(self, job_id: str):
         """Execute a job in a background thread."""
         job = self.get_job(job_id)
@@ -297,6 +309,24 @@ class JobManager:
 
     def _run_job(self, job_id: str):
         """Run job execution (blocking, runs in thread)."""
+        try:
+            self._run_job_inner(job_id)
+        except Exception:
+            job = self.get_job(job_id)
+            if not job:
+                return
+            with self.lock:
+                job.status = JobStatus.FAILED
+                job.completed_at = datetime.utcnow().isoformat()
+            asyncio.run(
+                self.send_ws_message(
+                    job_id,
+                    {"type": "job_complete", "job_id": job_id, "status": "failed"},
+                )
+            )
+
+    def _run_job_inner(self, job_id: str):
+        """Core job execution implementation."""
         job = self.get_job(job_id)
         if not job:
             return
@@ -417,7 +447,11 @@ class JobManager:
             return
 
         # Execute canary (no retry)
-        canary_verify_cmds = cast(List[str], canary_params["verify_cmds"])
+        canary_verify_cmds = self._resolve_verify_cmds(
+            job.verify_only,
+            is_canary=True,
+            verify_cmds=cast(List[str], canary_params["verify_cmds"]),
+        )
         canary_result = execute_device_commands(
             device_params=canary_params,
             commands=commands,
@@ -554,7 +588,11 @@ class JobManager:
             )
 
             # Execute device
-            verify_cmds = cast(List[str], device_params["verify_cmds"])
+            verify_cmds = self._resolve_verify_cmds(
+                job.verify_only,
+                is_canary=False,
+                verify_cmds=cast(List[str], device_params["verify_cmds"]),
+            )
             result = execute_device_commands(
                 device_params=device_params,
                 commands=commands,

@@ -22,13 +22,14 @@ import io
 import json
 import logging
 from datetime import datetime
-from typing import List
+from typing import Dict, List, Tuple
 from fastapi import FastAPI, HTTPException, WebSocket, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from .models import (
     Device,
+    DeviceImportFailure,
     DeviceInput,
     DeviceImportResponse,
     JobCreate,
@@ -95,37 +96,73 @@ app.add_middleware(
 )
 
 
-def parse_csv_devices(csv_content: str) -> List[DeviceInput]:
+def parse_csv_devices(
+    csv_content: str,
+) -> Tuple[List[DeviceInput], List[DeviceImportFailure]]:
     """
     Parse CSV content into DeviceInput objects.
 
     Expected columns: host, port (optional), device_type, username, password, name (optional), verify_cmds (optional)
     """
-    devices = []
+    devices: List[DeviceInput] = []
+    failed_rows: List[DeviceImportFailure] = []
     reader = csv.DictReader(io.StringIO(csv_content))
 
-    for row in reader:
+    for row_number, row in enumerate(reader, start=2):
+        normalized_row: Dict[str, str] = {
+            (key or ""): ((value or "").strip() if isinstance(value, str) else "")
+            for key, value in row.items()
+        }
+
         # Validate required fields
-        if (
-            not row.get("host")
-            or not row.get("device_type")
-            or not row.get("username")
-            or not row.get("password")
-        ):
+        required_fields = ("host", "device_type", "username", "password")
+        missing_fields = [
+            field for field in required_fields if not normalized_row.get(field)
+        ]
+        if missing_fields:
+            failed_rows.append(
+                DeviceImportFailure(
+                    row_number=row_number,
+                    row=normalized_row,
+                    error=f"Missing required fields: {', '.join(missing_fields)}",
+                )
+            )
             continue
 
-        device = DeviceInput(
-            host=row["host"].strip(),
-            port=int(row.get("port", "").strip() or "22"),
-            device_type=row["device_type"].strip(),
-            username=row["username"].strip(),
-            password=row["password"].strip(),
-            name=row.get("name", "").strip() or None,
-            verify_cmds=row.get("verify_cmds", "").strip() or None,
-        )
-        devices.append(device)
+        port_raw = normalized_row.get("port", "")
+        try:
+            port = int(port_raw or "22")
+        except ValueError:
+            failed_rows.append(
+                DeviceImportFailure(
+                    row_number=row_number,
+                    row=normalized_row,
+                    error=f"Invalid port value: {port_raw}",
+                )
+            )
+            continue
 
-    return devices
+        try:
+            device = DeviceInput(
+                host=normalized_row["host"],
+                port=port,
+                device_type=normalized_row["device_type"],
+                username=normalized_row["username"],
+                password=normalized_row["password"],
+                name=normalized_row.get("name") or None,
+                verify_cmds=normalized_row.get("verify_cmds") or None,
+            )
+            devices.append(device)
+        except Exception as e:
+            failed_rows.append(
+                DeviceImportFailure(
+                    row_number=row_number,
+                    row=normalized_row,
+                    error=f"Row validation failed: {str(e)}",
+                )
+            )
+
+    return devices, failed_rows
 
 
 def validate_single_device_for_import(device_input: DeviceInput) -> Device:
@@ -171,10 +208,16 @@ async def import_devices(csv_content: str = Body(..., media_type="text/plain")):
     """
     try:
         # Parse CSV
-        device_inputs = parse_csv_devices(csv_content)
+        device_inputs, failed_rows = parse_csv_devices(csv_content)
 
         if not device_inputs:
-            raise HTTPException(status_code=400, detail="No valid devices found in CSV")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "No valid devices found in CSV",
+                    "failed_rows": [item.model_dump() for item in failed_rows],
+                },
+            )
 
         # Validate each device with connection test
         validated_devices = [
@@ -185,8 +228,10 @@ async def import_devices(csv_content: str = Body(..., media_type="text/plain")):
         # Add validated devices to job manager
         job_manager.add_devices(validated_devices)
 
-        return DeviceImportResponse(devices=validated_devices)
+        return DeviceImportResponse(devices=validated_devices, failed_rows=failed_rows)
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -199,10 +244,14 @@ async def import_devices_with_progress(
 
     def generate_progress_stream():
         try:
-            device_inputs = parse_csv_devices(csv_content)
+            device_inputs, failed_rows = parse_csv_devices(csv_content)
             if not device_inputs:
                 yield json.dumps(
-                    {"type": "error", "detail": "No valid devices found in CSV"}
+                    {
+                        "type": "error",
+                        "detail": "No valid devices found in CSV",
+                        "failed_rows": [item.model_dump() for item in failed_rows],
+                    }
                 ) + "\n"
                 return
 
@@ -229,6 +278,8 @@ async def import_devices_with_progress(
                     "type": "complete",
                     "processed": total,
                     "total": total,
+                    "skipped": len(failed_rows),
+                    "failed_rows": [item.model_dump() for item in failed_rows],
                     "devices": [device.model_dump() for device in validated_devices],
                 }
             ) + "\n"
