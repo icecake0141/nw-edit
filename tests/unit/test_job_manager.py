@@ -17,6 +17,9 @@
 # Review required for correctness, security, and licensing.
 """Unit tests for job manager."""
 
+import pytest
+from pydantic import ValidationError
+
 from backend.app.job_manager import JobManager
 from backend.app.models import JobCreate, CanaryDevice, Device, JobStatus, DeviceStatus
 
@@ -292,3 +295,63 @@ def test_job_manager_history_limit_trims_oldest():
 
     history_ids = [job.job_id for job in jm.list_jobs()]
     assert history_ids == [job_three.job_id, job_two.job_id]
+
+
+def test_job_create_rejects_invalid_concurrency_limit():
+    """Test JobCreate rejects non-positive concurrency limits."""
+    with pytest.raises(ValidationError):
+        JobCreate(
+            canary=CanaryDevice(host="192.168.1.1", port=22),
+            commands="test",
+            devices=[],
+            concurrency_limit=0,
+        )
+
+
+def test_job_create_rejects_negative_stagger_delay():
+    """Test JobCreate rejects negative stagger delays."""
+    with pytest.raises(ValidationError):
+        JobCreate(
+            canary=CanaryDevice(host="192.168.1.1", port=22),
+            commands="test",
+            devices=[],
+            stagger_delay=-0.1,
+        )
+
+
+def test_run_job_exception_marks_job_failed(monkeypatch):
+    """Test unhandled execution exceptions transition job to FAILED."""
+    jm = JobManager()
+    jm.add_devices(
+        [
+            Device(
+                host="192.168.1.1",
+                port=22,
+                device_type="cisco_ios",
+                username="admin",
+                password="password",
+                connection_ok=True,
+            )
+        ]
+    )
+    job = jm.create_job(
+        JobCreate(
+            canary=CanaryDevice(host="192.168.1.1", port=22),
+            commands="test",
+            devices=[],
+        )
+    )
+
+    def raise_unexpected_error(*args, **kwargs):
+        raise RuntimeError("unexpected failure")
+
+    monkeypatch.setattr(
+        "backend.app.job_manager.execute_device_commands", raise_unexpected_error
+    )
+
+    jm._run_job(job.job_id)
+
+    updated = jm.get_job(job.job_id)
+    assert updated is not None
+    assert updated.status == JobStatus.FAILED
+    assert updated.completed_at is not None

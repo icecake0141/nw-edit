@@ -297,6 +297,24 @@ class JobManager:
 
     def _run_job(self, job_id: str):
         """Run job execution (blocking, runs in thread)."""
+        try:
+            self._run_job_inner(job_id)
+        except Exception:
+            job = self.get_job(job_id)
+            if not job:
+                return
+            with self.lock:
+                job.status = JobStatus.FAILED
+                job.completed_at = datetime.utcnow().isoformat()
+            asyncio.run(
+                self.send_ws_message(
+                    job_id,
+                    {"type": "job_complete", "job_id": job_id, "status": "failed"},
+                )
+            )
+
+    def _run_job_inner(self, job_id: str):
+        """Core job execution implementation."""
         job = self.get_job(job_id)
         if not job:
             return

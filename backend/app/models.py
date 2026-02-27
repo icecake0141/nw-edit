@@ -90,8 +90,8 @@ class JobCreate(BaseModel):
     commands: str  # multiline commands
     verify_only: VerifyMode = VerifyMode.CANARY
     verify_cmds: List[str] = Field(default_factory=list)
-    concurrency_limit: int = 5
-    stagger_delay: float = 1.0
+    concurrency_limit: int = Field(default=5, ge=1)
+    stagger_delay: float = Field(default=1.0, ge=0)
     stop_on_error: bool = True
 
 
@@ -155,8 +155,8 @@ class Job(BaseModel):
     commands: str
     verify_only: VerifyMode = VerifyMode.CANARY
     verify_cmds: List[str] = Field(default_factory=list)
-    concurrency_limit: int = 5
-    stagger_delay: float = 1.0
+    concurrency_limit: int = Field(default=5, ge=1)
+    stagger_delay: float = Field(default=1.0, ge=0)
     stop_on_error: bool = True
     device_results: Dict[str, DeviceResult] = Field(default_factory=dict)
     device_params: Dict[str, DeviceParams] = Field(default_factory=dict)
