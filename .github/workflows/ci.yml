@@ -16,12 +16,14 @@ on:
   push:
     branches: [ main, develop, copilot/** ]
     paths-ignore:
-      - '**.md'
+      - '*.md'
+      - '**/*.md'
       - 'docs/**'
   pull_request:
     branches: [ main, develop ]
     paths-ignore:
-      - '**.md'
+      - '*.md'
+      - '**/*.md'
       - 'docs/**'
 
 # Cancel superseded runs on the same PR or branch to avoid wasted minutes.
