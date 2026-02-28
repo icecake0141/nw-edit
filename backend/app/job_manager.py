@@ -398,6 +398,12 @@ class JobManager:
             with self.lock:
                 job.status = JobStatus.FAILED
                 job.completed_at = datetime.utcnow().isoformat()
+            asyncio.run(
+                self.send_ws_message(
+                    job_id,
+                    {"type": "job_complete", "job_id": job_id, "status": "failed"},
+                )
+            )
             return
 
         canary_params = device_params_map[canary_key]
