@@ -48,10 +48,24 @@ jobs:
       run: pip install -r backend/requirements-dev.txt
 
     - name: Run black
-      run: cd backend && black --check app/ ../tests/
+      run: black --check backend/app backend_v2/app tests backend_v2/tests
 
     - name: Run flake8
-      run: cd backend && flake8 app/ ../tests/ --max-line-length=120 --extend-ignore=E203,W503
+      run: flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
+
+    - name: Run mypy (backend_v2)
+      run: mypy --explicit-package-bases backend_v2/app
+
+    - name: Run py_compile smoke check
+      run: |
+        PYTHONPYCACHEPREFIX=.pycache python -m py_compile \
+          backend/app/main.py \
+          backend/app/models.py \
+          backend/app/ssh_executor.py \
+          backend/app/job_manager.py \
+          backend/app/ws.py \
+          backend_v2/app/api/main.py \
+          backend_v2/app/application/execution_engine.py
 
   test:
     name: Test
@@ -71,7 +85,7 @@ jobs:
       run: pip install -r backend/requirements-dev.txt
 
     - name: Run unit tests
-      run: pytest tests/unit -v --cov=backend/app --cov-report=xml --cov-report=term
+      run: pytest tests/unit backend_v2/tests/unit -v --cov=backend/app --cov=backend_v2/app --cov-report=xml --cov-report=term
 
     - name: Upload coverage
       if: always()
@@ -121,7 +135,7 @@ jobs:
         sleep 10
 
     - name: Run integration tests
-      run: pytest tests/integration -v -m integration
+      run: pytest tests/integration backend_v2/tests/integration -v -m integration
 
     - name: Stop services
       if: always()

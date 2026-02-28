@@ -41,7 +41,7 @@ def test_import_devices_skips_invalid_port_rows(monkeypatch):
 
     response = client.post(
         "/api/devices/import",
-        data=csv_content,
+        content=csv_content,
         headers={"Content-Type": "text/plain"},
     )
 

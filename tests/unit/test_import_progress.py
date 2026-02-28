@@ -41,7 +41,7 @@ def test_import_devices_with_progress_streams_events(monkeypatch):
 
     response = client.post(
         "/api/devices/import/progress",
-        data=csv_content,
+        content=csv_content,
         headers={"Content-Type": "text/plain"},
     )
 
@@ -86,7 +86,7 @@ def test_import_devices_with_progress_includes_failed_rows(monkeypatch):
 
     response = client.post(
         "/api/devices/import/progress",
-        data=csv_content,
+        content=csv_content,
         headers={"Content-Type": "text/plain"},
     )
 

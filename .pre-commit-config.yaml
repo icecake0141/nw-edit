@@ -1,0 +1,30 @@
+# Copyright 2026 icecake0141
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# This file was created or modified with the assistance of an AI (Large Language Model).
+# Review required for correctness, security, and licensing.
+
+repos:
+  - repo: local
+    hooks:
+      - id: black-check
+        name: black check
+        entry: python3 -m black --check backend/app backend_v2/app tests backend_v2/tests
+        language: system
+        pass_filenames: false
+      - id: flake8-check
+        name: flake8 check
+        entry: python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
+        language: system
+        pass_filenames: false
+      - id: mypy-backend-v2
+        name: mypy backend_v2
+        entry: python3 -m mypy --explicit-package-bases backend_v2/app
+        language: system
+        pass_filenames: false

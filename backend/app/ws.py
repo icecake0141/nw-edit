@@ -42,6 +42,7 @@ class ConnectionManager:
 
         # Register one callback per job_id to avoid duplicate broadcasts.
         if job_id not in self.job_callbacks:
+
             async def callback(message: dict):
                 await self.send_message(job_id, message)
 

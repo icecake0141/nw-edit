@@ -1,4 +1,16 @@
 #!/bin/bash
+#
+# Copyright 2026 icecake0141
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# This file was created or modified with the assistance of an AI (Large Language Model).
+# Review required for correctness, security, and licensing.
 
 # Verification script for Network Device Configuration Manager
 # This script verifies that all components are working correctly
@@ -63,6 +75,21 @@ else
     fail
 fi
 
+check "Backend v2 structure"
+if [ -f "backend_v2/app/api/main.py" ] && [ -f "backend_v2/app/application/execution_engine.py" ] && \
+   [ -f "backend_v2/app/domain/state_machine.py" ] && [ -f "backend_v2/app/infrastructure/in_memory_job_store.py" ]; then
+    pass
+else
+    fail
+fi
+
+check "Frontend v2 structure"
+if [ -f "frontend_v2/public/index.html" ] && [ -f "frontend_v2/public/app.js" ]; then
+    pass
+else
+    fail
+fi
+
 check "Test structure"
 if [ -d "tests/unit" ] && [ -d "tests/integration" ] && [ -d "tests/mock_ssh_server" ]; then
     pass
@@ -94,53 +121,83 @@ fi
 
 # Check if dependencies are installed
 check "Backend dependencies"
-if pip list | grep -q fastapi; then
+if python3 -c "import fastapi" &> /dev/null; then
     pass
 else
     warn
-    echo "  Run: cd backend && pip install -r requirements.txt"
+    echo "  Run: python3 -m pip install -r backend/requirements.txt"
 fi
 
 # Run linting if tools are available
-if command -v black &> /dev/null; then
+if python3 -c "import black" &> /dev/null; then
     check "Code formatting (black)"
-    cd backend
-    if black --check app/ ../tests/ &> /dev/null; then
+    if python3 -m black --check backend/app backend_v2/app tests backend_v2/tests &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: cd backend && black app/ ../tests/"
+        echo "  Run: python3 -m black backend/app backend_v2/app tests backend_v2/tests"
     fi
-    cd ..
 else
     warn "  black not installed, skipping"
 fi
 
-if command -v flake8 &> /dev/null; then
+if python3 -c "import flake8" &> /dev/null; then
     check "Code linting (flake8)"
-    cd backend
-    if flake8 app/ ../tests/ --max-line-length=120 --extend-ignore=E203,W503 &> /dev/null; then
+    if python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503 &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: cd backend && flake8 app/ ../tests/"
+        echo "  Run: python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503"
     fi
-    cd ..
 else
     warn "  flake8 not installed, skipping"
 fi
 
-# Run tests if pytest is available
-if command -v pytest &> /dev/null; then
-    check "Unit tests"
-    if pytest tests/unit -v &> /dev/null; then
+if python3 -c "import mypy" &> /dev/null; then
+    check "Type checking (mypy backend_v2)"
+    if python3 -m mypy --explicit-package-bases backend_v2/app &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: pytest tests/unit -v"
+        echo "  Run: python3 -m mypy --explicit-package-bases backend_v2/app"
+    fi
+else
+    warn "  mypy not installed, skipping"
+fi
+
+if python3 -c "import pre_commit" &> /dev/null; then
+    check "Pre-commit hooks"
+    if PRE_COMMIT_HOME="${PRE_COMMIT_HOME:-.pre-commit-cache}" python3 -m pre_commit run --all-files &> /dev/null; then
+        pass
+    else
+        fail
+        echo "  Run: PRE_COMMIT_HOME=.pre-commit-cache python3 -m pre_commit run --all-files"
+    fi
+else
+    warn "  pre-commit not installed, skipping"
+fi
+
+# Run tests if pytest is available
+if python3 -c "import pytest" &> /dev/null; then
+    check "Unit tests"
+    if python3 -m pytest tests/unit backend_v2/tests/unit -v &> /dev/null; then
+        pass
+    else
+        fail
+        echo "  Run: python3 -m pytest tests/unit backend_v2/tests/unit -v"
     fi
 else
     warn "  pytest not installed, skipping"
+fi
+
+if python3 -c "import pytest" &> /dev/null; then
+    check "Integration test discovery"
+    if python3 -m pytest --collect-only tests/integration backend_v2/tests/integration -q &> /dev/null; then
+        pass
+    else
+        fail
+        echo "  Run: python3 -m pytest --collect-only tests/integration backend_v2/tests/integration -q"
+    fi
 fi
 
 # Check sample files
@@ -167,10 +224,10 @@ if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}✓ All checks passed!${NC}"
     echo ""
     echo "Next steps:"
-    echo "1. Install dependencies: cd backend && pip install -r requirements.txt"
-    echo "2. Run tests: pytest tests/unit -v"
-    echo "3. Start application: ./start.sh"
-    echo "4. Access frontend: http://localhost:3000"
+    echo "1. Install dependencies: python3 -m pip install -r backend/requirements-dev.txt"
+    echo "2. Run tests: python3 -m pytest tests/unit backend_v2/tests/unit -v"
+    echo "3. Start v1 application: ./start.sh"
+    echo "4. Start v2 application: ./start_v2.sh"
     exit 0
 else
     echo -e "${RED}✗ Some checks failed${NC}"

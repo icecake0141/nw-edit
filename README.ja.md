@@ -50,6 +50,12 @@ SSH経由で複数のネットワークデバイスに対して複数行の設�
 
 ## 🚀 クイックスタート
 
+再実装スキャフォールド（`backend_v2` + `frontend_v2`）については以下を参照してください。
+- [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
+- バックエンドとフロントエンドの同時起動: `./start_v2.sh`
+- ローカルチェックのショートカット: `make check`（統合テスト含む場合は `make check-integration`）
+- 追加ショートカット: `make typecheck`、`make precommit`
+
 ### 前提条件
 
 - Docker および Docker Compose
@@ -307,7 +313,7 @@ pytest -v --cov=backend/app --cov-report=html
 
 このプロジェクトには、以下を実行するGitHub Actionsワークフローが含まれています：
 
-1. **Lint**: Pythonコードに対して`black`と`flake8`を実行
+1. **Lint**: Pythonコードに対して`black`、`flake8`、`mypy`を実行
 2. **Test**: カバレッジレポート付きでユニットテストを実行
 3. **Build**: Dockerイメージをビルドして検証
 4. **Integration**: モックSSHサーバーに対してインテグレーションテストを実行
@@ -318,19 +324,20 @@ pytest -v --cov=backend/app --cov-report=html
 
 ```bash
 # Lint
-cd backend
-black app/ ../tests/
-flake8 app/ ../tests/ --max-line-length=120 --extend-ignore=E203,W503
+python3 -m black backend/app backend_v2/app tests backend_v2/tests
+python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
+python3 -m mypy --explicit-package-bases backend_v2/app
+PRE_COMMIT_HOME=.pre-commit-cache python3 -m pre_commit run --all-files
 
 # Test
-pytest tests/unit -v --cov=backend/app
+python3 -m pytest tests/unit backend_v2/tests/unit -v --cov=backend/app --cov=backend_v2/app
 
 # Build
 docker build -t nw-edit:latest .
 
 # Integration
 docker-compose --profile test up -d mock-ssh
-pytest tests/integration -v -m integration
+python3 -m pytest tests/integration backend_v2/tests/integration -v -m integration
 docker-compose down
 ```
 

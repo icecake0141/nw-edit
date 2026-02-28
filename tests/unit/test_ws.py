@@ -119,7 +119,9 @@ async def test_disconnect_unregisters_callback_when_last_connection_closed(monke
         unregistered.append((job_id, callback))
 
     monkeypatch.setattr("backend.app.ws.job_manager.register_ws_callback", _register)
-    monkeypatch.setattr("backend.app.ws.job_manager.unregister_ws_callback", _unregister)
+    monkeypatch.setattr(
+        "backend.app.ws.job_manager.unregister_ws_callback", _unregister
+    )
 
     ws1 = _FakeWebSocket()
     ws2 = _FakeWebSocket()

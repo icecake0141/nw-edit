@@ -54,6 +54,12 @@ The diagram above illustrates the complete workflow from device import to deploy
 
 ## 🚀 Quick Start
 
+For the reimplementation scaffold (`backend_v2` + `frontend_v2`), see:
+- [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
+- Run both services together: `./start_v2.sh`
+- Local checks shortcut: `make check` (`make check-integration` for integration)
+- Extra shortcuts: `make typecheck`, `make precommit`
+
 ### Prerequisites
 
 - Docker and Docker Compose
@@ -349,7 +355,7 @@ pytest -v --cov=backend/app --cov-report=html
 
 The project includes a GitHub Actions workflow that:
 
-1. **Lint**: Runs `black` and `flake8` on Python code
+1. **Lint**: Runs `black`, `flake8`, and `mypy` on Python code
 2. **Test**: Executes unit tests with coverage reporting
 3. **Build**: Builds Docker image and validates
 4. **Integration**: Runs integration tests against mock SSH server
@@ -360,19 +366,20 @@ Workflow file: `.github/workflows/ci.yml`
 
 ```bash
 # Lint
-cd backend
-black app/ ../tests/
-flake8 app/ ../tests/ --max-line-length=120 --extend-ignore=E203,W503
+python3 -m black backend/app backend_v2/app tests backend_v2/tests
+python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
+python3 -m mypy --explicit-package-bases backend_v2/app
+PRE_COMMIT_HOME=.pre-commit-cache python3 -m pre_commit run --all-files
 
 # Test
-pytest tests/unit -v --cov=backend/app
+python3 -m pytest tests/unit backend_v2/tests/unit -v --cov=backend/app --cov=backend_v2/app
 
 # Build
 docker build -t nw-edit:latest .
 
 # Integration
 docker-compose --profile test up -d mock-ssh
-pytest tests/integration -v -m integration
+python3 -m pytest tests/integration backend_v2/tests/integration -v -m integration
 docker-compose down
 ```
 

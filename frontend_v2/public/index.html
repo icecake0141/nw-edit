@@ -1,0 +1,201 @@
+<!--
+Copyright 2026 icecake0141
+SPDX-License-Identifier: Apache-2.0
+
+This file was created or modified with the assistance of an AI (Large Language Model).
+Please review for correctness and security.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nw-edit v2 scaffold</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --ink: #1f2430;
+      --card: #fffdfa;
+      --accent: #0f766e;
+      --accent-2: #b45309;
+      --line: #d6d3d1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 85% 15%, #c7e7df 0, transparent 35%),
+        radial-gradient(circle at 12% 88%, #fcd9ac 0, transparent 28%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1024px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      gap: 16px;
+    }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .head h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 2vw, 2rem);
+      letter-spacing: 0.01em;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 12px 24px rgba(31, 36, 48, 0.06);
+    }
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    label {
+      display: block;
+      font-size: 0.86rem;
+      margin-bottom: 6px;
+      opacity: 0.8;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      font: inherit;
+      color: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .split {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .split { grid-template-columns: 1fr; }
+    }
+    .muted { opacity: 0.72; font-size: 0.86rem; }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .primary { background: var(--accent); color: white; }
+    .secondary { background: var(--accent-2); color: white; }
+    pre {
+      margin: 0;
+      padding: 12px;
+      border-radius: 10px;
+      background: #151923;
+      color: #e5e7eb;
+      max-height: 300px;
+      overflow: auto;
+      font-size: 0.86rem;
+    }
+    .history-list {
+      display: grid;
+      gap: 8px;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .history-item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <h1>nw-edit v2 scaffold runner</h1>
+      <div id="status">idle</div>
+    </div>
+
+    <section class="panel grid">
+      <div>
+        <label for="apiBase">API Base</label>
+        <input id="apiBase" value="http://127.0.0.1:8010" />
+      </div>
+      <div>
+        <label for="creator">Creator</label>
+        <input id="creator" value="local" />
+      </div>
+      <div>
+        <label for="jobName">Job Name</label>
+        <input id="jobName" value="v2 demo rollout" />
+      </div>
+    </section>
+
+    <section class="split">
+      <div class="panel">
+        <label for="csvInput">CSV Import (host,port,device_type,username,password,name,verify_cmds)</label>
+        <textarea id="csvInput">host,port,device_type,username,password,name,verify_cmds
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run
+10.0.0.2,22,cisco_ios,admin,pass,edge-2,show ip interface brief</textarea>
+        <div class="btn-row">
+          <button class="secondary" id="importBtn">Import CSV</button>
+          <button class="secondary" id="refreshDevicesBtn">Refresh Devices</button>
+        </div>
+        <p class="muted" id="deviceCount">imported devices: 0</p>
+
+        <label for="devices">Ad-hoc Devices (host:port per line)</label>
+        <textarea id="devices">10.0.0.1:22
+10.0.0.2:22
+10.0.0.3:22</textarea>
+        <label><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
+        <label for="commands">Commands (one line each)</label>
+        <textarea id="commands">show version
+show ip interface brief</textarea>
+        <div class="btn-row">
+          <button class="primary" id="runBtn">Create + Run</button>
+          <button class="primary" id="runAsyncBtn">Create + Run Async</button>
+          <button class="secondary" id="pauseBtn">Pause Active</button>
+          <button class="secondary" id="resumeBtn">Resume Active</button>
+          <button class="secondary" id="cancelBtn">Cancel Active</button>
+          <button class="secondary" id="listJobsBtn">Refresh Jobs</button>
+          <button class="secondary" id="clearBtn">Clear Logs</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <label>Job History</label>
+        <div id="history" class="history-list"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <label>Activity Log</label>
+      <pre id="log"></pre>
+    </section>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
