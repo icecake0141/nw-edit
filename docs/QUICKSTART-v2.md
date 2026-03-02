@@ -13,6 +13,14 @@ You may obtain a copy of the License at
 -->
 # QUICKSTART v2
 
+## 0. Install dependencies
+
+`backend_v2` uses the shared backend dependency set.
+
+```bash
+python3 -m pip install -r backend/requirements-dev.txt
+```
+
 ## 1. Start backend v2
 
 ```bash
