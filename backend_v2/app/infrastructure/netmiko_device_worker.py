@@ -63,9 +63,12 @@ class NetmikoDeviceWorker(DeviceWorker):
             status=output.get("status", "failed"),
             logs=list(output.get("logs", [])),
             error=output.get("error"),
+            error_code=output.get("error_code"),
             pre_output=output.get("pre_output"),
             apply_output=output.get("apply_output"),
             post_output=output.get("post_output"),
             diff=output.get("diff"),
+            diff_truncated=bool(output.get("diff_truncated", False)),
+            diff_original_size=int(output.get("diff_original_size", 0)),
             log_trimmed=bool(output.get("log_trimmed", False)),
         )

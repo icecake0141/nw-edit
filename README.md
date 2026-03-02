@@ -56,6 +56,7 @@ The diagram above illustrates the complete workflow from device import to deploy
 
 For the reimplementation scaffold (`backend_v2` + `frontend_v2`), see:
 - [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
+- [docs/V2-MIGRATION-CHECKLIST.md](docs/V2-MIGRATION-CHECKLIST.md)
 - Install dependencies first: `python3 -m pip install -r backend/requirements-dev.txt`
 - Run both services together: `./start_v2.sh`
 - Local checks shortcut: `make check` (`make check-integration` for integration)

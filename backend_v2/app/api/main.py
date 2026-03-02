@@ -140,11 +140,14 @@ def _to_run_response(summary: JobRunSummary) -> RunJobResponse:
                 status=result.status,
                 attempts=result.attempts,
                 error=result.error,
+                error_code=result.error_code,
                 logs=result.logs,
-                pre_output=result.pre_output,
-                apply_output=result.apply_output,
-                post_output=result.post_output,
-                diff=result.diff,
+                pre_output=result.pre_output or "",
+                apply_output=result.apply_output or "",
+                post_output=result.post_output or "",
+                diff=result.diff or "",
+                diff_truncated=result.diff_truncated,
+                diff_original_size=result.diff_original_size,
                 log_trimmed=result.log_trimmed,
             )
             for key, result in summary.device_results.items()

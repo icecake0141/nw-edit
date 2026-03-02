@@ -39,6 +39,7 @@ ERROR_PATTERNS = [
 
 # Limits
 MAX_LOG_SIZE = 1024 * 1024  # 1 MiB
+MAX_DIFF_SIZE = 256 * 1024  # 256 KiB
 CONNECTION_TIMEOUT = 10
 COMMAND_TIMEOUT = 20
 DEVICE_TIMEOUT = 180
@@ -145,6 +146,19 @@ def create_unified_diff(
     return "".join(diff)
 
 
+def trim_diff(diff: str, max_size: int = MAX_DIFF_SIZE) -> Tuple[str, bool, int]:
+    """
+    Trim diff output to max size, preserving the beginning of the diff.
+
+    Returns:
+        Tuple of (trimmed_diff, was_trimmed, original_size)
+    """
+    original_size = len(diff)
+    if original_size <= max_size:
+        return diff, False, original_size
+    return diff[:max_size], True, original_size
+
+
 def run_status_command(device_params: dict, commands: str) -> str:
     """
     Execute read-only status commands on a device in exec mode.
@@ -226,15 +240,19 @@ def execute_device_commands(
     result: Dict[str, Any] = {
         "status": "success",
         "error": None,
+        "error_code": None,
         "pre_output": None,
         "apply_output": None,
         "post_output": None,
         "diff": None,
+        "diff_truncated": False,
+        "diff_original_size": 0,
         "logs": [],
         "log_trimmed": False,
     }
 
     logs = []
+    start_time = time.monotonic()
 
     def add_log(msg: str):
         logs.append(msg)
@@ -245,6 +263,7 @@ def execute_device_commands(
     def handle_cancel() -> dict:
         result["status"] = "cancelled"
         result["error"] = "Job was cancelled by user request"
+        result["error_code"] = "cancelled"
         add_log("Execution cancelled by user request")
         all_logs = "\n".join(logs)
         trimmed_logs, was_trimmed = trim_log(all_logs)
@@ -252,8 +271,35 @@ def execute_device_commands(
         result["log_trimmed"] = was_trimmed
         return result
 
+    def handle_failure(error_code: str, error_message: str, log_message: str) -> dict:
+        result["status"] = "failed"
+        result["error_code"] = error_code
+        result["error"] = error_message
+        add_log(log_message)
+        all_logs = "\n".join(logs)
+        trimmed_logs, was_trimmed = trim_log(all_logs)
+        result["logs"] = trimmed_logs.split("\n") if trimmed_logs else logs
+        result["log_trimmed"] = was_trimmed
+        return result
+
+    def has_timed_out(stage: str) -> bool:
+        elapsed = time.monotonic() - start_time
+        if elapsed <= DEVICE_TIMEOUT:
+            return False
+        timeout_message = (
+            f"Device total timeout ({DEVICE_TIMEOUT}s) exceeded during {stage}"
+        )
+        handle_failure(
+            error_code="device_timeout",
+            error_message=timeout_message,
+            log_message=f"ERROR: {timeout_message}",
+        )
+        return True
+
     if should_cancel():
         return handle_cancel()
+    if has_timed_out(stage="pre-connect checks"):
+        return result
 
     # Attempt connection with retry logic
     connection: Optional[Any] = None
@@ -262,6 +308,8 @@ def execute_device_commands(
 
     while retry_count <= max_retries:
         try:
+            if has_timed_out(stage="connection"):
+                return result
             add_log(
                 f"Connecting to {device_params['host']}:{device_params.get('port', 22)}..."
             )
@@ -277,21 +325,34 @@ def execute_device_commands(
             )
             add_log("Connected successfully")
             break
-        except (
-            NetmikoTimeoutException,
-            NetmikoAuthenticationException,
-            Exception,
-        ) as e:
+        except NetmikoTimeoutException as e:
             if retry_count < max_retries and retry_on_connection_error:
                 add_log(f"Connection failed: {str(e)}. Retrying in 5s...")
                 time.sleep(5)
                 retry_count += 1
             else:
-                result["status"] = "failed"
-                result["error"] = f"Connection failed: {str(e)}"
-                add_log(f"Connection failed: {str(e)}")
-                result["logs"] = logs
-                return result
+                return handle_failure(
+                    error_code="connection_timeout",
+                    error_message=f"Connection failed: {str(e)}",
+                    log_message=f"Connection failed: {str(e)}",
+                )
+        except NetmikoAuthenticationException as e:
+            return handle_failure(
+                error_code="authentication_failed",
+                error_message=f"Connection failed: {str(e)}",
+                log_message=f"Connection failed: {str(e)}",
+            )
+        except Exception as e:
+            if retry_count < max_retries and retry_on_connection_error:
+                add_log(f"Connection failed: {str(e)}. Retrying in 5s...")
+                time.sleep(5)
+                retry_count += 1
+            else:
+                return handle_failure(
+                    error_code="connection_error",
+                    error_message=f"Connection failed: {str(e)}",
+                    log_message=f"Connection failed: {str(e)}",
+                )
 
     try:
         # Pre-verification
@@ -306,6 +367,10 @@ def execute_device_commands(
                     if connection:
                         connection.disconnect()
                     return handle_cancel()
+                if has_timed_out(stage="pre-verification"):
+                    if connection:
+                        connection.disconnect()
+                    return result
                 add_log(f"  > {cmd}")
                 output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
                 pre_outputs.append(output)
@@ -319,8 +384,15 @@ def execute_device_commands(
                 if connection:
                     connection.disconnect()
                 return handle_cancel()
+            if has_timed_out(stage="configuration apply"):
+                if connection:
+                    connection.disconnect()
+                return result
             add_log(f"  > {cmd}")
 
+        if has_timed_out(stage="configuration apply"):
+            connection.disconnect()
+            return result
         apply_output = connection.send_config_set(
             commands, read_timeout=COMMAND_TIMEOUT
         )
@@ -330,12 +402,12 @@ def execute_device_commands(
         # Check for command errors
         error_msg = check_for_errors(apply_output)
         if error_msg:
-            result["status"] = "failed"
-            result["error"] = error_msg
-            add_log(f"ERROR: {error_msg}")
-            result["logs"] = logs
             connection.disconnect()
-            return result
+            return handle_failure(
+                error_code="command_error",
+                error_message=error_msg,
+                log_message=f"ERROR: {error_msg}",
+            )
 
         # Post-verification
         if verify_cmds:
@@ -346,6 +418,10 @@ def execute_device_commands(
                     if connection:
                         connection.disconnect()
                     return handle_cancel()
+                if has_timed_out(stage="post-verification"):
+                    if connection:
+                        connection.disconnect()
+                    return result
                 add_log(f"  > {cmd}")
                 output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
                 post_outputs.append(output)
@@ -357,21 +433,37 @@ def execute_device_commands(
                 result["post_output"], str
             ):
                 diff = create_unified_diff(result["pre_output"], result["post_output"])
-                result["diff"] = diff
+                trimmed_diff, was_trimmed, original_size = trim_diff(diff)
+                result["diff"] = trimmed_diff
+                result["diff_truncated"] = was_trimmed
+                result["diff_original_size"] = original_size
                 add_log("Diff created")
 
         connection.disconnect()
         add_log("Disconnected")
 
-    except Exception as e:
-        result["status"] = "failed"
-        result["error"] = f"Execution error: {str(e)}"
-        add_log(f"ERROR: {str(e)}")
+    except NetmikoTimeoutException as e:
         if connection:
             try:
                 connection.disconnect()
             except Exception:
                 pass
+        return handle_failure(
+            error_code="command_timeout",
+            error_message=f"Execution timeout: {str(e)}",
+            log_message=f"ERROR: {str(e)}",
+        )
+    except Exception as e:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+        return handle_failure(
+            error_code="execution_error",
+            error_message=f"Execution error: {str(e)}",
+            log_message=f"ERROR: {str(e)}",
+        )
 
     # Trim logs if needed
     all_logs = "\n".join(logs)

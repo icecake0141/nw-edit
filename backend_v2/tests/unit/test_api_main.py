@@ -66,6 +66,8 @@ def test_job_run_with_simulated_worker():
     assert payload["device_results"]["10.1.0.2:22"]["status"] == "success"
     assert "pre_output" in payload["device_results"]["10.1.0.1:22"]
     assert "diff" in payload["device_results"]["10.1.0.1:22"]
+    assert "diff_truncated" in payload["device_results"]["10.1.0.1:22"]
+    assert "diff_original_size" in payload["device_results"]["10.1.0.1:22"]
 
     events_response = client.get(f"/api/v2/jobs/{job_id}/events")
     assert events_response.status_code == 200
@@ -109,6 +111,39 @@ def test_device_import_and_run_with_imported_devices():
     payload = run_response.json()
     assert payload["status"] == "completed"
     assert "10.2.0.1:22" in payload["device_results"]
+
+
+def test_run_response_fields_are_consistent_strings():
+    client = TestClient(app)
+    create_response = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "mismatch canary", "creator": "tester"},
+    )
+    assert create_response.status_code == 200
+    job_id = create_response.json()["job_id"]
+
+    run_response = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "devices": [{"host": "10.3.0.1", "port": 22}],
+            "canary": {"host": "10.3.0.99", "port": 22},
+            "commands": ["show version"],
+        },
+    )
+    assert run_response.status_code == 200
+    payload = run_response.json()
+    assert payload["status"] == "failed"
+    device_result = payload["device_results"]["10.3.0.99:22"]
+    assert isinstance(device_result["pre_output"], str)
+    assert isinstance(device_result["apply_output"], str)
+    assert isinstance(device_result["post_output"], str)
+    assert isinstance(device_result["diff"], str)
+    assert isinstance(device_result["diff_truncated"], bool)
+    assert isinstance(device_result["diff_original_size"], int)
+    assert device_result["pre_output"] == ""
+    assert device_result["apply_output"] == ""
+    assert device_result["post_output"] == ""
+    assert device_result["diff"] == ""
 
 
 def test_list_jobs_endpoint():
