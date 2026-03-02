@@ -86,11 +86,14 @@ class DeviceExecutionResult:
     status: str
     logs: list[str] = field(default_factory=list)
     error: Optional[str] = None
+    error_code: Optional[str] = None
     attempts: int = 1
     pre_output: Optional[str] = None
     apply_output: Optional[str] = None
     post_output: Optional[str] = None
     diff: Optional[str] = None
+    diff_truncated: bool = False
+    diff_original_size: int = 0
     log_trimmed: bool = False
 
 

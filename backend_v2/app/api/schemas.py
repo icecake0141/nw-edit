@@ -69,11 +69,14 @@ class DeviceRunResponse(BaseModel):
     status: str
     attempts: int
     error: Optional[str] = None
+    error_code: Optional[str] = None
     logs: List[str]
-    pre_output: Optional[str] = None
-    apply_output: Optional[str] = None
-    post_output: Optional[str] = None
-    diff: Optional[str] = None
+    pre_output: str = ""
+    apply_output: str = ""
+    post_output: str = ""
+    diff: str = ""
+    diff_truncated: bool = False
+    diff_original_size: int = 0
     log_trimmed: bool = False
 
 
