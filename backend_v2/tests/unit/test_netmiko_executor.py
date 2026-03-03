@@ -80,6 +80,18 @@ def test_validate_device_connection_auth_failure(monkeypatch):
     assert "Authentication failed" in error
 
 
+def test_validate_device_connection_timeout(monkeypatch):
+    def raise_timeout(**kwargs):
+        del kwargs
+        raise executor.NetmikoTimeoutException("timed out")
+
+    monkeypatch.setattr(executor, "ConnectHandler", raise_timeout)
+    ok, error = executor.validate_device_connection(_device_params())
+    assert ok is False
+    assert error is not None
+    assert "Connection timeout" in error
+
+
 def test_execute_device_commands_success_with_diff(monkeypatch):
     fake = _FakeConnection(pre_output="snmp old", post_output="snmp new")
     monkeypatch.setattr(executor, "ConnectHandler", lambda **kwargs: fake)
@@ -139,3 +151,123 @@ def test_execute_device_commands_cancelled_before_connect(monkeypatch):
     )
     assert result["status"] == "cancelled"
     assert result["error_code"] == "cancelled"
+
+
+def test_execute_device_commands_connection_timeout_failure(monkeypatch):
+    def raise_timeout(**kwargs):
+        del kwargs
+        raise executor.NetmikoTimeoutException("connect timeout")
+
+    monkeypatch.setattr(executor, "ConnectHandler", raise_timeout)
+    result = executor.execute_device_commands(
+        device_params=_device_params(),
+        commands=["show version"],
+        verify_cmds=[],
+        is_canary=True,
+    )
+    assert result["status"] == "failed"
+    assert result["error_code"] == "connection_timeout"
+
+
+def test_execute_device_commands_connection_error_retries_once(monkeypatch):
+    attempts = {"count": 0}
+
+    def raise_runtime(**kwargs):
+        del kwargs
+        attempts["count"] += 1
+        raise RuntimeError("connection broken")
+
+    monkeypatch.setattr(executor, "ConnectHandler", raise_runtime)
+    monkeypatch.setattr(executor.time, "sleep", lambda *_: None)
+    result = executor.execute_device_commands(
+        device_params=_device_params(),
+        commands=["show version"],
+        verify_cmds=[],
+        is_canary=False,
+        retry_on_connection_error=True,
+    )
+    assert attempts["count"] == 2
+    assert result["status"] == "failed"
+    assert result["error_code"] == "connection_error"
+
+
+def test_execute_device_commands_command_timeout(monkeypatch):
+    fake = _FakeConnection()
+
+    def send_config_set_timeout(commands: list[str], read_timeout: int) -> str:
+        del commands, read_timeout
+        raise executor.NetmikoTimeoutException("command timeout")
+
+    fake.send_config_set = send_config_set_timeout  # type: ignore[method-assign]
+    monkeypatch.setattr(executor, "ConnectHandler", lambda **kwargs: fake)
+    result = executor.execute_device_commands(
+        device_params=_device_params(),
+        commands=["show version"],
+        verify_cmds=[],
+        is_canary=True,
+    )
+    assert result["status"] == "failed"
+    assert result["error_code"] == "command_timeout"
+    assert fake.disconnected is True
+
+
+def test_execute_device_commands_execution_error(monkeypatch):
+    fake = _FakeConnection()
+
+    def send_config_set_runtime_error(commands: list[str], read_timeout: int) -> str:
+        del commands, read_timeout
+        raise RuntimeError("boom")
+
+    fake.send_config_set = send_config_set_runtime_error  # type: ignore[method-assign]
+    monkeypatch.setattr(executor, "ConnectHandler", lambda **kwargs: fake)
+    result = executor.execute_device_commands(
+        device_params=_device_params(),
+        commands=["show version"],
+        verify_cmds=[],
+        is_canary=True,
+    )
+    assert result["status"] == "failed"
+    assert result["error_code"] == "execution_error"
+    assert fake.disconnected is True
+
+
+def test_execute_device_commands_cancelled_during_pre_verification(monkeypatch):
+    cancel_event = threading.Event()
+    fake = _FakeConnection()
+
+    original_send_command = fake.send_command
+
+    def send_command_and_cancel(command: str, read_timeout: int) -> str:
+        output = original_send_command(command, read_timeout)
+        cancel_event.set()
+        return output
+
+    fake.send_command = send_command_and_cancel  # type: ignore[method-assign]
+    monkeypatch.setattr(executor, "ConnectHandler", lambda **kwargs: fake)
+    result = executor.execute_device_commands(
+        device_params=_device_params(),
+        commands=["show version"],
+        verify_cmds=["show run", "show ip int br"],
+        is_canary=True,
+        cancel_event=cancel_event,
+    )
+    assert result["status"] == "cancelled"
+    assert result["error_code"] == "cancelled"
+    assert fake.disconnected is True
+
+
+def test_execute_device_commands_device_timeout_before_connect(monkeypatch):
+    monkeypatch.setattr(executor, "DEVICE_TIMEOUT", -1)
+
+    def should_not_connect(**kwargs):
+        del kwargs
+        raise AssertionError("ConnectHandler should not be called on early timeout")
+
+    monkeypatch.setattr(executor, "ConnectHandler", should_not_connect)
+    result = executor.execute_device_commands(
+        device_params=_device_params(),
+        commands=["show version"],
+        verify_cmds=[],
+    )
+    assert result["status"] == "failed"
+    assert result["error_code"] == "device_timeout"
