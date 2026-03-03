@@ -168,6 +168,10 @@ You may obtain a copy of the License at
         <label for="jobName">Job Name</label>
         <input id="jobName" value="v2 demo rollout" />
       </div>
+      <div>
+        <label for="globalVars">Global Vars (JSON)</label>
+        <textarea id="globalVars">{"timezone":"Asia/Tokyo"}</textarea>
+      </div>
     </section>
 
     <section class="panel nav" aria-label="v2 pages">
@@ -179,10 +183,10 @@ You may obtain a copy of the License at
     </section>
 
     <section class="panel page active" data-page="import">
-      <label for="csvInput">CSV Import (host,port,device_type,username,password,name,verify_cmds)</label>
-      <textarea id="csvInput">host,port,device_type,username,password,name,verify_cmds
-10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run
-10.0.0.2,22,cisco_ios,admin,pass,edge-2,show ip interface brief</textarea>
+      <label for="csvInput">CSV Import (host,port,device_type,username,password,name,verify_cmds,host_vars)</label>
+      <textarea id="csvInput">host,port,device_type,username,password,name,verify_cmds,host_vars
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1""}"
+10.0.0.2,22,cisco_ios,admin,pass,edge-2,show ip interface brief,"{""hostname"":""edge-2""}"</textarea>
       <div class="btn-row">
         <button class="secondary" id="importBtn">Import CSV</button>
         <button class="secondary" id="refreshDevicesBtn">Refresh Devices</button>

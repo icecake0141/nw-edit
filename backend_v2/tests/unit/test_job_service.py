@@ -38,8 +38,20 @@ def test_create_job_defaults_to_queued():
 
     assert job.status == JobStatus.QUEUED
     assert job.created_at
+    assert job.global_vars == {}
     assert job.started_at is None
     assert job.completed_at is None
+
+
+def test_create_job_persists_global_vars():
+    service = build_service()
+    job = service.create_job(
+        job_name="canary rollout",
+        creator="alice",
+        global_vars={"timezone": "Asia/Tokyo"},
+    )
+
+    assert job.global_vars == {"timezone": "Asia/Tokyo"}
 
 
 def test_apply_events_updates_timestamps():

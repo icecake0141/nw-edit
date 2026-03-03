@@ -52,7 +52,7 @@ def test_canary_failure_aborts_remaining_devices():
         job_id="job-1",
         devices=devices,
         canary=canary,
-        commands=["show version"],
+        commands_by_device={d.key: ["show version"] for d in devices},
         config=ExecutionConfig(),
     )
 
@@ -71,7 +71,10 @@ def test_non_canary_retry_then_success():
         job_id="job-2",
         devices=[canary, other],
         canary=canary,
-        commands=["conf t"],
+        commands_by_device={
+            canary.key: ["conf t"],
+            other.key: ["conf t"],
+        },
         config=ExecutionConfig(non_canary_retry_limit=1),
     )
 
@@ -90,7 +93,7 @@ def test_missing_canary_is_failed_job():
         job_id="job-3",
         devices=devices,
         canary=canary,
-        commands=["show run"],
+        commands_by_device={d.key: ["show run"] for d in devices},
         config=ExecutionConfig(),
     )
 
@@ -112,7 +115,11 @@ def test_stop_on_error_stops_future_submissions():
         job_id="job-4",
         devices=[canary, d2, d3],
         canary=canary,
-        commands=["write memory"],
+        commands_by_device={
+            canary.key: ["write memory"],
+            d2.key: ["write memory"],
+            d3.key: ["write memory"],
+        },
         config=ExecutionConfig(
             concurrency_limit=1,
             stop_on_error=True,
@@ -135,7 +142,7 @@ def test_engine_emits_completion_event():
         job_id="job-5",
         devices=[canary],
         canary=canary,
-        commands=["show version"],
+        commands_by_device={canary.key: ["show version"]},
         config=ExecutionConfig(),
     )
 
@@ -156,7 +163,7 @@ def test_engine_cancel_before_start():
         job_id="job-6",
         devices=[canary],
         canary=canary,
-        commands=["show run"],
+        commands_by_device={canary.key: ["show run"]},
         config=ExecutionConfig(),
         control=control,
     )

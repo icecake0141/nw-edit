@@ -52,6 +52,14 @@ make check
 make check-integration
 ```
 
+## コマンド変数（v2）
+
+- 実行コマンドで `{{var}}` プレースホルダを利用可能。
+- ジョブ単位の `global_vars` は `POST /api/v2/jobs` で指定。
+- ホスト単位の `host_vars` は CSV 取込の `host_vars` 列（JSONオブジェクト文字列）で指定。
+- 解決優先順位は `host_vars > global_vars`。
+- 未定義変数がある場合、デバイス実行前の preflight で `HTTP 400` を返す。
+
 ## ドキュメント
 
 - ドキュメント一覧（英日）: [docs/INDEX.ja.md](docs/INDEX.ja.md)

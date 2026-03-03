@@ -84,6 +84,25 @@ function parseCommands(text) {
     .filter(Boolean);
 }
 
+function parseGlobalVars(text) {
+  const raw = text.trim();
+  if (!raw) {
+    return {};
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`global vars JSON parse error: ${String(error)}`);
+  }
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("global vars must be a JSON object");
+  }
+  return Object.fromEntries(
+    Object.entries(parsed).map(([key, value]) => [String(key), String(value)])
+  );
+}
+
 function openJobSocket(apiBase, jobId) {
   if (activeSocket) {
     activeSocket.close();
@@ -184,6 +203,7 @@ async function refreshActive() {
 async function runSync() {
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
+  const globalVarsText = document.getElementById("globalVars").value;
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
   const useImported = useImportedEl.checked;
@@ -197,10 +217,18 @@ async function runSync() {
     return;
   }
 
+  let globalVars;
+  try {
+    globalVars = parseGlobalVars(globalVarsText);
+  } catch (error) {
+    appendLog(String(error));
+    return;
+  }
+
   runBtn.disabled = true;
   setStatus("creating");
   try {
-    const job = await client().createJob(jobName, creator);
+    const job = await client().createJob(jobName, creator, globalVars);
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
 
@@ -230,6 +258,7 @@ async function runSync() {
 async function runAsync() {
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
+  const globalVarsText = document.getElementById("globalVars").value;
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
   const useImported = useImportedEl.checked;
@@ -243,10 +272,18 @@ async function runAsync() {
     return;
   }
 
+  let globalVars;
+  try {
+    globalVars = parseGlobalVars(globalVarsText);
+  } catch (error) {
+    appendLog(String(error));
+    return;
+  }
+
   runAsyncBtn.disabled = true;
   setStatus("creating-async");
   try {
-    const job = await client().createJob(jobName, creator);
+    const job = await client().createJob(jobName, creator, globalVars);
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
     const started = await client().runJobAsync(job.job_id, commands, devices, useImported);

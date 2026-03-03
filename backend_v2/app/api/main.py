@@ -39,6 +39,7 @@ from backend_v2.app.application.device_import_service import (
     DeviceConnectionValidator,
     DeviceImportService,
 )
+from backend_v2.app.application.command_template import render_commands
 from backend_v2.app.application.events import ExecutionEvent, utc_now
 from backend_v2.app.application.execution_engine import (
     DeviceWorker,
@@ -109,6 +110,7 @@ def to_response(job: JobRecord) -> JobResponse:
         creator=job.creator,
         status=job.status.value,
         created_at=job.created_at,
+        global_vars=job.global_vars,
         started_at=job.started_at,
         completed_at=job.completed_at,
     )
@@ -155,9 +157,33 @@ def _to_run_response(summary: JobRunSummary) -> RunJobResponse:
     )
 
 
-def _execute_run(job_id: str, payload: RunJobRequest) -> JobRunSummary:
-    control = control_store.get_or_create(job_id)
+def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
+    JobRecord,
+    list[DeviceTarget],
+    DeviceTarget,
+    dict[str, list[str]],
+    ExecutionConfig,
+]:
+    job = store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
     devices, canary = _resolve_run_targets(payload)
+    commands_by_device: dict[str, list[str]] = {}
+    for device in devices:
+        profile = device_store.get_by_key(device.key)
+        merged_vars = dict(job.global_vars)
+        if profile is not None:
+            merged_vars.update(profile.host_vars)
+        rendered, missing = render_commands(payload.commands, merged_vars)
+        if missing:
+            missing_vars = ", ".join(sorted(missing))
+            raise HTTPException(
+                status_code=400,
+                detail=(f"Missing command variables for {device.key}: {missing_vars}"),
+            )
+        commands_by_device[device.key] = rendered
+
     config = ExecutionConfig(
         concurrency_limit=payload.concurrency_limit,
         stagger_delay=payload.stagger_delay,
@@ -165,11 +191,22 @@ def _execute_run(job_id: str, payload: RunJobRequest) -> JobRunSummary:
         non_canary_retry_limit=payload.non_canary_retry_limit,
         retry_backoff_seconds=payload.retry_backoff_seconds,
     )
+    return job, devices, canary, commands_by_device, config
+
+
+def _execute_run_prepared(
+    job_id: str,
+    devices: list[DeviceTarget],
+    canary: DeviceTarget,
+    commands_by_device: dict[str, list[str]],
+    config: ExecutionConfig,
+) -> JobRunSummary:
+    control = control_store.get_or_create(job_id)
     summary = engine.run_job(
         job_id=job_id,
         devices=devices,
         canary=canary,
-        commands=payload.commands,
+        commands_by_device=commands_by_device,
         config=config,
         control=control,
     )
@@ -214,6 +251,7 @@ def import_devices(
                 password=d.password,
                 name=d.name,
                 verify_cmds=d.verify_cmds,
+                host_vars=d.host_vars,
                 connection_ok=d.connection_ok,
                 error_message=d.error_message,
             )
@@ -243,6 +281,7 @@ def list_devices() -> list[DeviceProfileResponse]:
             password=d.password,
             name=d.name,
             verify_cmds=d.verify_cmds,
+            host_vars=d.host_vars,
             connection_ok=d.connection_ok,
             error_message=d.error_message,
         )
@@ -253,7 +292,11 @@ def list_devices() -> list[DeviceProfileResponse]:
 @app.post("/api/v2/jobs", response_model=JobResponse)
 def create_job(payload: CreateJobRequest) -> JobResponse:
     """Create a queued job."""
-    job = service.create_job(job_name=payload.job_name, creator=payload.creator)
+    job = service.create_job(
+        job_name=payload.job_name,
+        creator=payload.creator,
+        global_vars=payload.global_vars,
+    )
     return to_response(job)
 
 
@@ -317,9 +360,10 @@ def apply_event(job_id: str, event_name: str) -> JobResponse:
 @app.post("/api/v2/jobs/{job_id}/run", response_model=RunJobResponse)
 def run_job(job_id: str, payload: RunJobRequest) -> RunJobResponse:
     """Run job with simulated worker and return summary."""
-    job = store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+    _, devices, canary, commands_by_device, config = _prepare_run(
+        job_id=job_id,
+        payload=payload,
+    )
 
     try:
         service.apply_event(job_id=job_id, event_name="start")
@@ -329,16 +373,23 @@ def run_job(job_id: str, payload: RunJobRequest) -> RunJobResponse:
     control.pause_event.clear()
     control.cancel_event.clear()
 
-    summary = _execute_run(job_id=job_id, payload=payload)
+    summary = _execute_run_prepared(
+        job_id=job_id,
+        devices=devices,
+        canary=canary,
+        commands_by_device=commands_by_device,
+        config=config,
+    )
     return _to_run_response(summary)
 
 
 @app.post("/api/v2/jobs/{job_id}/run/async", response_model=JobResponse)
 def run_job_async(job_id: str, payload: RunJobRequest) -> JobResponse:
     """Run job in background thread."""
-    job = store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+    job, devices, canary, commands_by_device, config = _prepare_run(
+        job_id=job_id,
+        payload=payload,
+    )
     try:
         service.apply_event(job_id=job_id, event_name="start")
     except ValueError:
@@ -348,7 +399,14 @@ def run_job_async(job_id: str, payload: RunJobRequest) -> JobResponse:
     control.cancel_event.clear()
 
     started = run_coordinator.start(
-        job_id=job_id, target=lambda: _execute_run(job_id, payload)
+        job_id=job_id,
+        target=lambda: _execute_run_prepared(
+            job_id=job_id,
+            devices=devices,
+            canary=canary,
+            commands_by_device=commands_by_device,
+            config=config,
+        ),
     )
     if not started:
         raise HTTPException(status_code=409, detail="Job run already in progress")

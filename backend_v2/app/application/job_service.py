@@ -58,7 +58,9 @@ class JobService:
         self.repository = repository
         self.state_machine = state_machine
 
-    def create_job(self, job_name: str, creator: str) -> JobRecord:
+    def create_job(
+        self, job_name: str, creator: str, global_vars: dict[str, str] | None = None
+    ) -> JobRecord:
         """Create a queued job."""
         job = JobRecord(
             job_id=str(uuid4()),
@@ -66,6 +68,7 @@ class JobService:
             creator=creator,
             status=JobStatus.QUEUED,
             created_at=utc_now(),
+            global_vars=dict(global_vars or {}),
         )
         self.repository.save(job)
         return job

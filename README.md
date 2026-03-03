@@ -54,6 +54,14 @@ make check
 make check-integration
 ```
 
+## Command variables (v2)
+
+- Use `{{var}}` placeholders in run commands.
+- Define job-level `global_vars` at `POST /api/v2/jobs`.
+- Define per-host `host_vars` in CSV import (`host_vars` column as JSON object string).
+- Resolution order is `host_vars > global_vars`.
+- Missing variables fail preflight with `HTTP 400` before any device command runs.
+
 ## Documentation
 
 - Full index (EN/JA): [docs/INDEX.md](docs/INDEX.md)
