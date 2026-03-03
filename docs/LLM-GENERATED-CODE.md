@@ -19,6 +19,8 @@ limitations under the License.
 -->
 # LLM生成コードについて
 
+English version: [LLM-GENERATED-CODE.en.md](LLM-GENERATED-CODE.en.md)
+
 ## 概要
 
 本リポジトリには、大規模言語モデル（LLM: Large Language Model）の支援により生成されたコードが含まれる可能性があります。このドキュメントでは、LLM生成コードの取り扱いに関する方針と推奨事項を説明します。

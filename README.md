@@ -55,6 +55,7 @@ make check-integration
 
 ## Documentation
 
+- Full index (EN/JA): [docs/INDEX.md](docs/INDEX.md)
 - v2 quickstart: [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
 - v2 quickstart (JA): [docs/QUICKSTART-v2.ja.md](docs/QUICKSTART-v2.ja.md)
 - v1->v2 migration notes: [docs/MIGRATION-v1-to-v2.md](docs/MIGRATION-v1-to-v2.md)

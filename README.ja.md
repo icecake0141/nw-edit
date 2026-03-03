@@ -53,6 +53,7 @@ make check-integration
 
 ## ドキュメント
 
+- ドキュメント一覧（英日）: [docs/INDEX.ja.md](docs/INDEX.ja.md)
 - v2 クイックスタート: [docs/QUICKSTART-v2.ja.md](docs/QUICKSTART-v2.ja.md)
 - v2 quickstart（英語）: [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
 - v1->v2 移行ノート: [docs/MIGRATION-v1-to-v2.ja.md](docs/MIGRATION-v1-to-v2.ja.md)
