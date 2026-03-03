@@ -41,7 +41,7 @@ You may obtain a copy of the License at
       min-height: 100vh;
     }
     .wrap {
-      max-width: 1024px;
+      max-width: 1080px;
       margin: 0 auto;
       padding: 24px;
       display: grid;
@@ -70,6 +70,21 @@ You may obtain a copy of the License at
       gap: 12px;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
+    .nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .nav button[aria-pressed="true"] {
+      outline: 2px solid #0b4b45;
+      outline-offset: 1px;
+    }
+    .page {
+      display: none;
+    }
+    .page.active {
+      display: block;
+    }
     label {
       display: block;
       font-size: 0.86rem;
@@ -89,7 +104,7 @@ You may obtain a copy of the License at
     .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
     .split {
       display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-columns: 1fr 1fr;
       gap: 16px;
     }
     @media (max-width: 900px) {
@@ -115,11 +130,13 @@ You may obtain a copy of the License at
       max-height: 300px;
       overflow: auto;
       font-size: 0.86rem;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
     .history-list {
       display: grid;
       gap: 8px;
-      max-height: 220px;
+      max-height: 360px;
       overflow: auto;
     }
     .history-item {
@@ -153,49 +170,71 @@ You may obtain a copy of the License at
       </div>
     </section>
 
-    <section class="split">
-      <div class="panel">
-        <label for="csvInput">CSV Import (host,port,device_type,username,password,name,verify_cmds)</label>
-        <textarea id="csvInput">host,port,device_type,username,password,name,verify_cmds
+    <section class="panel nav" aria-label="v2 pages">
+      <button class="secondary nav-btn" data-page="import" aria-pressed="true">Import</button>
+      <button class="secondary nav-btn" data-page="create" aria-pressed="false">Create</button>
+      <button class="secondary nav-btn" data-page="monitor" aria-pressed="false">Monitor</button>
+      <button class="secondary nav-btn" data-page="history" aria-pressed="false">History</button>
+      <button class="secondary nav-btn" data-page="detail" aria-pressed="false">Detail</button>
+    </section>
+
+    <section class="panel page active" data-page="import">
+      <label for="csvInput">CSV Import (host,port,device_type,username,password,name,verify_cmds)</label>
+      <textarea id="csvInput">host,port,device_type,username,password,name,verify_cmds
 10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run
 10.0.0.2,22,cisco_ios,admin,pass,edge-2,show ip interface brief</textarea>
-        <div class="btn-row">
-          <button class="secondary" id="importBtn">Import CSV</button>
-          <button class="secondary" id="refreshDevicesBtn">Refresh Devices</button>
-        </div>
-        <p class="muted" id="deviceCount">imported devices: 0</p>
+      <div class="btn-row">
+        <button class="secondary" id="importBtn">Import CSV</button>
+        <button class="secondary" id="refreshDevicesBtn">Refresh Devices</button>
+      </div>
+      <p class="muted" id="deviceCount">imported devices: 0</p>
+    </section>
 
-        <label for="devices">Ad-hoc Devices (host:port per line)</label>
-        <textarea id="devices">10.0.0.1:22
+    <section class="panel page" data-page="create">
+      <label for="devices">Ad-hoc Devices (host:port per line)</label>
+      <textarea id="devices">10.0.0.1:22
 10.0.0.2:22
 10.0.0.3:22</textarea>
-        <label><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
-        <label for="commands">Commands (one line each)</label>
-        <textarea id="commands">show version
+      <label><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
+      <label for="commands">Commands (one line each)</label>
+      <textarea id="commands">show version
 show ip interface brief</textarea>
-        <div class="btn-row">
-          <button class="primary" id="runBtn">Create + Run</button>
-          <button class="primary" id="runAsyncBtn">Create + Run Async</button>
-          <button class="secondary" id="pauseBtn">Pause Active</button>
-          <button class="secondary" id="resumeBtn">Resume Active</button>
-          <button class="secondary" id="cancelBtn">Cancel Active</button>
-          <button class="secondary" id="listJobsBtn">Refresh Jobs</button>
-          <button class="secondary" id="clearBtn">Clear Logs</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <label>Job History</label>
-        <div id="history" class="history-list"></div>
+      <div class="btn-row">
+        <button class="primary" id="runBtn">Create + Run</button>
+        <button class="primary" id="runAsyncBtn">Create + Run Async</button>
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel page" data-page="monitor">
+      <div class="btn-row">
+        <button class="secondary" id="pauseBtn">Pause Active</button>
+        <button class="secondary" id="resumeBtn">Resume Active</button>
+        <button class="secondary" id="cancelBtn">Cancel Active</button>
+        <button class="secondary" id="refreshActiveBtn">Refresh Active</button>
+      </div>
+      <p class="muted" id="activeSummary">active job: none</p>
       <label>Activity Log</label>
       <pre id="log"></pre>
+      <div class="btn-row" style="margin-top: 10px;">
+        <button class="secondary" id="clearBtn">Clear Logs</button>
+      </div>
+    </section>
+
+    <section class="panel page" data-page="history">
+      <div class="btn-row">
+        <button class="secondary" id="listJobsBtn">Refresh Jobs</button>
+      </div>
+      <label>Job History</label>
+      <div id="history" class="history-list"></div>
+    </section>
+
+    <section class="panel page" data-page="detail">
+      <p class="muted" id="detailMeta">No job selected</p>
+      <label for="detailData">Selected Job Result</label>
+      <pre id="detailData"></pre>
     </section>
   </div>
 
-  <script src="./app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

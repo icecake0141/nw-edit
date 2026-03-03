@@ -12,8 +12,18 @@
  * Review required for correctness, security, and licensing.
  */
 
+// @ts-check
+
+import { NwEditApiClient } from "./api-client.js";
+
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
+const detailMetaEl = document.getElementById("detailMeta");
+const detailDataEl = document.getElementById("detailData");
+const activeSummaryEl = document.getElementById("activeSummary");
+const historyEl = document.getElementById("history");
+const deviceCountEl = document.getElementById("deviceCount");
+const useImportedEl = document.getElementById("useImported");
 const runBtn = document.getElementById("runBtn");
 const runAsyncBtn = document.getElementById("runAsyncBtn");
 const pauseBtn = document.getElementById("pauseBtn");
@@ -23,15 +33,28 @@ const clearBtn = document.getElementById("clearBtn");
 const importBtn = document.getElementById("importBtn");
 const refreshDevicesBtn = document.getElementById("refreshDevicesBtn");
 const listJobsBtn = document.getElementById("listJobsBtn");
-const historyEl = document.getElementById("history");
-const deviceCountEl = document.getElementById("deviceCount");
-const useImportedEl = document.getElementById("useImported");
+const refreshActiveBtn = document.getElementById("refreshActiveBtn");
 
+/** @type {WebSocket|null} */
 let activeSocket = null;
-let latestActiveJobId = null;
+/** @type {string|null} */
+let selectedJobId = null;
+
 pauseBtn.disabled = true;
 resumeBtn.disabled = true;
 cancelBtn.disabled = true;
+
+function currentApiBase() {
+  return document.getElementById("apiBase").value.trim();
+}
+
+function client() {
+  return new NwEditApiClient(currentApiBase());
+}
+
+function toWsBase(apiBase) {
+  return apiBase.replace("http://", "ws://").replace("https://", "wss://");
+}
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -50,8 +73,7 @@ function parseDevices(text) {
     .filter(Boolean)
     .map((line) => {
       const [host, rawPort] = line.split(":");
-      const port = Number(rawPort || "22");
-      return { host, port };
+      return { host, port: Number(rawPort || "22") };
     });
 }
 
@@ -62,205 +84,12 @@ function parseCommands(text) {
     .filter(Boolean);
 }
 
-function toWsBase(apiBase) {
-  return apiBase.replace("http://", "ws://").replace("https://", "wss://");
-}
-
-async function createJob(apiBase, jobName, creator) {
-  const response = await fetch(`${apiBase}/api/v2/jobs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_name: jobName, creator }),
-  });
-  if (!response.ok) {
-    throw new Error(`create job failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function runJob(apiBase, jobId, devices, commands, useImported) {
-  const payload = {
-    commands,
-    concurrency_limit: 2,
-    stagger_delay: 0.0,
-    stop_on_error: true,
-    non_canary_retry_limit: 1,
-    retry_backoff_seconds: 0.0,
-  };
-  if (!useImported) {
-    payload.devices = devices;
-    payload.canary = devices[0];
-  }
-  const response = await fetch(`${apiBase}/api/v2/jobs/${jobId}/run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`run job failed: ${response.status} ${text}`);
-  }
-  return response.json();
-}
-
-async function runJobAsync(apiBase, jobId, devices, commands, useImported) {
-  const payload = {
-    commands,
-    concurrency_limit: 2,
-    stagger_delay: 0.0,
-    stop_on_error: true,
-    non_canary_retry_limit: 1,
-    retry_backoff_seconds: 0.0,
-  };
-  if (!useImported) {
-    payload.devices = devices;
-    payload.canary = devices[0];
-  }
-  const response = await fetch(`${apiBase}/api/v2/jobs/${jobId}/run/async`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`run async failed: ${response.status} ${text}`);
-  }
-  return response.json();
-}
-
-async function importCsv(apiBase, csvInput) {
-  const response = await fetch(`${apiBase}/api/v2/devices/import`, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: csvInput,
-  });
-  if (!response.ok) {
-    throw new Error(`import failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function fetchDevices(apiBase) {
-  const response = await fetch(`${apiBase}/api/v2/devices`);
-  if (!response.ok) {
-    throw new Error(`device fetch failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function fetchJobs(apiBase) {
-  const response = await fetch(`${apiBase}/api/v2/jobs`);
-  if (!response.ok) {
-    throw new Error(`job list failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function fetchActiveJob(apiBase) {
-  const response = await fetch(`${apiBase}/api/v2/jobs/active`);
-  if (!response.ok) {
-    throw new Error(`active job failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function controlActiveJob(apiBase, action) {
-  const active = await fetchActiveJob(apiBase);
-  if (!active.active || !active.job) {
-    throw new Error("no active job");
-  }
-  const response = await fetch(`${apiBase}/api/v2/jobs/${active.job.job_id}/${action}`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`${action} failed: ${response.status} ${text}`);
-  }
-  return response.json();
-}
-
-async function fetchJob(apiBase, jobId) {
-  const response = await fetch(`${apiBase}/api/v2/jobs/${jobId}`);
-  if (!response.ok) {
-    throw new Error(`job detail failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function fetchJobEvents(apiBase, jobId) {
-  const response = await fetch(`${apiBase}/api/v2/jobs/${jobId}/events`);
-  if (!response.ok) {
-    throw new Error(`job events failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-async function fetchJobResult(apiBase, jobId) {
-  const response = await fetch(`${apiBase}/api/v2/jobs/${jobId}/result`);
-  if (!response.ok) {
-    throw new Error(`job result failed: ${response.status}`);
-  }
-  return response.json();
-}
-
-function renderHistory(items) {
-  historyEl.replaceChildren();
-  if (!items.length) {
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.textContent = "no jobs yet";
-    historyEl.append(div);
-    return;
-  }
-  items.forEach((job) => {
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.innerHTML = `
-      <div><strong>${job.job_name}</strong></div>
-      <div class="muted">${job.job_id}</div>
-      <div class="muted">status: ${job.status}</div>
-    `;
-    div.addEventListener("click", async () => {
-      const apiBase = document.getElementById("apiBase").value.trim();
-      try {
-        const detail = await fetchJob(apiBase, job.job_id);
-        const events = await fetchJobEvents(apiBase, job.job_id);
-        const result = await fetchJobResult(apiBase, job.job_id);
-        appendLog(
-          `history selected: ${detail.job_id} status=${detail.status} events=${events.length}`
-        );
-        Object.entries(result.device_results || {}).forEach(([key, value]) => {
-          appendLog(`result ${key}: status=${value.status} attempts=${value.attempts}`);
-        });
-      } catch (error) {
-        appendLog(String(error));
-      }
-    });
-    historyEl.append(div);
-  });
-}
-
-async function refreshImportedDevices() {
-  const apiBase = document.getElementById("apiBase").value.trim();
-  const devices = await fetchDevices(apiBase);
-  deviceCountEl.textContent = `imported devices: ${devices.length}`;
-  appendLog(`loaded imported devices: ${devices.length}`);
-}
-
-async function refreshJobs() {
-  const apiBase = document.getElementById("apiBase").value.trim();
-  const jobs = await fetchJobs(apiBase);
-  renderHistory(jobs);
-  appendLog(`loaded jobs: ${jobs.length}`);
-}
-
 function openJobSocket(apiBase, jobId) {
   if (activeSocket) {
     activeSocket.close();
     activeSocket = null;
   }
-  const wsUrl = `${toWsBase(apiBase)}/ws/v2/jobs/${jobId}`;
-  activeSocket = new WebSocket(wsUrl);
+  activeSocket = new WebSocket(`${toWsBase(apiBase)}/ws/v2/jobs/${jobId}`);
   activeSocket.onmessage = (event) => {
     const data = JSON.parse(event.data);
     appendLog(
@@ -270,54 +99,89 @@ function openJobSocket(apiBase, jobId) {
   activeSocket.onerror = () => appendLog("websocket error");
 }
 
-async function run() {
-  const apiBase = document.getElementById("apiBase").value.trim();
-  const jobName = document.getElementById("jobName").value.trim();
-  const creator = document.getElementById("creator").value.trim();
-  const devices = parseDevices(document.getElementById("devices").value);
-  const commands = parseCommands(document.getElementById("commands").value);
-  const useImported = useImportedEl.checked;
-
-  if (commands.length === 0) {
-    appendLog("devices or commands is empty");
-    return;
-  }
-  if (!useImported && devices.length === 0) {
-    appendLog("ad-hoc devices is empty");
-    return;
-  }
-
-  setStatus("creating");
-  runBtn.disabled = true;
-  try {
-    const job = await createJob(apiBase, jobName, creator);
-    appendLog(`job created: ${job.job_id}`);
-    openJobSocket(apiBase, job.job_id);
-
-    setStatus("running");
-    const result = await runJob(apiBase, job.job_id, devices, commands, useImported);
-    appendLog(`run completed: ${result.status}`);
-    Object.entries(result.device_results).forEach(([key, value]) => {
-      appendLog(`${key} => status=${value.status} attempts=${value.attempts}`);
-      if (value.diff) {
-        appendLog(`${key} diff:\n${value.diff}`);
-      }
-    });
-    setStatus(result.status);
-    await refreshJobs();
-  } catch (error) {
-    appendLog(String(error));
-    setStatus("failed");
-  } finally {
-    runBtn.disabled = false;
-    if (activeSocket) {
-      setTimeout(() => activeSocket.close(), 800);
-    }
-  }
+function renderJobDetail(job, events, result) {
+  const payload = {
+    job,
+    event_count: events.length,
+    result,
+  };
+  detailMetaEl.textContent = `selected: ${job.job_id} (${job.status}) events=${events.length}`;
+  detailDataEl.textContent = JSON.stringify(payload, null, 2);
 }
 
-async function runAsync() {
-  const apiBase = document.getElementById("apiBase").value.trim();
+function switchPage(pageName) {
+  document.querySelectorAll(".page").forEach((el) => {
+    el.classList.toggle("active", el.getAttribute("data-page") === pageName);
+  });
+  document.querySelectorAll(".nav-btn").forEach((el) => {
+    const pressed = el.getAttribute("data-page") === pageName;
+    el.setAttribute("aria-pressed", pressed ? "true" : "false");
+  });
+}
+
+async function refreshImportedDevices() {
+  const devices = await client().listDevices();
+  deviceCountEl.textContent = `imported devices: ${devices.length}`;
+  appendLog(`loaded imported devices: ${devices.length}`);
+}
+
+async function refreshJobs() {
+  const jobs = await client().listJobs();
+  historyEl.replaceChildren();
+
+  if (jobs.length === 0) {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.textContent = "no jobs yet";
+    historyEl.append(div);
+    return;
+  }
+
+  jobs.forEach((job) => {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.innerHTML = `<div><strong>${job.job_name}</strong></div>
+      <div class="muted">${job.job_id}</div>
+      <div class="muted">status: ${job.status}</div>`;
+    div.addEventListener("click", async () => {
+      try {
+        selectedJobId = job.job_id;
+        const [detail, events, result] = await Promise.all([
+          client().getJob(job.job_id),
+          client().listJobEvents(job.job_id),
+          client().getJobResult(job.job_id).catch(() => ({ job_id: job.job_id, status: "pending", device_results: {} })),
+        ]);
+        renderJobDetail(detail, events, result);
+        appendLog(`history selected: ${job.job_id}`);
+        switchPage("detail");
+      } catch (error) {
+        appendLog(String(error));
+      }
+    });
+    historyEl.append(div);
+  });
+
+  appendLog(`loaded jobs: ${jobs.length}`);
+}
+
+async function refreshActive() {
+  const active = await client().getActiveJob();
+  if (!active.active || !active.job) {
+    activeSummaryEl.textContent = "active job: none";
+    pauseBtn.disabled = true;
+    resumeBtn.disabled = true;
+    cancelBtn.disabled = true;
+    return;
+  }
+
+  activeSummaryEl.textContent = `active job: ${active.job.job_id} (${active.job.status})`;
+  setStatus(`active:${active.job.status}`);
+  pauseBtn.disabled = active.job.status !== "running";
+  resumeBtn.disabled = active.job.status !== "paused";
+  cancelBtn.disabled = !["running", "paused", "queued"].includes(active.job.status);
+}
+
+async function runSync() {
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
   const devices = parseDevices(document.getElementById("devices").value);
@@ -333,35 +197,81 @@ async function runAsync() {
     return;
   }
 
-  setStatus("creating-async");
-  runAsyncBtn.disabled = true;
+  runBtn.disabled = true;
+  setStatus("creating");
   try {
-    const job = await createJob(apiBase, jobName, creator);
+    const job = await client().createJob(jobName, creator);
     appendLog(`job created: ${job.job_id}`);
-    openJobSocket(apiBase, job.job_id);
-    const started = await runJobAsync(apiBase, job.job_id, devices, commands, useImported);
+    openJobSocket(currentApiBase(), job.job_id);
+
+    const result = await client().runJob(job.job_id, commands, devices, useImported);
+    appendLog(`run completed: ${result.status}`);
+    Object.entries(result.device_results).forEach(([key, value]) => {
+      appendLog(`${key} => status=${value.status} attempts=${value.attempts}`);
+      if (value.error_code) {
+        appendLog(`${key} error_code=${value.error_code}`);
+      }
+    });
+
+    setStatus(result.status);
+    await refreshJobs();
+    await refreshActive();
+  } catch (error) {
+    setStatus("failed");
+    appendLog(String(error));
+  } finally {
+    runBtn.disabled = false;
+    if (activeSocket) {
+      setTimeout(() => activeSocket && activeSocket.close(), 800);
+    }
+  }
+}
+
+async function runAsync() {
+  const jobName = document.getElementById("jobName").value.trim();
+  const creator = document.getElementById("creator").value.trim();
+  const devices = parseDevices(document.getElementById("devices").value);
+  const commands = parseCommands(document.getElementById("commands").value);
+  const useImported = useImportedEl.checked;
+
+  if (commands.length === 0) {
+    appendLog("commands is empty");
+    return;
+  }
+  if (!useImported && devices.length === 0) {
+    appendLog("ad-hoc devices is empty");
+    return;
+  }
+
+  runAsyncBtn.disabled = true;
+  setStatus("creating-async");
+  try {
+    const job = await client().createJob(jobName, creator);
+    appendLog(`job created: ${job.job_id}`);
+    openJobSocket(currentApiBase(), job.job_id);
+    const started = await client().runJobAsync(job.job_id, commands, devices, useImported);
     appendLog(`run async started: ${started.status}`);
     setStatus("running");
     await refreshJobs();
+    await refreshActive();
+    switchPage("monitor");
   } catch (error) {
-    appendLog(String(error));
     setStatus("failed");
+    appendLog(String(error));
   } finally {
     runAsyncBtn.disabled = false;
   }
 }
 
-runBtn.addEventListener("click", run);
+runBtn.addEventListener("click", runSync);
 runAsyncBtn.addEventListener("click", runAsync);
+
 importBtn.addEventListener("click", async () => {
-  const apiBase = document.getElementById("apiBase").value.trim();
   const csvInput = document.getElementById("csvInput").value;
   try {
-    const result = await importCsv(apiBase, csvInput);
-    appendLog(
-      `import success: valid=${result.devices.length} failed_rows=${result.failed_rows.length}`
-    );
-    if (result.failed_rows.length) {
+    const result = await client().importDevices(csvInput);
+    appendLog(`import success: valid=${result.devices.length} failed_rows=${result.failed_rows.length}`);
+    if (result.failed_rows.length > 0) {
       appendLog(`first failure: ${result.failed_rows[0].error}`);
     }
     await refreshImportedDevices();
@@ -369,81 +279,70 @@ importBtn.addEventListener("click", async () => {
     appendLog(String(error));
   }
 });
-refreshDevicesBtn.addEventListener("click", async () => {
-  try {
-    await refreshImportedDevices();
-  } catch (error) {
-    appendLog(String(error));
-  }
-});
-listJobsBtn.addEventListener("click", async () => {
-  try {
-    await refreshJobs();
-  } catch (error) {
-    appendLog(String(error));
-  }
-});
-clearBtn.addEventListener("click", () => {
-  logEl.textContent = "";
+
+refreshDevicesBtn.addEventListener("click", () => {
+  refreshImportedDevices().catch((error) => appendLog(String(error)));
 });
 
-refreshImportedDevices().catch(() => {});
-refreshJobs().catch(() => {});
+listJobsBtn.addEventListener("click", () => {
+  refreshJobs().catch((error) => appendLog(String(error)));
+});
 
-setInterval(async () => {
-  const apiBase = document.getElementById("apiBase").value.trim();
-  try {
-    const active = await fetchActiveJob(apiBase);
-    if (active.active && active.job) {
-      latestActiveJobId = active.job.job_id;
-      setStatus(`active:${active.job.status}`);
-      pauseBtn.disabled = active.job.status !== "running";
-      resumeBtn.disabled = active.job.status !== "paused";
-      cancelBtn.disabled = !["running", "paused", "queued"].includes(active.job.status);
-    } else {
-      latestActiveJobId = null;
-      pauseBtn.disabled = true;
-      resumeBtn.disabled = true;
-      cancelBtn.disabled = true;
-    }
-  } catch (error) {
-    appendLog(String(error));
-  }
-}, 4000);
+refreshActiveBtn.addEventListener("click", () => {
+  refreshActive().catch((error) => appendLog(String(error)));
+});
 
 pauseBtn.addEventListener("click", async () => {
-  const apiBase = document.getElementById("apiBase").value.trim();
   try {
-    const result = await controlActiveJob(apiBase, "pause");
+    const result = await client().controlActiveJob("pause");
     appendLog(`paused ${result.job_id}`);
     setStatus("paused");
+    await refreshActive();
   } catch (error) {
     appendLog(String(error));
   }
 });
 
 resumeBtn.addEventListener("click", async () => {
-  const apiBase = document.getElementById("apiBase").value.trim();
   try {
-    const result = await controlActiveJob(apiBase, "resume");
+    const result = await client().controlActiveJob("resume");
     appendLog(`resumed ${result.job_id}`);
     setStatus("running");
+    await refreshActive();
   } catch (error) {
     appendLog(String(error));
   }
 });
 
 cancelBtn.addEventListener("click", async () => {
-  const apiBase = document.getElementById("apiBase").value.trim();
   try {
-    const result = await controlActiveJob(apiBase, "cancel");
+    const result = await client().controlActiveJob("cancel");
     appendLog(`cancelled ${result.job_id}`);
     setStatus("cancelled");
-    if (latestActiveJobId) {
-      const events = await fetchJobEvents(apiBase, latestActiveJobId);
-      appendLog(`events after cancel: ${events.length}`);
+    await refreshActive();
+    if (selectedJobId) {
+      const events = await client().listJobEvents(selectedJobId);
+      appendLog(`selected job events: ${events.length}`);
     }
   } catch (error) {
     appendLog(String(error));
   }
 });
+
+clearBtn.addEventListener("click", () => {
+  logEl.textContent = "";
+});
+
+document.querySelectorAll(".nav-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    switchPage(btn.getAttribute("data-page") || "import");
+  });
+});
+
+setInterval(() => {
+  refreshActive().catch((error) => appendLog(String(error)));
+}, 4000);
+
+refreshImportedDevices().catch(() => {});
+refreshJobs().catch(() => {});
+refreshActive().catch(() => {});

@@ -20,7 +20,7 @@ You may obtain a copy of the License at
 - [x] Normalize connection/command failures into structured status codes.
 - [x] Ensure `pre_output`, `apply_output`, `post_output`, and `diff` are always populated consistently.
 - [x] Add diff truncation limits and response metadata for large outputs.
-- [ ] Split `frontend_v2` into dedicated pages (Import, Create, Monitor, History, Detail).
-- [ ] Replace ad-hoc frontend fetch calls with a typed API client.
-- [ ] Finalize migration notes and v2 release checklist.
-- [ ] Switch default docs/start flow to v2 and mark v1 as deprecated.
+- [x] Split `frontend_v2` into dedicated pages (Import, Create, Monitor, History, Detail).
+- [x] Replace ad-hoc frontend fetch calls with a typed API client.
+- [x] Finalize migration notes and v2 release checklist.
+- [x] Switch default docs/start flow to v2 and mark v1 as deprecated.
