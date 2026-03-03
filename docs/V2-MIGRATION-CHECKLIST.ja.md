@@ -43,8 +43,8 @@ You may obtain a copy of the License at
 - [x] `flake8`
 - [x] `mypy --explicit-package-bases backend_v2/app`
 - [x] `pre-commit run --all-files`
-- [x] `pytest tests/unit backend_v2/tests/unit -v`
-- [x] `pytest tests/integration backend_v2/tests/integration -v -m integration`
+- [x] `PYTHONPATH=. pytest backend_v2/tests/unit -v`
+- [x] `PYTHONPATH=. pytest backend_v2/tests/integration -v -m integration`
 - [x] 移行PRで CI green
 
 ## 4. 運用準備
