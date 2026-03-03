@@ -21,7 +21,7 @@ This guide summarizes behavior differences and rollout guidance when migrating f
 
 - Default path: v2 (`./start_v2.sh`)
 - v1 runtime path was removed after hard cutover (`start.sh` and `docs/QUICKSTART.md` are no longer available).
-- Shared modules under `backend/app` remain for v2 netmiko adapters.
+- Legacy v1 backend implementation code under `backend/app` has been removed.
 
 ## API differences
 

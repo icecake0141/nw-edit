@@ -91,9 +91,10 @@ Migration completion sign-off:
 - Date: `2026-03-03` (soft deprecation), `2026-03-03` (hard cutover)
 - Decision: `GO`
 - Risks accepted:
-  - Shared `backend/app` modules still exist for legacy test/runtime compatibility
+  - Integration tests require docker-backed mock SSH for full local execution
 - Follow-up issues:
   - Completed on `2026-03-03`: v2 netmiko adapters decoupled from `backend/app` imports
+  - Completed on `2026-03-03`: legacy v1 backend implementation code (`backend/app`) removed
 
 Evidence:
 

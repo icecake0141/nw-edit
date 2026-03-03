@@ -118,4 +118,3 @@ docker compose --profile test down
 - 実行時データはインメモリのみ（永続DBなし）。
 - 認証情報はプロセスメモリ上で平文扱い。
 - hard cutover により v1 ランタイム導線（`start.sh`、`frontend`、`docs/QUICKSTART.md`）は削除済み。
-- `backend/app` 配下の一部モジュールは v2 netmiko 実行/検証の内部依存として利用。

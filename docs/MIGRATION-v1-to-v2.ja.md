@@ -21,7 +21,7 @@ You may obtain a copy of the License at
 
 - デフォルト導線: v2（`./start_v2.sh`）
 - hard cutover 後は v1 ランタイム導線を削除（`start.sh`、`docs/QUICKSTART.md` は提供終了）。
-- `backend/app` 配下の一部モジュールは v2 netmiko アダプタの共通依存として継続利用。
+- legacy な v1 backend 実装コード（`backend/app`）は削除済み。
 
 ## API差分
 

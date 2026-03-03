@@ -109,7 +109,7 @@ if python3 -c "import fastapi" &> /dev/null; then
     pass
 else
     warn
-    echo "  Run: python3 -m pip install -r backend/requirements.txt"
+    echo "  Run: python3 -m pip install -r backend_v2/requirements.txt"
 fi
 
 # Run linting if tools are available
@@ -208,7 +208,7 @@ if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}✓ All checks passed!${NC}"
     echo ""
     echo "Next steps:"
-    echo "1. Install dependencies: python3 -m pip install -r backend/requirements-dev.txt"
+    echo "1. Install dependencies: python3 -m pip install -r backend_v2/requirements-dev.txt"
     echo "2. Run tests: PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v"
     echo "3. Start v2 application: ./start_v2.sh"
     exit 0
