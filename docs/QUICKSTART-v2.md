@@ -125,5 +125,5 @@ docker compose --profile test down
 
 - In-memory runtime only (no persistent DB/state).
 - Credentials are handled in plaintext in process memory.
-- v1 and v2 currently coexist in repository; v1 is legacy/deprecated.
-- Hard removal of v1 paths is out of scope for this quickstart and should be handled in a separate cleanup PR.
+- v1 runtime paths (`start.sh`, `frontend`, `docs/QUICKSTART.md`) have been removed after hard cutover.
+- Some modules under `backend/app` remain as internal dependencies for v2 netmiko execution/validation.

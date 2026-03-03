@@ -20,7 +20,8 @@ This guide summarizes behavior differences and rollout guidance when migrating f
 ## Current recommendation
 
 - Default path: v2 (`./start_v2.sh`)
-- v1 (`./start.sh`, `docs/QUICKSTART.md`) is legacy and should only be used for temporary fallback or comparison.
+- v1 runtime path was removed after hard cutover (`start.sh` and `docs/QUICKSTART.md` are no longer available).
+- Shared modules under `backend/app` remain for v2 netmiko adapters.
 
 ## API differences
 
@@ -54,12 +55,12 @@ This guide summarizes behavior differences and rollout guidance when migrating f
 2. Validate pause/resume/cancel operational flow in netmiko mode.
 3. Update internal runbooks and dashboards to consume v2 endpoints and metadata.
 4. Mark v1 endpoints and startup flow as deprecated in team docs.
-5. Remove v1 runtime paths only after sign-off in `V2-MIGRATION-CHECKLIST.md`.
+5. Execute hard cutover and remove v1 runtime paths after sign-off in `V2-MIGRATION-CHECKLIST.md`.
 
 ## Rollback policy
 
-- During migration window, rollback means temporarily switching startup/docs references back to v1.
-- After hard cutover and v1 removal, rollback requires reverting release commits that removed v1 code paths.
+- Before hard cutover, rollback means temporarily switching startup/docs references back to v1.
+- After hard cutover, rollback requires reverting release commits that removed v1 runtime code paths.
 
 ## Release checklist pointer
 

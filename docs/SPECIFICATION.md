@@ -100,4 +100,5 @@ For full coverage, see Netmiko documentation.
 - No rollback implementation.
 - Plaintext credential handling in process memory.
 - Single-process scalability constraints.
-- v1 and v2 coexist in repository; v1 is legacy/deprecated.
+- v1 runtime path is removed after hard cutover; only v2 startup/docs flow is supported.
+- Some `backend/app` modules remain as shared internals for v2 netmiko adapters.

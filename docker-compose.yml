@@ -18,28 +18,6 @@
 # limitations under the License.
 #
 services:
-  backend:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./backend/app:/app/app
-    networks:
-      - nw-edit-network
-
-  frontend:
-    image: nginx:alpine
-    ports:
-      - "3000:80"
-    volumes:
-      - ./frontend/public:/usr/share/nginx/html:ro
-    networks:
-      - nw-edit-network
-    depends_on:
-      - backend
-
   mock-ssh:
     build: ./tests/mock_ssh_server
     ports:

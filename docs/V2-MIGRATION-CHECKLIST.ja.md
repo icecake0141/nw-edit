@@ -66,18 +66,18 @@ You may obtain a copy of the License at
 - [x] README 既定例が v2
 - [x] CI 既定ゲートに v2 チェックを含む
 - [x] v1 ステータス（deprecated/removed）を文書化
+- [x] v1 ランタイム導線（`start.sh`、`frontend`、`docs/QUICKSTART.md`）を削除
 
 ## 7. サインオフ記録
 
 - Scope owner: `icecake0141`
 - Reviewer(s): `PR #79, #81 でのメンテナレビュー`
-- Date: `2026-03-03`
+- Date: `2026-03-03`（soft deprecation）, `2026-03-03`（hard cutover）
 - Decision: `GO`
 - Accepted risks:
-  - ソフトdeprecation期間中は v1 コードが残る
-  - fallback 用に legacy ドキュメントを維持
+  - `backend/app` の一部モジュールが v2 内部依存として残る
 - Follow-up:
-  - 必要なら別PRで v1 ランタイムを物理削除
+  - 将来的に v2 の netmiko 依存を `backend/app` から分離可能か検討
 
 証跡:
 
