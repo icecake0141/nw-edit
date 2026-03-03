@@ -31,17 +31,16 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 2. **Install development dependencies**
    ```bash
-   cd backend
-   pip install -r requirements-dev.txt
+   python3 -m pip install -r backend_v2/requirements-dev.txt
    ```
 
 3. **Run tests**
    ```bash
-   # Unit tests
-   pytest tests/unit -v
-   
+   # Unit tests (v2)
+   PYTHONPATH=. pytest backend_v2/tests/unit -v
+
    # With coverage
-   pytest tests/unit -v --cov=backend/app --cov-report=html
+   PYTHONPATH=. pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=html
    ```
 
 ## Code Standards
@@ -50,14 +49,12 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 - **Formatting**: Use `black` for code formatting
   ```bash
-  cd backend
-  black app/ ../tests/
+  black backend_v2/app backend_v2/tests
   ```
 
 - **Linting**: Code must pass `flake8` checks
   ```bash
-  cd backend
-  flake8 app/ ../tests/ --max-line-length=120 --extend-ignore=E203,W503
+  flake8 backend_v2/app backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
   ```
 
 - **Type Hints**: Use type hints where appropriate
@@ -100,10 +97,8 @@ docs: Update API documentation
 
 3. **Run tests and linting**
    ```bash
-   cd backend
-   black app/ ../tests/
-   flake8 app/ ../tests/ --max-line-length=120 --extend-ignore=E203,W503
-   pytest tests/unit -v
+   make check
+   RUN_INTEGRATION=1 ./scripts/run_v2_checks.sh
    ```
 
 4. **Commit your changes** with clear commit messages

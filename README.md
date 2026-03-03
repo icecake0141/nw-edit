@@ -27,7 +27,7 @@ A minimal web application for applying multi-line configuration commands to mult
 
 - v2 path (`backend_v2` + `frontend_v2`) is the default.
 - v1 runtime path (`start.sh`, `frontend`) has been removed after hard cutover.
-- Some modules under `backend/app` remain as shared implementation dependencies for v2.
+- Legacy v1 backend implementation code (`backend/app`) has been removed.
 - Credentials are handled in plaintext and stored in memory only.
 
 ## Install and Run (v2)
@@ -40,7 +40,7 @@ A minimal web application for applying multi-line configuration commands to mult
 ### Quick start
 
 ```bash
-python3 -m pip install -r backend/requirements-dev.txt
+python3 -m pip install -r backend_v2/requirements-dev.txt
 ./start_v2.sh
 ```
 

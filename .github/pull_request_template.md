@@ -33,7 +33,7 @@ You may obtain a copy of the License at
 ## Validation Commands
 
 ```bash
-python3 -m pip install -r backend/requirements-dev.txt
+python3 -m pip install -r backend_v2/requirements-dev.txt
 make check
 ./verify.sh
 # Optional (docker-backed integration path)

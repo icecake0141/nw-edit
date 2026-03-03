@@ -75,9 +75,10 @@ You may obtain a copy of the License at
 - Date: `2026-03-03`（soft deprecation）, `2026-03-03`（hard cutover）
 - Decision: `GO`
 - Accepted risks:
-  - legacy テスト/互換性のため `backend/app` モジュール自体は継続配置
+  - ローカルで統合テストを完全実行するには docker-backed mock SSH が必要
 - Follow-up:
   - `2026-03-03` 対応済み: v2 の netmiko 依存 import を `backend/app` から分離
+  - `2026-03-03` 対応済み: legacy な v1 backend 実装コード（`backend/app`）を削除
 
 証跡:
 

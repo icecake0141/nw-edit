@@ -25,7 +25,7 @@ limitations under the License.
 
 - v2 系（`backend_v2` + `frontend_v2`）をデフォルト運用とします。
 - hard cutover 後、v1 ランタイム導線（`start.sh`、`frontend`）は削除済みです。
-- `backend/app` 配下の一部モジュールは v2 の共通実装依存として継続利用します。
+- legacy な v1 backend 実装コード（`backend/app`）は削除済みです。
 - 認証情報は平文のままプロセスメモリ上で扱います（永続化なし）。
 
 ## インストールと起動（v2）
@@ -38,7 +38,7 @@ limitations under the License.
 ### クイックスタート
 
 ```bash
-python3 -m pip install -r backend/requirements-dev.txt
+python3 -m pip install -r backend_v2/requirements-dev.txt
 ./start_v2.sh
 ```
 

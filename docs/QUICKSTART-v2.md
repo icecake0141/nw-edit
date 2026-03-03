@@ -18,7 +18,7 @@ You may obtain a copy of the License at
 `backend_v2` uses the shared backend dependency set.
 
 ```bash
-python3 -m pip install -r backend/requirements-dev.txt
+python3 -m pip install -r backend_v2/requirements-dev.txt
 ```
 
 ## 1. Start backend v2
@@ -126,4 +126,3 @@ docker compose --profile test down
 - In-memory runtime only (no persistent DB/state).
 - Credentials are handled in plaintext in process memory.
 - v1 runtime paths (`start.sh`, `frontend`, `docs/QUICKSTART.md`) have been removed after hard cutover.
-- Some modules under `backend/app` remain as internal dependencies for v2 netmiko execution/validation.

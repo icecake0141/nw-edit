@@ -22,7 +22,7 @@ You may obtain a copy of the License at
 ```bash
 git clone https://github.com/icecake0141/nw-edit.git
 cd nw-edit
-python3 -m pip install -r backend/requirements-dev.txt
+python3 -m pip install -r backend_v2/requirements-dev.txt
 ```
 
 ## ローカル検証

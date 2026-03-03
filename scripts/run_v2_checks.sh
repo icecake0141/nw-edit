@@ -30,7 +30,7 @@ done
 
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "[v2-checks] missing required commands: ${missing[*]}"
-  echo "[v2-checks] install dev dependencies first: python3 -m pip install -r backend/requirements-dev.txt"
+  echo "[v2-checks] install dev dependencies first: python3 -m pip install -r backend_v2/requirements-dev.txt"
   exit 2
 fi
 

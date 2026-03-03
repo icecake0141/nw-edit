@@ -110,4 +110,3 @@ For full coverage, see Netmiko documentation.
 - Plaintext credential handling in process memory.
 - Single-process scalability constraints.
 - v1 runtime path is removed after hard cutover; only v2 startup/docs flow is supported.
-- Some `backend/app` modules remain as shared internals for v2 netmiko adapters.

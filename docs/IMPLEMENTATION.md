@@ -356,16 +356,14 @@ docker-compose up -d
 
 ### Run Tests
 ```bash
-cd backend
-pip install -r requirements-dev.txt
-pytest tests/unit -v
+python3 -m pip install -r backend_v2/requirements-dev.txt
+PYTHONPATH=. pytest backend_v2/tests/unit -v
 ```
 
 ### Run Linting
 ```bash
-cd backend
-black app/ ../tests/
-flake8 app/ ../tests/ --max-line-length=120 --extend-ignore=E203,W503
+black backend_v2/app backend_v2/tests
+flake8 backend_v2/app backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
 ```
 
 ---
