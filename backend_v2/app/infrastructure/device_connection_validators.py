@@ -32,10 +32,12 @@ class SimulatedConnectionValidator(DeviceConnectionValidator):
 
 
 class NetmikoConnectionValidator(DeviceConnectionValidator):
-    """Uses existing Netmiko-based validator from v1 backend."""
+    """Uses v2-local Netmiko validator."""
 
     def validate(self, device: DeviceProfile) -> tuple[bool, str | None]:
-        from backend.app.ssh_executor import validate_device_connection
+        from backend_v2.app.infrastructure.netmiko_executor import (
+            validate_device_connection,
+        )
 
         return validate_device_connection(
             {
