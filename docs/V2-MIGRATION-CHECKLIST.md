@@ -51,8 +51,8 @@ Required outcome:
 - [x] `flake8` passes
 - [x] `mypy --explicit-package-bases backend_v2/app` passes
 - [x] `pre-commit run --all-files` passes
-- [x] `pytest tests/unit backend_v2/tests/unit -v` passes
-- [x] `pytest tests/integration backend_v2/tests/integration -v -m integration` passes
+- [x] `PYTHONPATH=. pytest backend_v2/tests/unit -v` passes
+- [x] `PYTHONPATH=. pytest backend_v2/tests/integration -v -m integration` passes
 - [x] CI workflow is green on the migration PR branch
 
 ## 4. Operational readiness gates
