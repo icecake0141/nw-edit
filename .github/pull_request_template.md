@@ -43,6 +43,7 @@ make check-integration
 ## Backward Compatibility / Migration Notes
 
 - 
+- If this PR affects v2 migration readiness, update: `docs/V2-MIGRATION-CHECKLIST.md`
 
 ## Documentation Updates
 
@@ -63,6 +64,7 @@ make check-integration
 - [ ] CI green or expected to pass
 - [ ] No merge conflicts with base branch
 - [ ] Documentation updated (README, docs/, examples)
+- [ ] `docs/V2-MIGRATION-CHECKLIST.md` reviewed/updated when migration-related
 - [ ] Changelog/version updated if applicable
 - [ ] PR description includes summary, rationale, LLM involvement note
 - [ ] Validation commands listed in PR description

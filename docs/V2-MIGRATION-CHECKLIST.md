@@ -27,13 +27,13 @@ Migration is complete only when all of the following are true:
 
 ## 2. Capability parity gates (must pass)
 
-- [ ] Device import and validation (`POST /api/v2/devices/import`, `GET /api/v2/devices`)
-- [ ] Job lifecycle APIs (`create/list/get/events`)
-- [ ] Execution modes (`run`, `run/async`) and active-job snapshot
-- [ ] Execution controls (`pause/resume/cancel`) in netmiko mode
-- [ ] Result API includes consistent `pre_output` / `apply_output` / `post_output` / `diff` fields
-- [ ] WebSocket monitor flow for live execution tracking
-- [ ] Frontend supports import, create, monitor, history/detail without relying on v1 UI
+- [x] Device import and validation (`POST /api/v2/devices/import`, `GET /api/v2/devices`)
+- [x] Job lifecycle APIs (`create/list/get/events`)
+- [x] Execution modes (`run`, `run/async`) and active-job snapshot
+- [x] Execution controls (`pause/resume/cancel`) in netmiko mode
+- [x] Result API includes consistent `pre_output` / `apply_output` / `post_output` / `diff` fields
+- [x] WebSocket monitor flow for live execution tracking
+- [x] Frontend supports import, create, monitor, history/detail without relying on v1 UI
 
 ## 3. Reliability and quality gates (must pass)
 
@@ -45,27 +45,27 @@ Run from repository root:
 
 Required outcome:
 
-- [ ] `black --check` passes
-- [ ] `flake8` passes
-- [ ] `mypy --explicit-package-bases backend_v2/app` passes
-- [ ] `pre-commit run --all-files` passes
-- [ ] `pytest tests/unit backend_v2/tests/unit -v` passes
-- [ ] `pytest tests/integration backend_v2/tests/integration -v -m integration` passes
-- [ ] CI workflow is green on the migration PR branch
+- [x] `black --check` passes
+- [x] `flake8` passes
+- [x] `mypy --explicit-package-bases backend_v2/app` passes
+- [x] `pre-commit run --all-files` passes
+- [x] `pytest tests/unit backend_v2/tests/unit -v` passes
+- [x] `pytest tests/integration backend_v2/tests/integration -v -m integration` passes
+- [x] CI workflow is green on the migration PR branch
 
 ## 4. Operational readiness gates
 
-- [ ] `start_v2.sh` is the recommended local startup path in README and docs
-- [ ] Environment variables for v2 modes are documented with safe defaults
-- [ ] Monitoring/troubleshooting steps for v2 are documented
-- [ ] Known limitations and non-goals are documented
+- [x] `start_v2.sh` is the recommended local startup path in README and docs
+- [x] Environment variables for v2 modes are documented with safe defaults
+- [x] Monitoring/troubleshooting steps for v2 are documented
+- [x] Known limitations and non-goals are documented
 
 ## 5. Documentation and release gates
 
-- [ ] Migration notes document behavior differences vs v1
-- [ ] Backward-compatibility impact is clearly stated
-- [ ] Rollout plan includes staged adoption and rollback policy
-- [ ] PR checklist and release checklist are updated for v2-first delivery
+- [x] Migration notes document behavior differences vs v1
+- [x] Backward-compatibility impact is clearly stated
+- [x] Rollout plan includes staged adoption and rollback policy
+- [x] PR checklist and release checklist are updated for v2-first delivery
 
 ## 6. v1 deprecation gates
 
@@ -76,20 +76,28 @@ Choose one and record it in the migration PR:
 
 Checklist:
 
-- [ ] README default examples use v2 endpoints and startup scripts
-- [ ] CI default gates include v2 checks as blocking
-- [ ] v1 status is documented (deprecated or removed)
+- [x] README default examples use v2 endpoints and startup scripts
+- [x] CI default gates include v2 checks as blocking
+- [x] v1 status is documented (deprecated or removed)
 
 ## 7. Sign-off template
 
-Use this section in the migration completion PR:
+Migration completion sign-off:
 
-- Scope owner:
-- Reviewer(s):
-- Date:
-- Decision: `GO` / `NO-GO`
+- Scope owner: `icecake0141`
+- Reviewer(s): `Maintainer review via merged PRs #79 and #81`
+- Date: `2026-03-03`
+- Decision: `GO`
 - Risks accepted:
+  - v1 code paths remain in repository during soft-deprecation window
+  - Legacy docs remain available for fallback use
 - Follow-up issues:
+  - Hard cutover (optional): remove v1 runtime paths in a dedicated cleanup PR
+
+Evidence:
+
+- CI green on `main` for commit `40cc9fe` (workflow run `22624179626`)
+- Integration job succeeded in CI with docker-backed mock SSH
 
 ## 8. Suggested implementation order
 

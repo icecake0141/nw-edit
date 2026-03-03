@@ -84,3 +84,38 @@ curl -s -X POST http://127.0.0.1:8010/api/v2/jobs/<job_id>/cancel
 make check
 make check-integration
 ```
+
+## 5. 監視とトラブルシュート
+
+- 実行中ジョブの確認:
+
+```bash
+curl -s http://127.0.0.1:8010/api/v2/jobs/active
+```
+
+- イベント履歴の確認:
+
+```bash
+curl -s http://127.0.0.1:8010/api/v2/jobs/<job_id>/events
+```
+
+- 実行結果の確認:
+
+```bash
+curl -s http://127.0.0.1:8010/api/v2/jobs/<job_id>/result
+```
+
+ローカルで統合テストが skip される場合は、docker compose と mock SSH を有効化してください:
+
+```bash
+docker compose --profile test up -d mock-ssh
+make check-integration
+docker compose --profile test down
+```
+
+## 6. 既知制約と非目標
+
+- 実行時データはインメモリのみ（永続DBなし）。
+- 認証情報はプロセスメモリ上で平文扱い。
+- リポジトリ内では v1 と v2 が共存中で、v1 は legacy/deprecated 扱い。
+- v1 の完全削除はこのクイックスタートの範囲外で、別PRで段階実施する想定。
