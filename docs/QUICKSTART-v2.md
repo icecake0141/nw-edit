@@ -92,3 +92,38 @@ curl -s -X POST http://127.0.0.1:8010/api/v2/jobs/<job_id>/cancel
 make check
 make check-integration
 ```
+
+## 5. Monitoring and troubleshooting
+
+- Check active run:
+
+```bash
+curl -s http://127.0.0.1:8010/api/v2/jobs/active
+```
+
+- Check event stream buffer:
+
+```bash
+curl -s http://127.0.0.1:8010/api/v2/jobs/<job_id>/events
+```
+
+- Check latest run result:
+
+```bash
+curl -s http://127.0.0.1:8010/api/v2/jobs/<job_id>/result
+```
+
+If integration tests are skipped locally, ensure docker compose and mock SSH are available:
+
+```bash
+docker compose --profile test up -d mock-ssh
+make check-integration
+docker compose --profile test down
+```
+
+## 6. Known limitations and non-goals
+
+- In-memory runtime only (no persistent DB/state).
+- Credentials are handled in plaintext in process memory.
+- v1 and v2 currently coexist in repository; v1 is legacy/deprecated.
+- Hard removal of v1 paths is out of scope for this quickstart and should be handled in a separate cleanup PR.
