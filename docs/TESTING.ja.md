@@ -29,7 +29,7 @@ You may obtain a copy of the License at
 - `flake8`
 - `mypy --explicit-package-bases backend_v2/app`
 - `pre-commit run --all-files`
-- 単体テスト（`tests/unit` + `backend_v2/tests/unit`）
+- 単体テスト（`backend_v2/tests/unit`）
 - 任意で統合テスト（`RUN_INTEGRATION=1`）
 
 ## Makeショートカット
@@ -44,14 +44,14 @@ make precommit
 ## 単体テスト
 
 ```bash
-python3 -m pytest tests/unit backend_v2/tests/unit -v --cov=backend/app --cov=backend_v2/app
+python3 -m pytest backend_v2/tests/unit -v --cov=backend_v2/app
 ```
 
 ## 統合テスト
 
 ```bash
 docker compose --profile test up -d mock-ssh
-python3 -m pytest tests/integration backend_v2/tests/integration -v -m integration
+python3 -m pytest backend_v2/tests/integration -v -m integration
 docker compose --profile test down
 ```
 
