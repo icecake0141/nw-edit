@@ -13,6 +13,8 @@ You may obtain a copy of the License at
 -->
 # Specification
 
+Japanese version: [SPECIFICATION.ja.md](SPECIFICATION.ja.md)
+
 ## Scope
 
 - Target: network device configuration updates via SSH.

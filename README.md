@@ -56,11 +56,17 @@ make check-integration
 ## Documentation
 
 - v2 quickstart: [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
+- v2 quickstart (JA): [docs/QUICKSTART-v2.ja.md](docs/QUICKSTART-v2.ja.md)
 - v1->v2 migration notes: [docs/MIGRATION-v1-to-v2.md](docs/MIGRATION-v1-to-v2.md)
+- v1->v2 migration notes (JA): [docs/MIGRATION-v1-to-v2.ja.md](docs/MIGRATION-v1-to-v2.ja.md)
 - migration completion gate: [docs/V2-MIGRATION-CHECKLIST.md](docs/V2-MIGRATION-CHECKLIST.md)
+- migration completion gate (JA): [docs/V2-MIGRATION-CHECKLIST.ja.md](docs/V2-MIGRATION-CHECKLIST.ja.md)
 - specification: [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
+- specification (JA): [docs/SPECIFICATION.ja.md](docs/SPECIFICATION.ja.md)
 - testing and CI: [docs/TESTING.md](docs/TESTING.md)
+- testing and CI (JA): [docs/TESTING.ja.md](docs/TESTING.ja.md)
 - contribution guide: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
+- contribution guide (JA): [docs/CONTRIBUTING.ja.md](docs/CONTRIBUTING.ja.md)
 - Japanese README: [README.ja.md](README.ja.md)
 
 ## License

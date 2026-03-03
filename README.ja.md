@@ -54,11 +54,17 @@ make check-integration
 ## ドキュメント
 
 - v2 クイックスタート: [docs/QUICKSTART-v2.ja.md](docs/QUICKSTART-v2.ja.md)
-- v1->v2 移行ノート: [docs/MIGRATION-v1-to-v2.md](docs/MIGRATION-v1-to-v2.md)
-- 移行完了判定: [docs/V2-MIGRATION-CHECKLIST.md](docs/V2-MIGRATION-CHECKLIST.md)
-- 仕様: [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
-- テスト/CI: [docs/TESTING.md](docs/TESTING.md)
-- 貢献ガイド: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
+- v2 quickstart（英語）: [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
+- v1->v2 移行ノート: [docs/MIGRATION-v1-to-v2.ja.md](docs/MIGRATION-v1-to-v2.ja.md)
+- v1->v2 migration notes（英語）: [docs/MIGRATION-v1-to-v2.md](docs/MIGRATION-v1-to-v2.md)
+- 移行完了判定: [docs/V2-MIGRATION-CHECKLIST.ja.md](docs/V2-MIGRATION-CHECKLIST.ja.md)
+- migration checklist（英語）: [docs/V2-MIGRATION-CHECKLIST.md](docs/V2-MIGRATION-CHECKLIST.md)
+- 仕様: [docs/SPECIFICATION.ja.md](docs/SPECIFICATION.ja.md)
+- specification（英語）: [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
+- テスト/CI: [docs/TESTING.ja.md](docs/TESTING.ja.md)
+- testing/CI（英語）: [docs/TESTING.md](docs/TESTING.md)
+- 貢献ガイド: [docs/CONTRIBUTING.ja.md](docs/CONTRIBUTING.ja.md)
+- contribution guide（英語）: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
 - English README: [README.md](README.md)
 
 ## ライセンス

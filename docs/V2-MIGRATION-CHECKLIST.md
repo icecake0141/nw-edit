@@ -13,6 +13,8 @@ You may obtain a copy of the License at
 -->
 # v2 Migration Completion Checklist
 
+Japanese version: [V2-MIGRATION-CHECKLIST.ja.md](V2-MIGRATION-CHECKLIST.ja.md)
+
 This document defines when migration from v1 (`backend` + `frontend`) to v2 (`backend_v2` + `frontend_v2`) can be considered complete.
 
 ## 1. Scope and decision
