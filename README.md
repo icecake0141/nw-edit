@@ -26,7 +26,8 @@ A minimal web application for applying multi-line configuration commands to mult
 ## Overview
 
 - v2 path (`backend_v2` + `frontend_v2`) is the default.
-- v1 path (`backend` + `frontend`) is legacy/deprecated.
+- v1 runtime path (`start.sh`, `frontend`) has been removed after hard cutover.
+- Some modules under `backend/app` remain as shared implementation dependencies for v2.
 - Credentials are handled in plaintext and stored in memory only.
 
 ## Install and Run (v2)

@@ -20,7 +20,8 @@ You may obtain a copy of the License at
 ## 現在の推奨
 
 - デフォルト導線: v2（`./start_v2.sh`）
-- v1（`./start.sh`, `docs/QUICKSTART.md`）は legacy 扱い。比較・一時退避用途に限定。
+- hard cutover 後は v1 ランタイム導線を削除（`start.sh`、`docs/QUICKSTART.md` は提供終了）。
+- `backend/app` 配下の一部モジュールは v2 netmiko アダプタの共通依存として継続利用。
 
 ## API差分
 
@@ -54,12 +55,12 @@ You may obtain a copy of the License at
 2. netmiko モードで pause/resume/cancel を運用観点で確認
 3. 運用Runbook・監視を v2 エンドポイント/メタデータに更新
 4. v1 導線を deprecated として明記
-5. `V2-MIGRATION-CHECKLIST.md` で sign-off 後に v1 削除判断
+5. `V2-MIGRATION-CHECKLIST.md` で sign-off 後に hard cutover を実施し v1 ランタイム導線を削除
 
 ## ロールバック方針
 
-- 移行期間中: 導線を一時的に v1 側へ戻して回避
-- ハードカット後: v1 削除コミットを含むリリース差分を revert して復旧
+- hard cutover 前: 導線を一時的に v1 側へ戻して回避
+- hard cutover 後: v1 ランタイム削除コミットを含むリリース差分を revert して復旧
 
 ## リリース判定
 

@@ -69,18 +69,18 @@ Required outcome:
 - [x] Rollout plan includes staged adoption and rollback policy
 - [x] PR checklist and release checklist are updated for v2-first delivery
 
-## 6. v1 deprecation gates
+## 6. v1 cutover gates
 
-Choose one and record it in the migration PR:
+Current mode: hard cutover
 
-1. Soft deprecation: keep v1 code, but mark as deprecated and remove from default flow.
-2. Hard cutover: remove v1 runtime paths after v2 production acceptance.
+- v1 runtime paths (`start.sh`, `frontend`, `docs/QUICKSTART.md`) are removed after v2 production acceptance.
 
 Checklist:
 
 - [x] README default examples use v2 endpoints and startup scripts
 - [x] CI default gates include v2 checks as blocking
 - [x] v1 status is documented (deprecated or removed)
+- [x] v1 runtime startup/docs path is removed from repository
 
 ## 7. Sign-off template
 
@@ -88,13 +88,12 @@ Migration completion sign-off:
 
 - Scope owner: `icecake0141`
 - Reviewer(s): `Maintainer review via merged PRs #79 and #81`
-- Date: `2026-03-03`
+- Date: `2026-03-03` (soft deprecation), `2026-03-03` (hard cutover)
 - Decision: `GO`
 - Risks accepted:
-  - v1 code paths remain in repository during soft-deprecation window
-  - Legacy docs remain available for fallback use
+  - Shared `backend/app` modules remain in repository as v2 internal dependencies
 - Follow-up issues:
-  - Hard cutover (optional): remove v1 runtime paths in a dedicated cleanup PR
+  - Optional cleanup: decouple v2 netmiko adapters from `backend/app` shared modules
 
 Evidence:
 

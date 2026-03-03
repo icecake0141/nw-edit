@@ -98,7 +98,7 @@ tests/
 │       └── ci.yml       # CI/CD pipeline
 ├── docs/
 │   ├── screenshots/         # Placeholder images
-│   ├── QUICKSTART.md        # Quick start guide
+│   ├── QUICKSTART-v2.md     # Quick start guide (v2)
 │   ├── CONTRIBUTING.md      # Contribution guidelines
 │   ├── IMPLEMENTATION.md    # Implementation summary (this file)
 │   └── LLM-GENERATED-CODE.md # LLM-generated code policy
@@ -106,7 +106,7 @@ tests/
 ├── README.ja.md         # Japanese documentation
 ├── sample_devices.csv   # Sample device import
 ├── sample_commands.txt  # Sample configuration commands
-└── start.sh            # Startup script
+└── start_v2.sh         # Startup script (v2)
 ```
 
 ---
@@ -262,7 +262,7 @@ jobs:
 - ✅ Same structure and content
 
 ### Additional Docs
-- ✅ docs/QUICKSTART.md - Step-by-step guide
+- ✅ docs/QUICKSTART-v2.md - Step-by-step guide
 - ✅ docs/CONTRIBUTING.md - Development guidelines
 - ✅ docs/IMPLEMENTATION.md - Implementation summary (this file)
 - ✅ docs/LLM-GENERATED-CODE.md - LLM-generated code policy
@@ -341,7 +341,7 @@ jobs:
 ```bash
 git clone https://github.com/icecake0141/nw-edit.git
 cd nw-edit
-./start.sh
+./start_v2.sh
 ```
 
 ### Manual Start

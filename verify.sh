@@ -68,13 +68,6 @@ else
     fail
 fi
 
-check "Frontend structure"
-if [ -f "frontend/public/index.html" ] && [ -f "frontend/public/app.js" ]; then
-    pass
-else
-    fail
-fi
-
 check "Backend v2 structure"
 if [ -f "backend_v2/app/api/main.py" ] && [ -f "backend_v2/app/application/execution_engine.py" ] && \
    [ -f "backend_v2/app/domain/state_machine.py" ] && [ -f "backend_v2/app/infrastructure/in_memory_job_store.py" ]; then
@@ -99,7 +92,7 @@ fi
 
 check "Documentation"
 if [ -f "README.md" ] && [ -f "README.ja.md" ] && \
-   [ -f "docs/QUICKSTART.md" ] && [ -f "docs/CONTRIBUTING.md" ]; then
+   [ -f "docs/QUICKSTART-v2.md" ] && [ -f "docs/CONTRIBUTING.md" ]; then
     pass
 else
     fail
@@ -226,8 +219,7 @@ if [ $FAILED -eq 0 ]; then
     echo "Next steps:"
     echo "1. Install dependencies: python3 -m pip install -r backend/requirements-dev.txt"
     echo "2. Run tests: python3 -m pytest tests/unit backend_v2/tests/unit -v"
-    echo "3. Start v1 application: ./start.sh"
-    echo "4. Start v2 application: ./start_v2.sh"
+    echo "3. Start v2 application: ./start_v2.sh"
     exit 0
 else
     echo -e "${RED}✗ Some checks failed${NC}"
