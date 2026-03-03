@@ -52,7 +52,7 @@ PYTHONPYCACHEPREFIX=.pycache python3 -m py_compile \
   backend_v2/app/application/execution_engine.py
 
 echo "[v2-checks] pytest"
-python3 -m pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=term
+PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=term
 
 if [[ "${RUN_INTEGRATION:-0}" == "1" ]]; then
   if [[ "${AUTO_START_MOCK_SSH:-1}" == "1" ]]; then
@@ -88,5 +88,5 @@ PY
   fi
 
   echo "[v2-checks] integration"
-  python3 -m pytest backend_v2/tests/integration -v -m integration
+  PYTHONPATH=. python3 -m pytest backend_v2/tests/integration -v -m integration
 fi

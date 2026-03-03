@@ -44,14 +44,14 @@ make precommit
 ## 単体テスト
 
 ```bash
-python3 -m pytest backend_v2/tests/unit -v --cov=backend_v2/app
+PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v --cov=backend_v2/app
 ```
 
 ## 統合テスト
 
 ```bash
 docker compose --profile test up -d mock-ssh
-python3 -m pytest backend_v2/tests/integration -v -m integration
+PYTHONPATH=. python3 -m pytest backend_v2/tests/integration -v -m integration
 docker compose --profile test down
 ```
 

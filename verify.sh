@@ -164,11 +164,11 @@ fi
 # Run tests if pytest is available
 if python3 -c "import pytest" &> /dev/null; then
     check "Unit tests"
-    if python3 -m pytest backend_v2/tests/unit -v &> /dev/null; then
+    if PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: python3 -m pytest backend_v2/tests/unit -v"
+        echo "  Run: PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v"
     fi
 else
     warn "  pytest not installed, skipping"
@@ -176,11 +176,11 @@ fi
 
 if python3 -c "import pytest" &> /dev/null; then
     check "Integration test discovery"
-    if python3 -m pytest --collect-only backend_v2/tests/integration -q &> /dev/null; then
+    if PYTHONPATH=. python3 -m pytest --collect-only backend_v2/tests/integration -q &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: python3 -m pytest --collect-only backend_v2/tests/integration -q"
+        echo "  Run: PYTHONPATH=. python3 -m pytest --collect-only backend_v2/tests/integration -q"
     fi
 fi
 
@@ -209,7 +209,7 @@ if [ $FAILED -eq 0 ]; then
     echo ""
     echo "Next steps:"
     echo "1. Install dependencies: python3 -m pip install -r backend/requirements-dev.txt"
-    echo "2. Run tests: python3 -m pytest backend_v2/tests/unit -v"
+    echo "2. Run tests: PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v"
     echo "3. Start v2 application: ./start_v2.sh"
     exit 0
 else

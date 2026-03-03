@@ -82,7 +82,7 @@ jobs:
       run: pip install -r backend/requirements-dev.txt
 
     - name: Run unit tests
-      run: pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=xml --cov-report=term
+      run: PYTHONPATH=. pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=xml --cov-report=term
 
     - name: Upload coverage
       if: always()
@@ -132,7 +132,7 @@ jobs:
         sleep 10
 
     - name: Run integration tests
-      run: pytest backend_v2/tests/integration -v -m integration
+      run: PYTHONPATH=. pytest backend_v2/tests/integration -v -m integration
 
     - name: Stop services
       if: always()
