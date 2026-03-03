@@ -11,28 +11,28 @@ You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 -->
-# Testing and CI
+# テストとCI
 
-Japanese version: [TESTING.ja.md](TESTING.ja.md)
+英語版: [TESTING.md](TESTING.md)
 
-## Local checks (recommended)
+## ローカルチェック（推奨）
 
-Run from repository root:
+リポジトリルートで実行:
 
 ```bash
 ./scripts/run_v2_checks.sh
 ```
 
-This runs:
+このスクリプトは以下を実行します:
 
 - `black --check`
 - `flake8`
 - `mypy --explicit-package-bases backend_v2/app`
 - `pre-commit run --all-files`
-- unit tests (`tests/unit` + `backend_v2/tests/unit`)
-- optional integration tests (`RUN_INTEGRATION=1`)
+- 単体テスト（`tests/unit` + `backend_v2/tests/unit`）
+- 任意で統合テスト（`RUN_INTEGRATION=1`）
 
-## Make shortcuts
+## Makeショートカット
 
 ```bash
 make check
@@ -41,13 +41,13 @@ make typecheck
 make precommit
 ```
 
-## Unit tests
+## 単体テスト
 
 ```bash
 python3 -m pytest tests/unit backend_v2/tests/unit -v --cov=backend/app --cov=backend_v2/app
 ```
 
-## Integration tests
+## 統合テスト
 
 ```bash
 docker compose --profile test up -d mock-ssh
@@ -55,18 +55,18 @@ python3 -m pytest tests/integration backend_v2/tests/integration -v -m integrati
 docker compose --profile test down
 ```
 
-## CI workflow
+## CIワークフロー
 
-Main CI workflow: `.github/workflows/ci.yml`
+メインCI: `.github/workflows/ci.yml`
 
-Jobs:
+ジョブ:
 
 - `Lint`: black/flake8/mypy/py_compile
-- `Test`: unit tests + coverage artifact
+- `Test`: 単体テスト + カバレッジアーティファクト
 - `Build Docker Image`: docker build + smoke run
-- `Integration Tests`: docker-backed integration suite
+- `Integration Tests`: docker ベース統合テスト
 
-## Troubleshooting
+## トラブルシュート
 
-- If integration tests skip locally, verify docker compose and mock SSH availability.
-- If only docs changed, CI may be skipped due to `paths-ignore` configuration.
+- ローカルで統合テストが skip される場合は docker compose と mock SSH の起動状況を確認
+- ドキュメントのみ変更時は `paths-ignore` により CI が起動しない場合があります

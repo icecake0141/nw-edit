@@ -13,6 +13,8 @@ You may obtain a copy of the License at
 -->
 # Migration Notes: v1 to v2
 
+Japanese version: [MIGRATION-v1-to-v2.ja.md](MIGRATION-v1-to-v2.ja.md)
+
 This guide summarizes behavior differences and rollout guidance when migrating from v1 (`backend` + `frontend`) to v2 (`backend_v2` + `frontend_v2`).
 
 ## Current recommendation
@@ -52,7 +54,7 @@ This guide summarizes behavior differences and rollout guidance when migrating f
 2. Validate pause/resume/cancel operational flow in netmiko mode.
 3. Update internal runbooks and dashboards to consume v2 endpoints and metadata.
 4. Mark v1 endpoints and startup flow as deprecated in team docs.
-5. Remove v1 runtime paths only after sign-off in `docs/V2-MIGRATION-CHECKLIST.md`.
+5. Remove v1 runtime paths only after sign-off in `V2-MIGRATION-CHECKLIST.md`.
 
 ## Rollback policy
 
@@ -61,4 +63,4 @@ This guide summarizes behavior differences and rollout guidance when migrating f
 
 ## Release checklist pointer
 
-Use [docs/V2-MIGRATION-CHECKLIST.md](docs/V2-MIGRATION-CHECKLIST.md) as the release gate for `GO/NO-GO` decisions.
+Use [V2-MIGRATION-CHECKLIST.md](V2-MIGRATION-CHECKLIST.md) as the release gate for `GO/NO-GO` decisions.
