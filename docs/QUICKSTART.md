@@ -21,6 +21,9 @@ limitations under the License.
 
 This guide will help you get the Network Device Configuration Manager up and running quickly.
 
+> Legacy note: this guide documents the v1 path (`backend` + `frontend`).
+> For new usage, use v2 quickstart: [QUICKSTART-v2.md](QUICKSTART-v2.md).
+
 ## Prerequisites
 
 - Docker and Docker Compose installed
