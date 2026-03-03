@@ -83,7 +83,7 @@ class ExecutionEngine:
     def _run_with_retry(
         self,
         device: DeviceTarget,
-        commands: list[str],
+        commands_by_device: dict[str, list[str]],
         retry_limit: int,
         backoff: float,
         control: ExecutionControl | None = None,
@@ -98,6 +98,7 @@ class ExecutionEngine:
                     attempts=attempt + 1,
                 )
             attempts = attempt + 1
+            commands = commands_by_device.get(device.key, [])
             result = self.worker.run(device=device, commands=commands)
             result.attempts = attempts
             last_result = result
@@ -118,7 +119,7 @@ class ExecutionEngine:
         job_id: str,
         devices: list[DeviceTarget],
         canary: DeviceTarget,
-        commands: list[str],
+        commands_by_device: dict[str, list[str]],
         config: ExecutionConfig,
         control: ExecutionControl | None = None,
     ) -> JobRunSummary:
@@ -160,7 +161,7 @@ class ExecutionEngine:
         )
         canary_result = self._run_with_retry(
             device=canary,
-            commands=commands,
+            commands_by_device=commands_by_device,
             retry_limit=0,
             backoff=0.0,
             control=control,
@@ -227,7 +228,7 @@ class ExecutionEngine:
                     future = executor.submit(
                         self._run_with_retry,
                         device,
-                        commands,
+                        commands_by_device,
                         config.non_canary_retry_limit,
                         config.retry_backoff_seconds,
                         control,

@@ -39,8 +39,8 @@ Japanese version: [SPECIFICATION.ja.md](SPECIFICATION.ja.md)
 ## CSV format
 
 ```csv
-host,port,device_type,username,password,name,verify_cmds
-192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp
+host,port,device_type,username,password,name,verify_cmds,host_vars
+192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp,"{""hostname"":""router-1""}"
 ```
 
 ### Columns
@@ -54,6 +54,15 @@ host,port,device_type,username,password,name,verify_cmds
 | `password` | Yes | SSH password | - |
 | `name` | No | Friendly name | - |
 | `verify_cmds` | No | `;`-separated verification commands | - |
+| `host_vars` | No | JSON object string for per-host template vars | - |
+
+## Command template variables
+
+- Command placeholders use `{{var}}` syntax.
+- Global variables are provided at job creation (`POST /api/v2/jobs` with `global_vars`).
+- Host variables are provided per imported device via CSV `host_vars`.
+- Merge precedence is `host_vars > global_vars`.
+- If any placeholder is unresolved, run preflight fails with `HTTP 400` before device execution.
 
 ## v2 API surface (summary)
 

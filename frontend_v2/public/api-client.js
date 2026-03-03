@@ -16,7 +16,8 @@
 
 /**
  * @typedef {{ host: string, port: number }} DeviceTarget
- * @typedef {{ job_id: string, job_name: string, creator: string, status: string, created_at: string }} JobSummary
+ * @typedef {{ [key: string]: string }} VariableMap
+ * @typedef {{ job_id: string, job_name: string, creator: string, status: string, created_at: string, global_vars: VariableMap }} JobSummary
  * @typedef {{ status: string, attempts: number, error?: string, error_code?: string, logs: string[], pre_output: string, apply_output: string, post_output: string, diff: string, diff_truncated: boolean, diff_original_size: number }} DeviceRunResponse
  * @typedef {{ job_id: string, status: string, device_results: Record<string, DeviceRunResponse> }} RunJobResponse
  * @typedef {{ devices: unknown[], failed_rows: { error: string }[] }} ImportDevicesResponse
@@ -47,12 +48,17 @@ export class NwEditApiClient {
     return /** @type {Promise<T>} */ (response.json());
   }
 
-  /** @param {string} jobName @param {string} creator @returns {Promise<JobSummary>} */
-  async createJob(jobName, creator) {
+  /**
+   * @param {string} jobName
+   * @param {string} creator
+   * @param {VariableMap} globalVars
+   * @returns {Promise<JobSummary>}
+   */
+  async createJob(jobName, creator, globalVars = {}) {
     return this.request("/api/v2/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job_name: jobName, creator }),
+      body: JSON.stringify({ job_name: jobName, creator, global_vars: globalVars }),
     });
   }
 

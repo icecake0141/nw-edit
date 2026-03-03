@@ -34,6 +34,25 @@ def test_health_endpoint():
     assert response.json() == {"status": "ok"}
 
 
+def test_create_job_persists_global_vars():
+    client = TestClient(app)
+    response = client.post(
+        "/api/v2/jobs",
+        json={
+            "job_name": "with globals",
+            "creator": "tester",
+            "global_vars": {"timezone": "Asia/Tokyo"},
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["global_vars"] == {"timezone": "Asia/Tokyo"}
+
+    job = client.get(f"/api/v2/jobs/{payload['job_id']}")
+    assert job.status_code == 200
+    assert job.json()["global_vars"] == {"timezone": "Asia/Tokyo"}
+
+
 def test_job_run_with_simulated_worker():
     client = TestClient(app)
     create_response = client.post(
@@ -85,9 +104,9 @@ def test_device_import_and_run_with_imported_devices():
     import_response = client.post(
         "/api/v2/devices/import",
         content=(
-            "host,port,device_type,username,password,name,verify_cmds\n"
-            "10.2.0.1,22,cisco_ios,admin,pass,edge-a,show run\n"
-            "10.2.0.2,22,cisco_ios,admin,pass,edge-b,\n"
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            '10.2.0.1,22,cisco_ios,admin,pass,edge-a,show run,"{""hostname"":""edge-a""}"\n'
+            '10.2.0.2,22,cisco_ios,admin,pass,edge-b,,"{""hostname"":""edge-b""}"\n'
         ),
         headers={"Content-Type": "text/plain"},
     )
@@ -111,6 +130,59 @@ def test_device_import_and_run_with_imported_devices():
     payload = run_response.json()
     assert payload["status"] == "completed"
     assert "10.2.0.1:22" in payload["device_results"]
+
+
+def test_run_fails_preflight_when_command_variable_is_missing():
+    client = TestClient(app)
+    create_response = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "missing vars", "creator": "tester"},
+    )
+    assert create_response.status_code == 200
+    job_id = create_response.json()["job_id"]
+
+    run_response = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "devices": [{"host": "10.8.0.1", "port": 22}],
+            "canary": {"host": "10.8.0.1", "port": 22},
+            "commands": ["hostname {{hostname}}"],
+        },
+    )
+    assert run_response.status_code == 400
+    assert "Missing command variables" in run_response.json()["detail"]
+
+
+def test_run_prefers_host_vars_over_global_vars():
+    client = TestClient(app)
+    import_response = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            '10.7.0.1,22,cisco_ios,admin,pass,edge-a,,"{""hostname"":""host-a""}"\n'
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert import_response.status_code == 200
+
+    create_response = client.post(
+        "/api/v2/jobs",
+        json={
+            "job_name": "host override",
+            "creator": "tester",
+            "global_vars": {"hostname": "global-name"},
+        },
+    )
+    assert create_response.status_code == 200
+    job_id = create_response.json()["job_id"]
+
+    run_response = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={"commands": ["hostname {{hostname}}"]},
+    )
+    assert run_response.status_code == 200
+    payload = run_response.json()
+    assert payload["status"] == "completed"
 
 
 def test_run_response_fields_are_consistent_strings():

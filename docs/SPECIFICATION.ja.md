@@ -39,8 +39,8 @@ You may obtain a copy of the License at
 ## CSV形式
 
 ```csv
-host,port,device_type,username,password,name,verify_cmds
-192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp
+host,port,device_type,username,password,name,verify_cmds,host_vars
+192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp,"{""hostname"":""router-1""}"
 ```
 
 ### カラム
@@ -54,6 +54,15 @@ host,port,device_type,username,password,name,verify_cmds
 | `password` | はい | SSHパスワード | - |
 | `name` | いいえ | 表示名 | - |
 | `verify_cmds` | いいえ | `;` 区切りの検証コマンド | - |
+| `host_vars` | いいえ | ホスト毎テンプレート変数(JSONオブジェクト文字列) | - |
+
+## コマンドテンプレート変数
+
+- コマンドのプレースホルダ記法は `{{var}}`。
+- グローバル変数はジョブ作成時（`POST /api/v2/jobs` の `global_vars`）に指定。
+- ホスト毎変数は CSV の `host_vars` 列で指定。
+- マージ優先順位は `host_vars > global_vars`。
+- 未解決プレースホルダが1つでもある場合、デバイス実行前に preflight で `HTTP 400` を返す。
 
 ## v2 API一覧（要約）
 

@@ -51,14 +51,15 @@ def test_import_csv_parses_and_stores_valid_devices():
         validator=SimulatedConnectionValidator(),
     )
     result = service.import_csv(
-        "host,port,device_type,username,password,name,verify_cmds\n"
-        "10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run;show ip int br\n"
+        "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+        '10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run;show ip int br,"{""hostname"":""edge-1"",""site"":100}"\n'
     )
 
     assert len(result.devices) == 1
     device = result.devices[0]
     assert device.host == "10.0.0.1"
     assert device.verify_cmds == ["show run", "show ip int br"]
+    assert device.host_vars == {"hostname": "edge-1", "site": "100"}
     assert device.connection_ok is True
     assert result.failed_rows == []
 
@@ -69,9 +70,9 @@ def test_import_csv_collects_failed_rows():
         validator=SimulatedConnectionValidator(),
     )
     result = service.import_csv(
-        "host,port,device_type,username,password\n"
+        "host,port,device_type,username,password,host_vars\n"
         ",22,cisco_ios,admin,pass\n"
-        "10.0.0.2,abc,cisco_ios,admin,pass\n"
+        "10.0.0.2,abc,cisco_ios,admin,pass,\n"
     )
 
     assert len(result.devices) == 0
@@ -135,3 +136,48 @@ def test_import_csv_does_not_store_failed_connection_devices():
 
     assert [d.host for d in result.devices] == ["10.0.2.1"]
     assert [d.host for d in store.list()] == ["10.0.2.1"]
+
+
+def test_import_csv_rejects_invalid_host_vars_json():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password,host_vars\n"
+        '10.0.0.3,22,cisco_ios,admin,pass,"{""hostname"":}"\n'
+    )
+
+    assert len(result.devices) == 0
+    assert len(result.failed_rows) == 1
+    assert "Invalid host_vars JSON" in result.failed_rows[0].error
+
+
+def test_import_csv_rejects_non_object_host_vars():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password,host_vars\n"
+        '10.0.0.4,22,cisco_ios,admin,pass,"[""a""]"\n'
+    )
+
+    assert len(result.devices) == 0
+    assert len(result.failed_rows) == 1
+    assert result.failed_rows[0].error == "host_vars must be a JSON object"
+
+
+def test_import_csv_rejects_invalid_host_vars_keys():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password,host_vars\n"
+        '10.0.0.5,22,cisco_ios,admin,pass,"{""bad-key"":""x""}"\n'
+    )
+
+    assert len(result.devices) == 0
+    assert len(result.failed_rows) == 1
+    assert "Invalid host_vars key(s): bad-key" == result.failed_rows[0].error

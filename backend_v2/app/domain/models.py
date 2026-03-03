@@ -62,6 +62,7 @@ class JobRecord:
     creator: str
     status: JobStatus
     created_at: str
+    global_vars: dict[str, str] = field(default_factory=dict)
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
@@ -117,6 +118,7 @@ class DeviceProfile:
     port: int = 22
     name: Optional[str] = None
     verify_cmds: list[str] = field(default_factory=list)
+    host_vars: dict[str, str] = field(default_factory=dict)
     connection_ok: bool = False
     error_message: Optional[str] = None
 

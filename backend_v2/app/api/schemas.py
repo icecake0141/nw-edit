@@ -29,6 +29,7 @@ class CreateJobRequest(BaseModel):
 
     job_name: str = Field(min_length=1, max_length=200)
     creator: str = Field(min_length=1, max_length=100)
+    global_vars: Dict[str, str] = Field(default_factory=dict)
 
 
 class JobResponse(BaseModel):
@@ -39,6 +40,7 @@ class JobResponse(BaseModel):
     creator: str
     status: str
     created_at: str
+    global_vars: Dict[str, str] = Field(default_factory=dict)
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
@@ -98,6 +100,7 @@ class DeviceProfileResponse(BaseModel):
     password: str
     name: Optional[str] = None
     verify_cmds: List[str]
+    host_vars: Dict[str, str] = Field(default_factory=dict)
     connection_ok: bool
     error_message: Optional[str] = None
 

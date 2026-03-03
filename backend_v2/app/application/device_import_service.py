@@ -22,6 +22,8 @@ from __future__ import annotations
 import csv
 import io
 from concurrent.futures import ThreadPoolExecutor
+import json
+import re
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -63,6 +65,7 @@ class DeviceImportService:
     ):
         self.store = store
         self.validator = validator
+        self._var_name_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
     def import_csv(self, csv_content: str) -> DeviceImportResult:
         reader = csv.DictReader(io.StringIO(csv_content))
@@ -104,6 +107,47 @@ class DeviceImportService:
                 for cmd in (normalized.get("verify_cmds") or "").split(";")
                 if cmd.strip()
             ]
+            host_vars_raw = normalized.get("host_vars") or ""
+            host_vars: dict[str, str] = {}
+            if host_vars_raw:
+                try:
+                    loaded = json.loads(host_vars_raw)
+                except json.JSONDecodeError as exc:
+                    failures.append(
+                        FailedRow(
+                            row_number=row_number,
+                            row=normalized,
+                            error=f"Invalid host_vars JSON: {exc.msg}",
+                        )
+                    )
+                    continue
+                if not isinstance(loaded, dict):
+                    failures.append(
+                        FailedRow(
+                            row_number=row_number,
+                            row=normalized,
+                            error="host_vars must be a JSON object",
+                        )
+                    )
+                    continue
+                invalid_keys = [
+                    key
+                    for key in loaded.keys()
+                    if not isinstance(key, str) or not self._var_name_pattern.match(key)
+                ]
+                if invalid_keys:
+                    failures.append(
+                        FailedRow(
+                            row_number=row_number,
+                            row=normalized,
+                            error=(
+                                "Invalid host_vars key(s): "
+                                + ", ".join(str(key) for key in invalid_keys)
+                            ),
+                        )
+                    )
+                    continue
+                host_vars = {str(key): str(value) for key, value in loaded.items()}
             parsed_devices.append(
                 DeviceProfile(
                     host=normalized["host"],
@@ -113,6 +157,7 @@ class DeviceImportService:
                     password=normalized["password"],
                     name=normalized.get("name") or None,
                     verify_cmds=verify_cmds,
+                    host_vars=host_vars,
                 )
             )
 
