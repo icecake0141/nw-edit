@@ -1,3 +1,15 @@
+# Copyright 2026 icecake0141
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# This file was created or modified with the assistance of an AI (Large Language Model).
+# Review required for correctness, security, and licensing.
+
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -14,13 +26,13 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY backend/app /app/app
+COPY backend_v2 /app/backend_v2
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8010
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
 # Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend_v2.app.api.main:app", "--host", "0.0.0.0", "--port", "8010"]

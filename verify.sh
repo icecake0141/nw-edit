@@ -59,15 +59,6 @@ else
 fi
 
 # Check file structure
-check "Backend structure"
-if [ -f "backend/app/main.py" ] && [ -f "backend/app/models.py" ] && \
-   [ -f "backend/app/ssh_executor.py" ] && [ -f "backend/app/job_manager.py" ] && \
-   [ -f "backend/app/ws.py" ]; then
-    pass
-else
-    fail
-fi
-
 check "Backend v2 structure"
 if [ -f "backend_v2/app/api/main.py" ] && [ -f "backend_v2/app/application/execution_engine.py" ] && \
    [ -f "backend_v2/app/domain/state_machine.py" ] && [ -f "backend_v2/app/infrastructure/in_memory_job_store.py" ]; then
@@ -84,7 +75,7 @@ else
 fi
 
 check "Test structure"
-if [ -d "tests/unit" ] && [ -d "tests/integration" ] && [ -d "tests/mock_ssh_server" ]; then
+if [ -d "backend_v2/tests/unit" ] && [ -d "backend_v2/tests/integration" ] && [ -d "tests/mock_ssh_server" ]; then
     pass
 else
     fail
@@ -124,11 +115,11 @@ fi
 # Run linting if tools are available
 if python3 -c "import black" &> /dev/null; then
     check "Code formatting (black)"
-    if python3 -m black --check backend/app backend_v2/app tests backend_v2/tests &> /dev/null; then
+    if python3 -m black --check backend_v2/app backend_v2/tests &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: python3 -m black backend/app backend_v2/app tests backend_v2/tests"
+        echo "  Run: python3 -m black backend_v2/app backend_v2/tests"
     fi
 else
     warn "  black not installed, skipping"
@@ -136,11 +127,11 @@ fi
 
 if python3 -c "import flake8" &> /dev/null; then
     check "Code linting (flake8)"
-    if python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503 &> /dev/null; then
+    if python3 -m flake8 backend_v2/app backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503 &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503"
+        echo "  Run: python3 -m flake8 backend_v2/app backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503"
     fi
 else
     warn "  flake8 not installed, skipping"
@@ -173,11 +164,11 @@ fi
 # Run tests if pytest is available
 if python3 -c "import pytest" &> /dev/null; then
     check "Unit tests"
-    if python3 -m pytest tests/unit backend_v2/tests/unit -v &> /dev/null; then
+    if PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: python3 -m pytest tests/unit backend_v2/tests/unit -v"
+        echo "  Run: PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v"
     fi
 else
     warn "  pytest not installed, skipping"
@@ -185,11 +176,11 @@ fi
 
 if python3 -c "import pytest" &> /dev/null; then
     check "Integration test discovery"
-    if python3 -m pytest --collect-only tests/integration backend_v2/tests/integration -q &> /dev/null; then
+    if PYTHONPATH=. python3 -m pytest --collect-only backend_v2/tests/integration -q &> /dev/null; then
         pass
     else
         fail
-        echo "  Run: python3 -m pytest --collect-only tests/integration backend_v2/tests/integration -q"
+        echo "  Run: PYTHONPATH=. python3 -m pytest --collect-only backend_v2/tests/integration -q"
     fi
 fi
 
@@ -218,7 +209,7 @@ if [ $FAILED -eq 0 ]; then
     echo ""
     echo "Next steps:"
     echo "1. Install dependencies: python3 -m pip install -r backend/requirements-dev.txt"
-    echo "2. Run tests: python3 -m pytest tests/unit backend_v2/tests/unit -v"
+    echo "2. Run tests: PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v"
     echo "3. Start v2 application: ./start_v2.sh"
     exit 0
 else

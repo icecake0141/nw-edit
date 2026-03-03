@@ -35,10 +35,10 @@ if [[ ${#missing[@]} -gt 0 ]]; then
 fi
 
 echo "[v2-checks] black"
-python3 -m black --check backend/app backend_v2/app tests backend_v2/tests
+python3 -m black --check backend_v2/app backend_v2/tests
 
 echo "[v2-checks] flake8"
-python3 -m flake8 backend/app backend_v2/app tests backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
+python3 -m flake8 backend_v2/app backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
 
 echo "[v2-checks] mypy (backend_v2)"
 python3 -m mypy --explicit-package-bases backend_v2/app
@@ -48,16 +48,11 @@ PRE_COMMIT_HOME="${PRE_COMMIT_HOME:-.pre-commit-cache}" python3 -m pre_commit ru
 
 echo "[v2-checks] py_compile"
 PYTHONPYCACHEPREFIX=.pycache python3 -m py_compile \
-  backend/app/main.py \
-  backend/app/models.py \
-  backend/app/ssh_executor.py \
-  backend/app/job_manager.py \
-  backend/app/ws.py \
   backend_v2/app/api/main.py \
   backend_v2/app/application/execution_engine.py
 
 echo "[v2-checks] pytest"
-python3 -m pytest tests/unit backend_v2/tests/unit -v --cov=backend/app --cov=backend_v2/app --cov-report=term
+PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=term
 
 if [[ "${RUN_INTEGRATION:-0}" == "1" ]]; then
   if [[ "${AUTO_START_MOCK_SSH:-1}" == "1" ]]; then
@@ -93,5 +88,5 @@ PY
   fi
 
   echo "[v2-checks] integration"
-  python3 -m pytest tests/integration backend_v2/tests/integration -v -m integration
+  PYTHONPATH=. python3 -m pytest backend_v2/tests/integration -v -m integration
 fi
