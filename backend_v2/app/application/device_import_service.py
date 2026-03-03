@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import csv
 import io
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -54,6 +55,8 @@ class DeviceImportResult:
 
 class DeviceImportService:
     """Parses and validates device CSV data."""
+
+    IMPORT_VALIDATION_WORKERS = 3
 
     def __init__(
         self, store: InMemoryDeviceStore, validator: DeviceConnectionValidator
@@ -113,9 +116,20 @@ class DeviceImportService:
                 )
             )
 
+        validation_results: dict[int, tuple[DeviceProfile, bool, str | None]] = {}
+        indexed_devices = list(enumerate(parsed_devices))
+        with ThreadPoolExecutor(max_workers=self.IMPORT_VALIDATION_WORKERS) as executor:
+            future_map = {
+                executor.submit(self.validator.validate, device): (index, device)
+                for index, device in indexed_devices
+            }
+            for future, (index, device) in future_map.items():
+                ok, error = future.result()
+                validation_results[index] = (device, ok, error)
+
         valid_devices: list[DeviceProfile] = []
-        for device in parsed_devices:
-            ok, error = self.validator.validate(device)
+        for index in sorted(validation_results):
+            device, ok, error = validation_results[index]
             device.connection_ok = ok
             device.error_message = error
             if ok:

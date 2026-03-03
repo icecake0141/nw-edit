@@ -17,11 +17,32 @@
 # Review required for correctness, security, and licensing.
 """Unit tests for CSV import service."""
 
+import time
+
 from backend_v2.app.application.device_import_service import DeviceImportService
 from backend_v2.app.infrastructure.device_connection_validators import (
     SimulatedConnectionValidator,
 )
 from backend_v2.app.infrastructure.in_memory_device_store import InMemoryDeviceStore
+from backend_v2.app.domain.models import DeviceProfile
+
+
+class SlowOrderAwareValidator:
+    """Validator that delays by host and can fail selected hosts."""
+
+    def __init__(
+        self,
+        delays: dict[str, float],
+        fail_hosts: set[str] | None = None,
+    ) -> None:
+        self.delays = delays
+        self.fail_hosts = fail_hosts or set()
+
+    def validate(self, device: DeviceProfile) -> tuple[bool, str | None]:
+        time.sleep(self.delays.get(device.host, 0.0))
+        if device.host in self.fail_hosts:
+            return False, "connection failed"
+        return True, None
 
 
 def test_import_csv_parses_and_stores_valid_devices():
@@ -55,3 +76,62 @@ def test_import_csv_collects_failed_rows():
 
     assert len(result.devices) == 0
     assert len(result.failed_rows) == 2
+
+
+def test_import_csv_parallel_validation_preserves_input_order():
+    store = InMemoryDeviceStore()
+    service = DeviceImportService(
+        store=store,
+        validator=SlowOrderAwareValidator(
+            delays={"10.0.0.1": 0.20, "10.0.0.2": 0.05, "10.0.0.3": 0.01}
+        ),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password\n"
+        "10.0.0.1,22,cisco_ios,admin,pass\n"
+        "10.0.0.2,22,cisco_ios,admin,pass\n"
+        "10.0.0.3,22,cisco_ios,admin,pass\n"
+    )
+
+    assert [d.host for d in result.devices] == ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
+    assert [d.host for d in store.list()] == ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
+
+
+def test_import_csv_parallel_validation_is_faster_than_serial_baseline():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SlowOrderAwareValidator(
+            delays={"10.0.1.1": 0.20, "10.0.1.2": 0.20, "10.0.1.3": 0.20}
+        ),
+    )
+
+    started_at = time.perf_counter()
+    result = service.import_csv(
+        "host,port,device_type,username,password\n"
+        "10.0.1.1,22,cisco_ios,admin,pass\n"
+        "10.0.1.2,22,cisco_ios,admin,pass\n"
+        "10.0.1.3,22,cisco_ios,admin,pass\n"
+    )
+    elapsed = time.perf_counter() - started_at
+
+    assert len(result.devices) == 3
+    assert elapsed < 0.45
+
+
+def test_import_csv_does_not_store_failed_connection_devices():
+    store = InMemoryDeviceStore()
+    service = DeviceImportService(
+        store=store,
+        validator=SlowOrderAwareValidator(
+            delays={"10.0.2.1": 0.01, "10.0.2.2": 0.01},
+            fail_hosts={"10.0.2.2"},
+        ),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password\n"
+        "10.0.2.1,22,cisco_ios,admin,pass\n"
+        "10.0.2.2,22,cisco_ios,admin,pass\n"
+    )
+
+    assert [d.host for d in result.devices] == ["10.0.2.1"]
+    assert [d.host for d in store.list()] == ["10.0.2.1"]
