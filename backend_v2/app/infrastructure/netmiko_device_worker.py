@@ -30,7 +30,7 @@ from backend_v2.app.domain.models import (
 
 
 class NetmikoDeviceWorker(DeviceWorker):
-    """Executes commands using the existing v1 ssh executor."""
+    """Executes commands using v2-local Netmiko executor."""
 
     def __init__(self, profile_resolver: Callable[[str], DeviceProfile | None]):
         self.profile_resolver = profile_resolver
@@ -43,7 +43,9 @@ class NetmikoDeviceWorker(DeviceWorker):
                 error=f"Device profile not found for {device.key}",
             )
 
-        from backend.app.ssh_executor import execute_device_commands
+        from backend_v2.app.infrastructure.netmiko_executor import (
+            execute_device_commands,
+        )
 
         output = execute_device_commands(
             device_params={

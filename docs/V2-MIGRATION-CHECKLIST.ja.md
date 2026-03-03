@@ -75,9 +75,9 @@ You may obtain a copy of the License at
 - Date: `2026-03-03`（soft deprecation）, `2026-03-03`（hard cutover）
 - Decision: `GO`
 - Accepted risks:
-  - `backend/app` の一部モジュールが v2 内部依存として残る
+  - legacy テスト/互換性のため `backend/app` モジュール自体は継続配置
 - Follow-up:
-  - 将来的に v2 の netmiko 依存を `backend/app` から分離可能か検討
+  - `2026-03-03` 対応済み: v2 の netmiko 依存 import を `backend/app` から分離
 
 証跡:
 

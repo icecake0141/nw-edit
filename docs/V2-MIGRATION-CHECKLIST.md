@@ -91,9 +91,9 @@ Migration completion sign-off:
 - Date: `2026-03-03` (soft deprecation), `2026-03-03` (hard cutover)
 - Decision: `GO`
 - Risks accepted:
-  - Shared `backend/app` modules remain in repository as v2 internal dependencies
+  - Shared `backend/app` modules still exist for legacy test/runtime compatibility
 - Follow-up issues:
-  - Optional cleanup: decouple v2 netmiko adapters from `backend/app` shared modules
+  - Completed on `2026-03-03`: v2 netmiko adapters decoupled from `backend/app` imports
 
 Evidence:
 

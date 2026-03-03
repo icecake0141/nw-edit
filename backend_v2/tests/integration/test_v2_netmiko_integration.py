@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.ssh_executor import validate_device_connection
+from backend_v2.app.infrastructure.netmiko_executor import validate_device_connection
 
 
 def _ensure_mock_server():
@@ -156,17 +156,17 @@ def test_v2_netmiko_async_pause_resume_cancel(monkeypatch):
 
     monkeypatch.setenv("NW_EDIT_V2_WORKER_MODE", "netmiko")
     monkeypatch.setenv("NW_EDIT_V2_VALIDATOR_MODE", "netmiko")
-    import backend.app.ssh_executor as ssh_executor
+    import backend_v2.app.infrastructure.netmiko_executor as netmiko_executor
     import backend_v2.app.api.main as api_main
 
-    original_execute = ssh_executor.execute_device_commands
+    original_execute = netmiko_executor.execute_device_commands
 
     def delayed_execute_device_commands(*args, **kwargs):
         time.sleep(2.0)
         return original_execute(*args, **kwargs)
 
     monkeypatch.setattr(
-        ssh_executor, "execute_device_commands", delayed_execute_device_commands
+        netmiko_executor, "execute_device_commands", delayed_execute_device_commands
     )
     importlib.reload(api_main)
     client = TestClient(api_main.app)
