@@ -363,7 +363,9 @@ def test_sync_run_rejected_while_same_job_is_running_async(monkeypatch):
     client = TestClient(app)
     monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
 
-    create = client.post("/api/v2/jobs", json={"job_name": "race-sync", "creator": "ops"})
+    create = client.post(
+        "/api/v2/jobs", json={"job_name": "race-sync", "creator": "ops"}
+    )
     assert create.status_code == 200
     job_id = create.json()["job_id"]
 
@@ -396,7 +398,9 @@ def test_duplicate_async_run_does_not_clear_pause_control(monkeypatch):
     client = TestClient(app)
     monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
 
-    create = client.post("/api/v2/jobs", json={"job_name": "race-async", "creator": "ops"})
+    create = client.post(
+        "/api/v2/jobs", json={"job_name": "race-async", "creator": "ops"}
+    )
     assert create.status_code == 200
     job_id = create.json()["job_id"]
 

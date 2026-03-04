@@ -165,7 +165,9 @@ class DeviceImportService:
                 )
             )
 
-        validation_results: dict[int, tuple[int, dict[str, str], DeviceProfile, bool, str | None]] = {}
+        validation_results: dict[
+            int, tuple[int, dict[str, str], DeviceProfile, bool, str | None]
+        ] = {}
         indexed_devices = list(enumerate(parsed_entries))
         with ThreadPoolExecutor(max_workers=self.IMPORT_VALIDATION_WORKERS) as executor:
             future_map = {
