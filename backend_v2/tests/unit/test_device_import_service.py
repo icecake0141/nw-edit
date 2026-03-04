@@ -64,6 +64,20 @@ def test_import_csv_parses_and_stores_valid_devices():
     assert result.failed_rows == []
 
 
+def test_import_csv_normalizes_generic_linux_device_type():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password\n"
+        "10.0.3.1,22,Generic Linux,admin,pass\n"
+    )
+
+    assert len(result.devices) == 1
+    assert result.devices[0].device_type == "linux"
+
+
 def test_import_csv_collects_failed_rows():
     service = DeviceImportService(
         store=InMemoryDeviceStore(),

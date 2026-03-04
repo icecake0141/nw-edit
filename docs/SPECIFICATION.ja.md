@@ -100,6 +100,7 @@ Netmikoベースで、代表的には以下をサポート:
 - `cisco_nxos`
 - `arista_eos`
 - `juniper_junos`
+- `linux`（Generic Linux）
 
 詳細は Netmiko ドキュメントを参照。
 

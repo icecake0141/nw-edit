@@ -59,6 +59,11 @@ class DeviceImportService:
     """Parses and validates device CSV data."""
 
     IMPORT_VALIDATION_WORKERS = 3
+    _DEVICE_TYPE_ALIASES = {
+        "generic linux": "linux",
+        "generic_linux": "linux",
+        "generic-linux": "linux",
+    }
 
     def __init__(
         self, store: InMemoryDeviceStore, validator: DeviceConnectionValidator
@@ -66,6 +71,13 @@ class DeviceImportService:
         self.store = store
         self.validator = validator
         self._var_name_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+    def _normalize_device_type(self, device_type: str) -> str:
+        canonical = device_type.strip()
+        alias = self._DEVICE_TYPE_ALIASES.get(canonical.lower())
+        if alias:
+            return alias
+        return canonical
 
     def import_csv(self, csv_content: str) -> DeviceImportResult:
         reader = csv.DictReader(io.StringIO(csv_content))
@@ -155,7 +167,9 @@ class DeviceImportService:
                     DeviceProfile(
                         host=normalized["host"],
                         port=port,
-                        device_type=normalized["device_type"],
+                        device_type=self._normalize_device_type(
+                            normalized["device_type"]
+                        ),
                         username=normalized["username"],
                         password=normalized["password"],
                         name=normalized.get("name") or None,
