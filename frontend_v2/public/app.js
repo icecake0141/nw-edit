@@ -159,9 +159,20 @@ async function refreshJobs() {
   jobs.forEach((job) => {
     const div = document.createElement("div");
     div.className = "history-item";
-    div.innerHTML = `<div><strong>${job.job_name}</strong></div>
-      <div class="muted">${job.job_id}</div>
-      <div class="muted">status: ${job.status}</div>`;
+    const titleWrap = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = job.job_name;
+    titleWrap.append(title);
+
+    const id = document.createElement("div");
+    id.className = "muted";
+    id.textContent = job.job_id;
+
+    const status = document.createElement("div");
+    status.className = "muted";
+    status.textContent = `status: ${job.status}`;
+
+    div.append(titleWrap, id, status);
     div.addEventListener("click", async () => {
       try {
         selectedJobId = job.job_id;

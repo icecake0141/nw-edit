@@ -386,8 +386,8 @@ def run_job(job_id: str, payload: RunJobRequest) -> RunJobResponse:
 
     try:
         service.apply_event(job_id=job_id, event_name="start")
-    except ValueError:
-        pass
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     control = control_store.get_or_create(job_id)
     control.pause_event.clear()
     control.cancel_event.clear()
@@ -411,8 +411,8 @@ def run_job_async(job_id: str, payload: RunJobRequest) -> JobResponse:
     )
     try:
         service.apply_event(job_id=job_id, event_name="start")
-    except ValueError:
-        pass
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     control = control_store.get_or_create(job_id)
     control.pause_event.clear()
     control.cancel_event.clear()
