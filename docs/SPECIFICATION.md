@@ -100,6 +100,7 @@ The runtime uses Netmiko and supports common types such as:
 - `cisco_nxos`
 - `arista_eos`
 - `juniper_junos`
+- `linux` (Generic Linux)
 
 For full coverage, see Netmiko documentation.
 
