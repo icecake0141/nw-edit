@@ -34,6 +34,19 @@ def test_health_endpoint():
     assert response.json() == {"status": "ok"}
 
 
+def test_cors_allows_local_frontend_origin():
+    client = TestClient(app)
+    preflight = client.options(
+        "/api/v2/devices/import",
+        headers={
+            "Origin": "http://127.0.0.1:3010",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "http://127.0.0.1:3010"
+
+
 def test_create_job_persists_global_vars():
     client = TestClient(app)
     response = client.post(
