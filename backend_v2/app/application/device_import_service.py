@@ -70,7 +70,7 @@ class DeviceImportService:
     def import_csv(self, csv_content: str) -> DeviceImportResult:
         reader = csv.DictReader(io.StringIO(csv_content))
         failures: list[FailedRow] = []
-        parsed_devices: list[DeviceProfile] = []
+        parsed_entries: list[tuple[int, dict[str, str], DeviceProfile]] = []
 
         for row_number, row in enumerate(reader, start=2):
             normalized = {
@@ -148,37 +148,50 @@ class DeviceImportService:
                     )
                     continue
                 host_vars = {str(key): str(value) for key, value in loaded.items()}
-            parsed_devices.append(
-                DeviceProfile(
-                    host=normalized["host"],
-                    port=port,
-                    device_type=normalized["device_type"],
-                    username=normalized["username"],
-                    password=normalized["password"],
-                    name=normalized.get("name") or None,
-                    verify_cmds=verify_cmds,
-                    host_vars=host_vars,
+            parsed_entries.append(
+                (
+                    row_number,
+                    dict(normalized),
+                    DeviceProfile(
+                        host=normalized["host"],
+                        port=port,
+                        device_type=normalized["device_type"],
+                        username=normalized["username"],
+                        password=normalized["password"],
+                        name=normalized.get("name") or None,
+                        verify_cmds=verify_cmds,
+                        host_vars=host_vars,
+                    ),
                 )
             )
 
-        validation_results: dict[int, tuple[DeviceProfile, bool, str | None]] = {}
-        indexed_devices = list(enumerate(parsed_devices))
+        validation_results: dict[int, tuple[int, dict[str, str], DeviceProfile, bool, str | None]] = {}
+        indexed_devices = list(enumerate(parsed_entries))
         with ThreadPoolExecutor(max_workers=self.IMPORT_VALIDATION_WORKERS) as executor:
             future_map = {
-                executor.submit(self.validator.validate, device): (index, device)
-                for index, device in indexed_devices
+                executor.submit(self.validator.validate, entry[2]): (index, entry)
+                for index, entry in indexed_devices
             }
-            for future, (index, device) in future_map.items():
+            for future, (index, entry) in future_map.items():
                 ok, error = future.result()
-                validation_results[index] = (device, ok, error)
+                row_number, row, device = entry
+                validation_results[index] = (row_number, row, device, ok, error)
 
         valid_devices: list[DeviceProfile] = []
         for index in sorted(validation_results):
-            device, ok, error = validation_results[index]
+            row_number, row, device, ok, error = validation_results[index]
             device.connection_ok = ok
             device.error_message = error
             if ok:
                 valid_devices.append(device)
+            else:
+                failures.append(
+                    FailedRow(
+                        row_number=row_number,
+                        row=row,
+                        error=error or "Connection validation failed",
+                    )
+                )
 
         self.store.replace(valid_devices)
         return DeviceImportResult(devices=valid_devices, failed_rows=failures)

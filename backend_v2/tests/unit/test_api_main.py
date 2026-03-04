@@ -357,3 +357,79 @@ def test_async_pause_resume_cancel_flow(monkeypatch):
     assert cancel.status_code == 200
     assert cancel.json()["status"] == "cancelled"
     assert control.cancel_event.is_set() is True
+
+
+def test_sync_run_rejected_while_same_job_is_running_async(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+
+    create = client.post("/api/v2/jobs", json={"job_name": "race-sync", "creator": "ops"})
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    start_async = client.post(
+        f"/api/v2/jobs/{job_id}/run/async",
+        json={
+            "devices": [
+                {"host": "10.9.3.1", "port": 22},
+                {"host": "10.9.3.2", "port": 22},
+            ],
+            "canary": {"host": "10.9.3.1", "port": 22},
+            "commands": ["show version"],
+        },
+    )
+    assert start_async.status_code == 200
+
+    sync = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "devices": [{"host": "10.9.3.1", "port": 22}],
+            "canary": {"host": "10.9.3.1", "port": 22},
+            "commands": ["show version"],
+        },
+    )
+    assert sync.status_code == 409
+    assert "Invalid transition" in sync.json()["detail"]
+
+
+def test_duplicate_async_run_does_not_clear_pause_control(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+
+    create = client.post("/api/v2/jobs", json={"job_name": "race-async", "creator": "ops"})
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    start_async = client.post(
+        f"/api/v2/jobs/{job_id}/run/async",
+        json={
+            "devices": [
+                {"host": "10.9.4.1", "port": 22},
+                {"host": "10.9.4.2", "port": 22},
+                {"host": "10.9.4.3", "port": 22},
+            ],
+            "canary": {"host": "10.9.4.1", "port": 22},
+            "commands": ["show version"],
+            "concurrency_limit": 1,
+        },
+    )
+    assert start_async.status_code == 200
+
+    time.sleep(0.15)
+    pause = client.post(f"/api/v2/jobs/{job_id}/pause")
+    assert pause.status_code == 200
+
+    control = api_main.control_store.get(job_id)
+    assert control is not None
+    assert control.pause_event.is_set() is True
+
+    duplicate_async = client.post(
+        f"/api/v2/jobs/{job_id}/run/async",
+        json={
+            "devices": [{"host": "10.9.4.1", "port": 22}],
+            "canary": {"host": "10.9.4.1", "port": 22},
+            "commands": ["show version"],
+        },
+    )
+    assert duplicate_async.status_code == 409
+    assert control.pause_event.is_set() is True

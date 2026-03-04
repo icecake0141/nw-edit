@@ -136,6 +136,9 @@ def test_import_csv_does_not_store_failed_connection_devices():
 
     assert [d.host for d in result.devices] == ["10.0.2.1"]
     assert [d.host for d in store.list()] == ["10.0.2.1"]
+    assert len(result.failed_rows) == 1
+    assert result.failed_rows[0].row_number == 3
+    assert result.failed_rows[0].error == "connection failed"
 
 
 def test_import_csv_rejects_invalid_host_vars_json():
