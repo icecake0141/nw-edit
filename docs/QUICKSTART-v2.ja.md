@@ -78,6 +78,16 @@ curl -s -X POST http://127.0.0.1:8010/api/v2/jobs/<job_id>/resume
 curl -s -X POST http://127.0.0.1:8010/api/v2/jobs/<job_id>/cancel
 ```
 
+6. 実行プリセットの作成/一覧
+
+```bash
+curl -s -X POST http://127.0.0.1:8010/api/v2/presets \
+  -H "Content-Type: application/json" \
+  -d '{"name":"ios baseline","os_model":"cisco_ios","commands":["show version"],"verify_commands":["show ip interface brief"]}'
+
+curl -s "http://127.0.0.1:8010/api/v2/presets?os_model=cisco_ios"
+```
+
 ## 4. ローカル検証ショートカット
 
 ```bash

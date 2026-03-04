@@ -106,7 +106,7 @@ You may obtain a copy of the License at
       opacity: 0.8;
       font-weight: 500;
     }
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
@@ -116,8 +116,8 @@ You may obtain a copy of the License at
       color: inherit;
       background: #fff;
     }
-    input { min-height: 40px; }
-    input:focus-visible, textarea:focus-visible, button:focus-visible {
+    input, select { min-height: 40px; }
+    input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
       outline: 2px solid #1f6fba;
       outline-offset: 1px;
     }
@@ -129,6 +129,40 @@ You may obtain a copy of the License at
       gap: 10px;
       margin: 10px 0 12px;
       opacity: 1;
+    }
+    .device-select-wrap {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfcfd;
+    }
+    .device-select-list {
+      display: grid;
+      gap: 6px;
+      max-height: 180px;
+      overflow: auto;
+      margin-top: 8px;
+    }
+    .device-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+    .device-option input {
+      width: auto;
+      min-height: 0;
+      margin: 0;
+    }
+    .modal {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 12px;
+      background: #f6faf9;
+    }
+    .hidden {
+      display: none !important;
     }
     .checkbox-row input {
       width: auto;
@@ -248,12 +282,42 @@ You may obtain a copy of the License at
 10.0.0.2:22
 10.0.0.3:22</textarea>
       <label class="checkbox-row"><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
+      <label for="osModelSelect">対象OSモデル</label>
+      <select id="osModelSelect">
+        <option value="">(未選択)</option>
+      </select>
+      <label for="presetSelect">実行プリセット</label>
+      <select id="presetSelect">
+        <option value="">(未選択)</option>
+      </select>
+      <div class="device-select-wrap">
+        <label>import済みデバイス選択（初期: 未選択）</label>
+        <div class="muted" id="importedDeviceHint">OSモデルを選択すると候補を表示します。</div>
+        <div id="importedDeviceList" class="device-select-list"></div>
+      </div>
       <label for="commands">Commands (one line each)</label>
       <textarea id="commands">show version
 show ip interface brief</textarea>
+      <label for="verifyCommands">Verify Commands (one line each)</label>
+      <textarea id="verifyCommands"></textarea>
       <div class="btn-row">
         <button class="primary" id="runBtn">Create + Run</button>
         <button class="primary" id="runAsyncBtn">Create + Run Async</button>
+        <button class="secondary hidden" id="savePresetBtn">実行プリセットとして保存</button>
+      </div>
+      <div class="modal hidden" id="savePresetModal">
+        <label for="savePresetName">プリセット名</label>
+        <input id="savePresetName" />
+        <label for="savePresetOsModel">OSモデル</label>
+        <input id="savePresetOsModel" />
+        <label for="savePresetCommands">Commands</label>
+        <textarea id="savePresetCommands"></textarea>
+        <label for="savePresetVerifyCommands">Verify Commands</label>
+        <textarea id="savePresetVerifyCommands"></textarea>
+        <div class="btn-row">
+          <button class="primary" id="savePresetConfirmBtn">保存</button>
+          <button class="secondary" id="savePresetCancelBtn">キャンセル</button>
+        </div>
       </div>
     </section>
 
@@ -284,6 +348,9 @@ show ip interface brief</textarea>
       <p class="muted" id="detailMeta">No job selected</p>
       <label for="detailData">Selected Job Result</label>
       <pre id="detailData"></pre>
+      <div class="btn-row" style="margin-top: 10px;">
+        <button class="secondary hidden" id="savePresetFromDetailBtn">この結果から実行プリセット保存</button>
+      </div>
     </section>
   </div>
 

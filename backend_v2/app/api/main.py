@@ -19,6 +19,7 @@
 
 import asyncio
 import os
+from typing import Optional
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi import WebSocket, WebSocketDisconnect
@@ -32,6 +33,9 @@ from backend_v2.app.api.schemas import (
     DeviceRunResponse,
     ExecutionEventResponse,
     JobResponse,
+    PresetCreateRequest,
+    PresetResponse,
+    PresetUpdateRequest,
     RunJobRequest,
     RunJobResponse,
     FailedRowResponse,
@@ -50,6 +54,7 @@ from backend_v2.app.application.execution_engine import (
 from backend_v2.app.application.job_service import JobService
 from backend_v2.app.domain.models import (
     DeviceTarget,
+    ExecutionPreset,
     JobRecord,
     JobRunSummary,
     JobStatus,
@@ -64,6 +69,10 @@ from backend_v2.app.infrastructure.in_memory_event_store import InMemoryEventSto
 from backend_v2.app.infrastructure.in_memory_job_store import InMemoryJobStore
 from backend_v2.app.infrastructure.in_memory_run_store import InMemoryRunStore
 from backend_v2.app.infrastructure.in_memory_control_store import InMemoryControlStore
+from backend_v2.app.infrastructure.file_preset_store import (
+    FilePresetStore,
+    PresetConflictError,
+)
 from backend_v2.app.infrastructure.netmiko_device_worker import NetmikoDeviceWorker
 from backend_v2.app.infrastructure.run_coordinator import RunCoordinator
 from backend_v2.app.infrastructure.simulated_device_worker import SimulatedDeviceWorker
@@ -96,6 +105,12 @@ device_store = InMemoryDeviceStore()
 event_store = InMemoryEventStore()
 run_store = InMemoryRunStore()
 control_store = InMemoryControlStore()
+preset_store = FilePresetStore(
+    path=os.getenv(
+        "NW_EDIT_V2_PRESET_FILE",
+        "backend_v2/data/run_presets.json",
+    ).strip(),
+)
 run_coordinator = RunCoordinator()
 service = JobService(repository=store, state_machine=JobStateMachine())
 
@@ -138,8 +153,33 @@ def to_response(job: JobRecord) -> JobResponse:
 def _resolve_run_targets(
     payload: RunJobRequest,
 ) -> tuple[list[DeviceTarget], DeviceTarget]:
+    if payload.devices and payload.imported_device_keys is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="devices and imported_device_keys cannot be used together",
+        )
     if payload.devices:
         devices = [DeviceTarget(host=d.host, port=d.port) for d in payload.devices]
+    elif payload.imported_device_keys is not None:
+        if not payload.imported_device_keys:
+            raise HTTPException(
+                status_code=400,
+                detail="imported_device_keys cannot be empty",
+            )
+        imported_map = {d.key: d for d in device_store.list()}
+        missing_keys = [
+            key for key in payload.imported_device_keys if key not in imported_map
+        ]
+        if missing_keys:
+            missing = ", ".join(missing_keys)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown imported_device_keys: {missing}",
+            )
+        devices = [
+            DeviceTarget(host=imported_map[key].host, port=imported_map[key].port)
+            for key in payload.imported_device_keys
+        ]
     else:
         devices = [DeviceTarget(host=d.host, port=d.port) for d in device_store.list()]
     if not devices:
@@ -156,6 +196,9 @@ def _to_run_response(summary: JobRunSummary) -> RunJobResponse:
     return RunJobResponse(
         job_id=summary.job_id,
         status=summary.status.value,
+        commands=summary.commands,
+        verify_commands=summary.verify_commands,
+        target_device_keys=summary.target_device_keys,
         device_results={
             key: DeviceRunResponse(
                 status=result.status,
@@ -181,6 +224,7 @@ def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
     list[DeviceTarget],
     DeviceTarget,
     dict[str, list[str]],
+    dict[str, list[str]],
     ExecutionConfig,
 ]:
     job = store.get(job_id)
@@ -189,6 +233,7 @@ def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
 
     devices, canary = _resolve_run_targets(payload)
     commands_by_device: dict[str, list[str]] = {}
+    verify_commands_by_device: dict[str, list[str]] = {}
     for device in devices:
         profile = device_store.get_by_key(device.key)
         merged_vars = dict(job.global_vars)
@@ -202,6 +247,12 @@ def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
                 detail=(f"Missing command variables for {device.key}: {missing_vars}"),
             )
         commands_by_device[device.key] = rendered
+        if payload.verify_commands is not None:
+            verify_commands_by_device[device.key] = list(payload.verify_commands)
+        else:
+            verify_commands_by_device[device.key] = (
+                list(profile.verify_cmds) if profile is not None else []
+            )
 
     config = ExecutionConfig(
         concurrency_limit=payload.concurrency_limit,
@@ -210,7 +261,7 @@ def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
         non_canary_retry_limit=payload.non_canary_retry_limit,
         retry_backoff_seconds=payload.retry_backoff_seconds,
     )
-    return job, devices, canary, commands_by_device, config
+    return job, devices, canary, commands_by_device, verify_commands_by_device, config
 
 
 def _execute_run_prepared(
@@ -218,7 +269,10 @@ def _execute_run_prepared(
     devices: list[DeviceTarget],
     canary: DeviceTarget,
     commands_by_device: dict[str, list[str]],
+    verify_commands_by_device: dict[str, list[str]],
     config: ExecutionConfig,
+    commands: Optional[list[str]] = None,
+    verify_commands: Optional[list[str]] = None,
 ) -> JobRunSummary:
     control = control_store.get_or_create(job_id)
     summary = engine.run_job(
@@ -226,7 +280,10 @@ def _execute_run_prepared(
         devices=devices,
         canary=canary,
         commands_by_device=commands_by_device,
+        verify_commands_by_device=verify_commands_by_device,
         config=config,
+        commands=commands,
+        verify_commands=verify_commands,
         control=control,
     )
     run_store.save(summary)
@@ -246,6 +303,18 @@ def _execute_run_prepared(
         except ValueError:
             pass
     return summary
+
+
+def _to_preset_response(preset: ExecutionPreset) -> PresetResponse:
+    return PresetResponse(
+        preset_id=preset.preset_id,
+        name=preset.name,
+        os_model=preset.os_model,
+        commands=preset.commands,
+        verify_commands=preset.verify_commands,
+        created_at=preset.created_at,
+        updated_at=preset.updated_at,
+    )
 
 
 @app.get("/health")
@@ -306,6 +375,54 @@ def list_devices() -> list[DeviceProfileResponse]:
         )
         for d in devices
     ]
+
+
+@app.get("/api/v2/presets", response_model=list[PresetResponse])
+def list_presets(os_model: Optional[str] = None) -> list[PresetResponse]:
+    """List execution presets with optional os_model filter."""
+    return [
+        _to_preset_response(preset)
+        for preset in preset_store.list_presets(os_model=os_model)
+    ]
+
+
+@app.get("/api/v2/presets/os-models", response_model=list[str])
+def list_preset_os_models() -> list[str]:
+    """List os models that have at least one preset."""
+    return preset_store.list_os_models()
+
+
+@app.post("/api/v2/presets", response_model=PresetResponse)
+def create_preset(payload: PresetCreateRequest) -> PresetResponse:
+    """Create execution preset."""
+    try:
+        preset = preset_store.create(
+            name=payload.name,
+            os_model=payload.os_model,
+            commands=list(payload.commands),
+            verify_commands=list(payload.verify_commands),
+        )
+    except PresetConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _to_preset_response(preset)
+
+
+@app.put("/api/v2/presets/{preset_id}", response_model=PresetResponse)
+def update_preset(preset_id: str, payload: PresetUpdateRequest) -> PresetResponse:
+    """Update execution preset."""
+    try:
+        preset = preset_store.update(
+            preset_id=preset_id,
+            name=payload.name,
+            os_model=payload.os_model,
+            commands=list(payload.commands),
+            verify_commands=list(payload.verify_commands),
+        )
+    except PresetConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if preset is None:
+        raise HTTPException(status_code=404, detail="Preset not found")
+    return _to_preset_response(preset)
 
 
 @app.post("/api/v2/jobs", response_model=JobResponse)
@@ -379,9 +496,11 @@ def apply_event(job_id: str, event_name: str) -> JobResponse:
 @app.post("/api/v2/jobs/{job_id}/run", response_model=RunJobResponse)
 def run_job(job_id: str, payload: RunJobRequest) -> RunJobResponse:
     """Run job with simulated worker and return summary."""
-    _, devices, canary, commands_by_device, config = _prepare_run(
-        job_id=job_id,
-        payload=payload,
+    _, devices, canary, commands_by_device, verify_commands_by_device, config = (
+        _prepare_run(
+            job_id=job_id,
+            payload=payload,
+        )
     )
 
     try:
@@ -397,7 +516,10 @@ def run_job(job_id: str, payload: RunJobRequest) -> RunJobResponse:
         devices=devices,
         canary=canary,
         commands_by_device=commands_by_device,
+        verify_commands_by_device=verify_commands_by_device,
         config=config,
+        commands=payload.commands,
+        verify_commands=list(payload.verify_commands or []),
     )
     return _to_run_response(summary)
 
@@ -405,9 +527,11 @@ def run_job(job_id: str, payload: RunJobRequest) -> RunJobResponse:
 @app.post("/api/v2/jobs/{job_id}/run/async", response_model=JobResponse)
 def run_job_async(job_id: str, payload: RunJobRequest) -> JobResponse:
     """Run job in background thread."""
-    job, devices, canary, commands_by_device, config = _prepare_run(
-        job_id=job_id,
-        payload=payload,
+    _, devices, canary, commands_by_device, verify_commands_by_device, config = (
+        _prepare_run(
+            job_id=job_id,
+            payload=payload,
+        )
     )
     try:
         service.apply_event(job_id=job_id, event_name="start")
@@ -424,7 +548,10 @@ def run_job_async(job_id: str, payload: RunJobRequest) -> JobResponse:
             devices=devices,
             canary=canary,
             commands_by_device=commands_by_device,
+            verify_commands_by_device=verify_commands_by_device,
             config=config,
+            commands=payload.commands,
+            verify_commands=list(payload.verify_commands or []),
         ),
     )
     if not started:

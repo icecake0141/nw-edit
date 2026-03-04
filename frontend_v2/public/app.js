@@ -34,15 +34,37 @@ const importBtn = document.getElementById("importBtn");
 const refreshDevicesBtn = document.getElementById("refreshDevicesBtn");
 const listJobsBtn = document.getElementById("listJobsBtn");
 const refreshActiveBtn = document.getElementById("refreshActiveBtn");
+const osModelSelectEl = document.getElementById("osModelSelect");
+const presetSelectEl = document.getElementById("presetSelect");
+const importedDeviceListEl = document.getElementById("importedDeviceList");
+const importedDeviceHintEl = document.getElementById("importedDeviceHint");
+const verifyCommandsEl = document.getElementById("verifyCommands");
+const savePresetBtn = document.getElementById("savePresetBtn");
+const savePresetFromDetailBtn = document.getElementById("savePresetFromDetailBtn");
+const savePresetModalEl = document.getElementById("savePresetModal");
+const savePresetNameEl = document.getElementById("savePresetName");
+const savePresetOsModelEl = document.getElementById("savePresetOsModel");
+const savePresetCommandsEl = document.getElementById("savePresetCommands");
+const savePresetVerifyCommandsEl = document.getElementById("savePresetVerifyCommands");
+const savePresetConfirmBtn = document.getElementById("savePresetConfirmBtn");
+const savePresetCancelBtn = document.getElementById("savePresetCancelBtn");
 
 /** @type {WebSocket|null} */
 let activeSocket = null;
 /** @type {string|null} */
 let selectedJobId = null;
+/** @type {import("./api-client.js").DeviceProfile[]} */
+let importedDevices = [];
+/** @type {import("./api-client.js").Preset[]} */
+let currentPresets = [];
+/** @type {{ source: "sync" | "detail", commands: string[], verifyCommands: string[], defaultOsModel: string }|null} */
+let savePresetContext = null;
 
 pauseBtn.disabled = true;
 resumeBtn.disabled = true;
 cancelBtn.disabled = true;
+setSavePresetVisible(false);
+setSavePresetFromDetailVisible(false);
 
 function currentApiBase() {
   return document.getElementById("apiBase").value.trim();
@@ -84,6 +106,10 @@ function parseCommands(text) {
     .filter(Boolean);
 }
 
+function parseVerifyCommands(text) {
+  return parseCommands(text);
+}
+
 function parseGlobalVars(text) {
   const raw = text.trim();
   if (!raw) {
@@ -101,6 +127,93 @@ function parseGlobalVars(text) {
   return Object.fromEntries(
     Object.entries(parsed).map(([key, value]) => [String(key), String(value)])
   );
+}
+
+function selectedImportedDeviceKeys() {
+  return Array.from(
+    document.querySelectorAll('input[name="importedDeviceKeys"]:checked')
+  ).map((el) => el.value);
+}
+
+function selectedOsModel() {
+  return osModelSelectEl.value.trim();
+}
+
+function setSavePresetVisible(visible) {
+  savePresetBtn.classList.toggle("hidden", !visible);
+}
+
+function setSavePresetFromDetailVisible(visible) {
+  savePresetFromDetailBtn.classList.toggle("hidden", !visible);
+}
+
+function openSavePresetModal(context) {
+  savePresetContext = context;
+  savePresetNameEl.value = "";
+  savePresetOsModelEl.value = context.defaultOsModel || "";
+  savePresetCommandsEl.value = context.commands.join("\n");
+  savePresetVerifyCommandsEl.value = context.verifyCommands.join("\n");
+  savePresetModalEl.classList.remove("hidden");
+}
+
+function closeSavePresetModal() {
+  savePresetModalEl.classList.add("hidden");
+}
+
+function populateOsModelSelect(models) {
+  const previous = selectedOsModel();
+  osModelSelectEl.innerHTML = '<option value="">(未選択)</option>';
+  models.forEach((model) => {
+    const option = document.createElement("option");
+    option.value = model;
+    option.textContent = model;
+    osModelSelectEl.append(option);
+  });
+  if (previous && models.includes(previous)) {
+    osModelSelectEl.value = previous;
+  }
+}
+
+function renderImportedDeviceCandidates() {
+  const model = selectedOsModel();
+  importedDeviceListEl.replaceChildren();
+  if (!model) {
+    importedDeviceHintEl.textContent = "OSモデルを選択すると候補を表示します。";
+    return;
+  }
+  const candidates = importedDevices.filter((device) => device.device_type === model);
+  importedDeviceHintEl.textContent = `${model} の候補: ${candidates.length}台（初期未選択）`;
+  if (candidates.length === 0) {
+    return;
+  }
+  candidates.forEach((device) => {
+    const label = document.createElement("label");
+    label.className = "device-option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "importedDeviceKeys";
+    input.value = `${device.host}:${device.port}`;
+    const text = document.createElement("span");
+    text.textContent = `${device.host}:${device.port} (${device.name || "-"} / ${device.device_type})`;
+    label.append(input, text);
+    importedDeviceListEl.append(label);
+  });
+}
+
+async function refreshPresetOptions() {
+  const model = selectedOsModel();
+  presetSelectEl.innerHTML = '<option value="">(未選択)</option>';
+  if (!model) {
+    currentPresets = [];
+    return;
+  }
+  currentPresets = await client().listPresets(model);
+  currentPresets.forEach((preset) => {
+    const option = document.createElement("option");
+    option.value = preset.preset_id;
+    option.textContent = preset.name;
+    presetSelectEl.append(option);
+  });
 }
 
 function openJobSocket(apiBase, jobId) {
@@ -139,9 +252,17 @@ function switchPage(pageName) {
 }
 
 async function refreshImportedDevices() {
-  const devices = await client().listDevices();
-  deviceCountEl.textContent = `imported devices: ${devices.length}`;
-  appendLog(`loaded imported devices: ${devices.length}`);
+  importedDevices = await client().listDevices();
+  deviceCountEl.textContent = `imported devices: ${importedDevices.length}`;
+  const deviceModels = Array.from(
+    new Set(importedDevices.map((device) => device.device_type))
+  ).sort();
+  const presetModels = await client().listPresetOsModels();
+  const allModels = Array.from(new Set([...deviceModels, ...presetModels])).sort();
+  populateOsModelSelect(allModels);
+  renderImportedDeviceCandidates();
+  await refreshPresetOptions();
+  appendLog(`loaded imported devices: ${importedDevices.length}`);
 }
 
 async function refreshJobs() {
@@ -182,6 +303,30 @@ async function refreshJobs() {
           client().getJobResult(job.job_id).catch(() => ({ job_id: job.job_id, status: "pending", device_results: {} })),
         ]);
         renderJobDetail(detail, events, result);
+        const canSave =
+          result.status === "completed" &&
+          Object.values(result.device_results || {}).every(
+            (value) => value.status === "success"
+          ) &&
+          Array.isArray(result.commands);
+        if (canSave) {
+          const targets = importedDevices.filter((device) =>
+            (result.target_device_keys || []).includes(`${device.host}:${device.port}`)
+          );
+          const osModels = Array.from(
+            new Set(targets.map((device) => device.device_type))
+          );
+          const defaultOsModel = osModels.length === 1 ? osModels[0] : "";
+          savePresetContext = {
+            source: "detail",
+            commands: result.commands || [],
+            verifyCommands: result.verify_commands || [],
+            defaultOsModel,
+          };
+          setSavePresetFromDetailVisible(true);
+        } else {
+          setSavePresetFromDetailVisible(false);
+        }
         appendLog(`history selected: ${job.job_id}`);
         switchPage("detail");
       } catch (error) {
@@ -217,7 +362,9 @@ async function runSync() {
   const globalVarsText = document.getElementById("globalVars").value;
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
+  const verifyCommands = parseVerifyCommands(verifyCommandsEl.value);
   const useImported = useImportedEl.checked;
+  const importedDeviceKeys = selectedImportedDeviceKeys();
 
   if (commands.length === 0) {
     appendLog("commands is empty");
@@ -226,6 +373,16 @@ async function runSync() {
   if (!useImported && devices.length === 0) {
     appendLog("ad-hoc devices is empty");
     return;
+  }
+  if (useImported) {
+    if (!selectedOsModel()) {
+      appendLog("対象OSモデルを選択してください");
+      return;
+    }
+    if (importedDeviceKeys.length === 0) {
+      appendLog("import済みデバイスの適用対象を選択してください");
+      return;
+    }
   }
 
   let globalVars;
@@ -243,7 +400,16 @@ async function runSync() {
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
 
-    const result = await client().runJob(job.job_id, commands, devices, useImported);
+    const result = await client().runJob(
+      job.job_id,
+      commands,
+      devices,
+      useImported,
+      {
+        verifyCommands,
+        importedDeviceKeys,
+      }
+    );
     appendLog(`run completed: ${result.status}`);
     Object.entries(result.device_results).forEach(([key, value]) => {
       appendLog(`${key} => status=${value.status} attempts=${value.attempts}`);
@@ -253,6 +419,29 @@ async function runSync() {
     });
 
     setStatus(result.status);
+    const canSave =
+      result.status === "completed" &&
+      Object.values(result.device_results).every((value) => value.status === "success");
+    if (canSave) {
+      const targets = importedDevices.filter((device) =>
+        result.target_device_keys.includes(`${device.host}:${device.port}`)
+      );
+      const osModels = Array.from(new Set(targets.map((device) => device.device_type)));
+      const defaultOsModel = osModels.length === 1 ? osModels[0] : selectedOsModel();
+      savePresetContext = {
+        source: "sync",
+        commands: result.commands.length > 0 ? result.commands : commands,
+        verifyCommands:
+          result.verify_commands.length > 0
+            ? result.verify_commands
+            : verifyCommands,
+        defaultOsModel,
+      };
+      setSavePresetVisible(true);
+    } else {
+      setSavePresetVisible(false);
+      savePresetContext = null;
+    }
     await refreshJobs();
     await refreshActive();
   } catch (error) {
@@ -272,7 +461,9 @@ async function runAsync() {
   const globalVarsText = document.getElementById("globalVars").value;
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
+  const verifyCommands = parseVerifyCommands(verifyCommandsEl.value);
   const useImported = useImportedEl.checked;
+  const importedDeviceKeys = selectedImportedDeviceKeys();
 
   if (commands.length === 0) {
     appendLog("commands is empty");
@@ -281,6 +472,16 @@ async function runAsync() {
   if (!useImported && devices.length === 0) {
     appendLog("ad-hoc devices is empty");
     return;
+  }
+  if (useImported) {
+    if (!selectedOsModel()) {
+      appendLog("対象OSモデルを選択してください");
+      return;
+    }
+    if (importedDeviceKeys.length === 0) {
+      appendLog("import済みデバイスの適用対象を選択してください");
+      return;
+    }
   }
 
   let globalVars;
@@ -297,9 +498,21 @@ async function runAsync() {
     const job = await client().createJob(jobName, creator, globalVars);
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
-    const started = await client().runJobAsync(job.job_id, commands, devices, useImported);
+    const started = await client().runJobAsync(
+      job.job_id,
+      commands,
+      devices,
+      useImported,
+      {
+        verifyCommands,
+        importedDeviceKeys,
+      }
+    );
     appendLog(`run async started: ${started.status}`);
     setStatus("running");
+    setSavePresetVisible(false);
+    setSavePresetFromDetailVisible(false);
+    savePresetContext = null;
     await refreshJobs();
     await refreshActive();
     switchPage("monitor");
@@ -338,6 +551,92 @@ listJobsBtn.addEventListener("click", () => {
 
 refreshActiveBtn.addEventListener("click", () => {
   refreshActive().catch((error) => appendLog(String(error)));
+});
+
+osModelSelectEl.addEventListener("change", () => {
+  renderImportedDeviceCandidates();
+  refreshPresetOptions().catch((error) => appendLog(String(error)));
+});
+
+presetSelectEl.addEventListener("change", () => {
+  const selected = currentPresets.find(
+    (preset) => preset.preset_id === presetSelectEl.value
+  );
+  if (!selected) {
+    return;
+  }
+  document.getElementById("commands").value = selected.commands.join("\n");
+  verifyCommandsEl.value = selected.verify_commands.join("\n");
+  appendLog(`実行プリセット適用: ${selected.name} (${selected.os_model})`);
+});
+
+savePresetBtn.addEventListener("click", () => {
+  if (!savePresetContext) {
+    return;
+  }
+  openSavePresetModal(savePresetContext);
+});
+
+savePresetFromDetailBtn.addEventListener("click", () => {
+  if (!savePresetContext) {
+    return;
+  }
+  openSavePresetModal(savePresetContext);
+});
+
+savePresetCancelBtn.addEventListener("click", () => {
+  closeSavePresetModal();
+});
+
+savePresetConfirmBtn.addEventListener("click", async () => {
+  const name = savePresetNameEl.value.trim();
+  const osModel = savePresetOsModelEl.value.trim();
+  const commands = parseCommands(savePresetCommandsEl.value);
+  const verifyCommands = parseVerifyCommands(savePresetVerifyCommandsEl.value);
+  if (!name) {
+    appendLog("プリセット名を入力してください");
+    return;
+  }
+  if (!osModel) {
+    appendLog("OSモデルを入力してください");
+    return;
+  }
+  if (commands.length === 0) {
+    appendLog("プリセットのcommandsが空です");
+    return;
+  }
+  const payload = {
+    name,
+    os_model: osModel,
+    commands,
+    verify_commands: verifyCommands,
+  };
+  try {
+    await client().createPreset(payload);
+    appendLog(`実行プリセット保存: ${name} (${osModel})`);
+  } catch (error) {
+    if (!String(error).includes("409")) {
+      appendLog(String(error));
+      return;
+    }
+    const sameModel = await client().listPresets(osModel);
+    const existing = sameModel.find((preset) => preset.name === name);
+    if (!existing) {
+      appendLog(String(error));
+      return;
+    }
+    const accepted = window.confirm(
+      `同名プリセットが存在します。上書きしますか？\nname=${name} os_model=${osModel}`
+    );
+    if (!accepted) {
+      appendLog("プリセット上書きをキャンセルしました");
+      return;
+    }
+    await client().updatePreset(existing.preset_id, payload);
+    appendLog(`実行プリセット上書き: ${name} (${osModel})`);
+  }
+  closeSavePresetModal();
+  await refreshImportedDevices();
 });
 
 pauseBtn.addEventListener("click", async () => {

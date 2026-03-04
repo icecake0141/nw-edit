@@ -29,7 +29,13 @@ from backend_v2.app.domain.models import DeviceExecutionResult, DeviceTarget
 class SimulatedDeviceWorker(DeviceWorker):
     """Returns successful execution for every device."""
 
-    def run(self, device: DeviceTarget, commands: list[str]) -> DeviceExecutionResult:
+    def run(
+        self,
+        device: DeviceTarget,
+        commands: list[str],
+        verify_commands: list[str] | None = None,
+    ) -> DeviceExecutionResult:
+        del verify_commands
         delay_ms = int(os.getenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "0").strip() or "0")
         if delay_ms > 0:
             time.sleep(delay_ms / 1000.0)

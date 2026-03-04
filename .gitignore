@@ -57,3 +57,6 @@ build/
 # CSV files (may contain sensitive data)
 *.csv
 !sample_devices.csv
+
+# Runtime preset storage
+backend_v2/data/run_presets.json

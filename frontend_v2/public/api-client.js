@@ -17,11 +17,13 @@
 /**
  * @typedef {{ host: string, port: number }} DeviceTarget
  * @typedef {{ [key: string]: string }} VariableMap
+ * @typedef {{ host: string, port: number, device_type: string, username: string, password: string, name?: string, verify_cmds: string[], host_vars: VariableMap, connection_ok: boolean, error_message?: string }} DeviceProfile
  * @typedef {{ job_id: string, job_name: string, creator: string, status: string, created_at: string, global_vars: VariableMap }} JobSummary
  * @typedef {{ status: string, attempts: number, error?: string, error_code?: string, logs: string[], pre_output: string, apply_output: string, post_output: string, diff: string, diff_truncated: boolean, diff_original_size: number }} DeviceRunResponse
- * @typedef {{ job_id: string, status: string, device_results: Record<string, DeviceRunResponse> }} RunJobResponse
+ * @typedef {{ job_id: string, status: string, commands: string[], verify_commands: string[], target_device_keys: string[], device_results: Record<string, DeviceRunResponse> }} RunJobResponse
  * @typedef {{ devices: unknown[], failed_rows: { error: string }[] }} ImportDevicesResponse
  * @typedef {{ active: boolean, job?: JobSummary }} ActiveJobResponse
+ * @typedef {{ preset_id: string, name: string, os_model: string, commands: string[], verify_commands: string[], created_at: string, updated_at: string }} Preset
  */
 
 /**
@@ -98,7 +100,7 @@ export class NwEditApiClient {
     });
   }
 
-  /** @returns {Promise<unknown[]>} */
+  /** @returns {Promise<DeviceProfile[]>} */
   async listDevices() {
     return this.request("/api/v2/devices");
   }
@@ -117,18 +119,22 @@ export class NwEditApiClient {
    * @param {string[]} commands
    * @param {DeviceTarget[]} devices
    * @param {boolean} useImported
+   * @param {{ verifyCommands?: string[], importedDeviceKeys?: string[] }=} options
    * @returns {Promise<RunJobResponse>}
    */
-  async runJob(jobId, commands, devices, useImported) {
+  async runJob(jobId, commands, devices, useImported, options = {}) {
     const payload = {
       commands,
+      verify_commands: options.verifyCommands,
       concurrency_limit: 2,
       stagger_delay: 0,
       stop_on_error: true,
       non_canary_retry_limit: 1,
       retry_backoff_seconds: 0,
     };
-    if (!useImported) {
+    if (useImported) {
+      payload.imported_device_keys = options.importedDeviceKeys;
+    } else {
       payload.devices = devices;
       payload.canary = devices[0];
     }
@@ -144,23 +150,63 @@ export class NwEditApiClient {
    * @param {string[]} commands
    * @param {DeviceTarget[]} devices
    * @param {boolean} useImported
+   * @param {{ verifyCommands?: string[], importedDeviceKeys?: string[] }=} options
    * @returns {Promise<JobSummary>}
    */
-  async runJobAsync(jobId, commands, devices, useImported) {
+  async runJobAsync(jobId, commands, devices, useImported, options = {}) {
     const payload = {
       commands,
+      verify_commands: options.verifyCommands,
       concurrency_limit: 2,
       stagger_delay: 0,
       stop_on_error: true,
       non_canary_retry_limit: 1,
       retry_backoff_seconds: 0,
     };
-    if (!useImported) {
+    if (useImported) {
+      payload.imported_device_keys = options.importedDeviceKeys;
+    } else {
       payload.devices = devices;
       payload.canary = devices[0];
     }
     return this.request(`/api/v2/jobs/${jobId}/run/async`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** @param {string=} osModel @returns {Promise<Preset[]>} */
+  async listPresets(osModel = "") {
+    const suffix = osModel ? `?os_model=${encodeURIComponent(osModel)}` : "";
+    return this.request(`/api/v2/presets${suffix}`);
+  }
+
+  /** @returns {Promise<string[]>} */
+  async listPresetOsModels() {
+    return this.request("/api/v2/presets/os-models");
+  }
+
+  /**
+   * @param {{ name: string, os_model: string, commands: string[], verify_commands: string[] }} payload
+   * @returns {Promise<Preset>}
+   */
+  async createPreset(payload) {
+    return this.request("/api/v2/presets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * @param {string} presetId
+   * @param {{ name: string, os_model: string, commands: string[], verify_commands: string[] }} payload
+   * @returns {Promise<Preset>}
+   */
+  async updatePreset(presetId, payload) {
+    return this.request(`/api/v2/presets/${presetId}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
