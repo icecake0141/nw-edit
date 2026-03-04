@@ -58,6 +58,8 @@ class RunJobRequest(BaseModel):
     devices: Optional[List[DeviceTargetPayload]] = None
     canary: Optional[DeviceTargetPayload] = None
     commands: List[str] = Field(min_length=1)
+    verify_commands: Optional[List[str]] = None
+    imported_device_keys: Optional[List[str]] = None
     concurrency_limit: int = Field(default=5, ge=1, le=100)
     stagger_delay: float = Field(default=0.0, ge=0.0, le=60.0)
     stop_on_error: bool = True
@@ -87,7 +89,40 @@ class RunJobResponse(BaseModel):
 
     job_id: str
     status: str
+    commands: List[str] = Field(default_factory=list)
+    verify_commands: List[str] = Field(default_factory=list)
+    target_device_keys: List[str] = Field(default_factory=list)
     device_results: Dict[str, DeviceRunResponse]
+
+
+class PresetCreateRequest(BaseModel):
+    """Payload to create an execution preset."""
+
+    name: str = Field(min_length=1, max_length=200)
+    os_model: str = Field(min_length=1, max_length=100)
+    commands: List[str] = Field(min_length=1)
+    verify_commands: List[str] = Field(default_factory=list)
+
+
+class PresetUpdateRequest(BaseModel):
+    """Payload to update an execution preset."""
+
+    name: str = Field(min_length=1, max_length=200)
+    os_model: str = Field(min_length=1, max_length=100)
+    commands: List[str] = Field(min_length=1)
+    verify_commands: List[str] = Field(default_factory=list)
+
+
+class PresetResponse(BaseModel):
+    """Execution preset response payload."""
+
+    preset_id: str
+    name: str
+    os_model: str
+    commands: List[str]
+    verify_commands: List[str]
+    created_at: str
+    updated_at: str
 
 
 class DeviceProfileResponse(BaseModel):

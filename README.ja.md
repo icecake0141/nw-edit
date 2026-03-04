@@ -60,6 +60,18 @@ make check-integration
 - 解決優先順位は `host_vars > global_vars`。
 - 未定義変数がある場合、デバイス実行前の preflight で `HTTP 400` を返す。
 
+## 実行プリセット（v2）
+
+- 成功した実行条件を `実行プリセット` として保存し、再利用できます。
+- プリセットは `os_model`（`device_type`）単位で管理し、次を保持します。
+  - `commands`
+  - `verify_commands`
+- 保存先はローカルJSONファイルです（`NW_EDIT_V2_PRESET_FILE`、既定: `backend_v2/data/run_presets.json`）。
+- 実行画面では次の順で利用します。
+  - 対象OSモデルを選択
+  - 実行プリセットを選択
+  - import済みデバイスから適用対象を選択（初期未選択）
+
 ## ドキュメント
 
 - ドキュメント一覧（英日）: [docs/INDEX.ja.md](docs/INDEX.ja.md)

@@ -62,6 +62,18 @@ make check-integration
 - Resolution order is `host_vars > global_vars`.
 - Missing variables fail preflight with `HTTP 400` before any device command runs.
 
+## Execution presets (v2)
+
+- Save successful run conditions as reusable `実行プリセット` (execution presets).
+- Presets are scoped by `os_model` (`device_type`) and contain:
+  - `commands`
+  - `verify_commands`
+- Presets are stored in local JSON file (`NW_EDIT_V2_PRESET_FILE`, default: `backend_v2/data/run_presets.json`).
+- Create page flow:
+  - choose OS model
+  - choose preset
+  - choose imported target devices (initially unselected)
+
 ## Documentation
 
 - Full index (EN/JA): [docs/INDEX.md](docs/INDEX.md)

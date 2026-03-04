@@ -35,6 +35,7 @@ You may obtain a copy of the License at
 - 非同期制御（`pause/resume/cancel`）
 - WebSocketによるリアルタイムイベント配信
 - デバイス単位の `pre/apply/post/diff` 結果
+- OSモデル別の実行プリセット保存・再利用
 
 ## CSV形式
 
@@ -82,8 +83,20 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
   - `POST /api/v2/jobs/{job_id}/pause`
   - `POST /api/v2/jobs/{job_id}/resume`
   - `POST /api/v2/jobs/{job_id}/cancel`
+- プリセット:
+  - `GET /api/v2/presets`
+  - `GET /api/v2/presets/os-models`
+  - `POST /api/v2/presets`
+  - `PUT /api/v2/presets/{preset_id}`
 - WebSocket:
   - `/ws/v2/jobs/{job_id}`
+
+## 実行リクエスト拡張
+
+- `verify_commands`（任意）: 指定時は全対象デバイスへ共通適用。
+- `imported_device_keys`（任意）: import済みデバイスの実行対象を `host:port` で明示。
+  - ad-hoc の `devices` と同時指定不可
+  - 空配列は `HTTP 400`
 
 ## 実行時設定
 

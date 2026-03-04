@@ -37,7 +37,12 @@ from backend_v2.app.domain.models import (
 class DeviceWorker(Protocol):
     """Device worker abstraction (SSH adapter will implement this later)."""
 
-    def run(self, device: DeviceTarget, commands: list[str]) -> DeviceExecutionResult:
+    def run(
+        self,
+        device: DeviceTarget,
+        commands: list[str],
+        verify_commands: list[str] | None = None,
+    ) -> DeviceExecutionResult:
         """Execute commands on one device and return result."""
 
 
@@ -84,6 +89,7 @@ class ExecutionEngine:
         self,
         device: DeviceTarget,
         commands_by_device: dict[str, list[str]],
+        verify_commands_by_device: dict[str, list[str]] | None,
         retry_limit: int,
         backoff: float,
         control: ExecutionControl | None = None,
@@ -99,7 +105,14 @@ class ExecutionEngine:
                 )
             attempts = attempt + 1
             commands = commands_by_device.get(device.key, [])
-            result = self.worker.run(device=device, commands=commands)
+            verify_commands: list[str] = []
+            if verify_commands_by_device is not None:
+                verify_commands = verify_commands_by_device.get(device.key, [])
+            result = self.worker.run(
+                device=device,
+                commands=commands,
+                verify_commands=verify_commands,
+            )
             result.attempts = attempts
             last_result = result
             if result.status == "success":
@@ -120,11 +133,20 @@ class ExecutionEngine:
         devices: list[DeviceTarget],
         canary: DeviceTarget,
         commands_by_device: dict[str, list[str]],
+        verify_commands_by_device: dict[str, list[str]] | None,
         config: ExecutionConfig,
+        commands: list[str] | None = None,
+        verify_commands: list[str] | None = None,
         control: ExecutionControl | None = None,
     ) -> JobRunSummary:
         """Run a job and return aggregated summary."""
-        summary = JobRunSummary(job_id=job_id, status=JobStatus.RUNNING)
+        summary = JobRunSummary(
+            job_id=job_id,
+            status=JobStatus.RUNNING,
+            commands=list(commands or []),
+            verify_commands=list(verify_commands or []),
+            target_device_keys=[device.key for device in devices],
+        )
         self._emit(event_type="job_status", job_id=job_id, status="running")
         if control and control.cancel_event.is_set():
             summary.status = JobStatus.CANCELLED
@@ -162,6 +184,7 @@ class ExecutionEngine:
         canary_result = self._run_with_retry(
             device=canary,
             commands_by_device=commands_by_device,
+            verify_commands_by_device=verify_commands_by_device,
             retry_limit=0,
             backoff=0.0,
             control=control,
@@ -229,6 +252,7 @@ class ExecutionEngine:
                         self._run_with_retry,
                         device,
                         commands_by_device,
+                        verify_commands_by_device,
                         config.non_canary_retry_limit,
                         config.retry_backoff_seconds,
                         control,

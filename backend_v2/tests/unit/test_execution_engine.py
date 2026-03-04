@@ -30,8 +30,14 @@ class StubWorker:
         self.plan = {k: list(v) for k, v in plan.items()}
         self.calls: list[str] = []
 
-    def run(self, device: DeviceTarget, commands: list[str]) -> DeviceExecutionResult:
+    def run(
+        self,
+        device: DeviceTarget,
+        commands: list[str],
+        verify_commands: list[str] | None = None,
+    ) -> DeviceExecutionResult:
         del commands
+        del verify_commands
         key = device.key
         self.calls.append(key)
         queue = self.plan.get(key, ["success"])
@@ -53,6 +59,7 @@ def test_canary_failure_aborts_remaining_devices():
         devices=devices,
         canary=canary,
         commands_by_device={d.key: ["show version"] for d in devices},
+        verify_commands_by_device={d.key: [] for d in devices},
         config=ExecutionConfig(),
     )
 
@@ -75,6 +82,7 @@ def test_non_canary_retry_then_success():
             canary.key: ["conf t"],
             other.key: ["conf t"],
         },
+        verify_commands_by_device={canary.key: [], other.key: []},
         config=ExecutionConfig(non_canary_retry_limit=1),
     )
 
@@ -94,6 +102,7 @@ def test_missing_canary_is_failed_job():
         devices=devices,
         canary=canary,
         commands_by_device={d.key: ["show run"] for d in devices},
+        verify_commands_by_device={d.key: [] for d in devices},
         config=ExecutionConfig(),
     )
 
@@ -120,6 +129,7 @@ def test_stop_on_error_stops_future_submissions():
             d2.key: ["write memory"],
             d3.key: ["write memory"],
         },
+        verify_commands_by_device={canary.key: [], d2.key: [], d3.key: []},
         config=ExecutionConfig(
             concurrency_limit=1,
             stop_on_error=True,
@@ -143,6 +153,7 @@ def test_engine_emits_completion_event():
         devices=[canary],
         canary=canary,
         commands_by_device={canary.key: ["show version"]},
+        verify_commands_by_device={canary.key: []},
         config=ExecutionConfig(),
     )
 
@@ -164,6 +175,7 @@ def test_engine_cancel_before_start():
         devices=[canary],
         canary=canary,
         commands_by_device={canary.key: ["show run"]},
+        verify_commands_by_device={canary.key: []},
         config=ExecutionConfig(),
         control=control,
     )
