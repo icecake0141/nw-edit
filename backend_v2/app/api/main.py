@@ -22,6 +22,7 @@ import os
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi import WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend_v2.app.api.schemas import (
     ActiveJobResponse,
@@ -70,6 +71,24 @@ from backend_v2.app.infrastructure.simulated_device_worker import SimulatedDevic
 app = FastAPI(
     title="Network Device Configuration Manager v2 (Scaffold)",
     version="0.1.0",
+)
+
+# Allow local v2 frontend (python http.server on 3010) to call API on 8010.
+# Comma-separated override is available for deployment-specific origins.
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "NW_EDIT_V2_CORS_ORIGINS",
+        "http://127.0.0.1:3010,http://localhost:3010",
+    ).split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 store = InMemoryJobStore()
