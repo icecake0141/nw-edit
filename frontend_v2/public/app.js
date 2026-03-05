@@ -17,6 +17,7 @@
 import { NwEditApiClient } from "./api-client.js";
 
 const statusEl = document.getElementById("status");
+const modeStatusEl = document.getElementById("modeStatus");
 const logEl = document.getElementById("log");
 const detailMetaEl = document.getElementById("detailMeta");
 const detailDataEl = document.getElementById("detailData");
@@ -104,6 +105,12 @@ function toWsBase(apiBase) {
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function setModeStatus(text) {
+  if (modeStatusEl) {
+    modeStatusEl.textContent = text;
+  }
 }
 
 function appendLog(message) {
@@ -814,6 +821,16 @@ async function refreshActive() {
   }
 }
 
+async function refreshRuntimeModes() {
+  try {
+    const modes = await client().getRuntimeModes();
+    setModeStatus(`mode: worker=${modes.worker_mode} / validator=${modes.validator_mode}`);
+  } catch (error) {
+    setModeStatus("mode: worker=- / validator=-");
+    appendLog(`failed to load runtime modes: ${String(error)}`);
+  }
+}
+
 function resolveRunTargets(useImported, adHocDevices) {
   if (!useImported) {
     return {
@@ -1299,6 +1316,10 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
   });
 });
 
+document.getElementById("apiBase").addEventListener("change", () => {
+  refreshRuntimeModes().catch((error) => appendLog(String(error)));
+});
+
 setInterval(() => {
   refreshActive().catch((error) => appendLog(String(error)));
 }, 4000);
@@ -1309,3 +1330,4 @@ renderMonitorState();
 refreshImportedDevices().catch(() => {});
 refreshJobs().catch(() => {});
 refreshActive().catch(() => {});
+refreshRuntimeModes().catch(() => {});

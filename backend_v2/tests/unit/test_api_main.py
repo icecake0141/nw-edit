@@ -79,6 +79,20 @@ def test_health_endpoint():
     assert response.json() == {"status": "ok"}
 
 
+def test_runtime_modes_endpoint_defaults_worker_to_netmiko(monkeypatch):
+    monkeypatch.delenv("NW_EDIT_V2_WORKER_MODE", raising=False)
+    monkeypatch.delenv("NW_EDIT_V2_VALIDATOR_MODE", raising=False)
+    client = TestClient(app)
+
+    response = client.get("/api/v2/runtime/modes")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "worker_mode": "netmiko",
+        "validator_mode": "netmiko",
+    }
+
+
 def test_cors_allows_local_frontend_origin():
     client = TestClient(app)
     preflight = client.options(

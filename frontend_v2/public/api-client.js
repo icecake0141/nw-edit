@@ -24,6 +24,7 @@
  * @typedef {{ devices: DeviceProfile[], failed_rows: { row_number?: number, error: string }[] }} ImportDevicesResponse
  * @typedef {{ output: string }} StatusCommandResponse
  * @typedef {{ active: boolean, job?: JobSummary }} ActiveJobResponse
+ * @typedef {{ worker_mode: string, validator_mode: string }} RuntimeModesResponse
  * @typedef {{ preset_id: string, name: string, os_model: string, commands: string[], verify_commands: string[], created_at: string, updated_at: string }} Preset
  */
 
@@ -109,6 +110,11 @@ export class NwEditApiClient {
   /** @returns {Promise<ActiveJobResponse>} */
   async getActiveJob() {
     return this.request("/api/v2/jobs/active");
+  }
+
+  /** @returns {Promise<RuntimeModesResponse>} */
+  async getRuntimeModes() {
+    return this.request("/api/v2/runtime/modes");
   }
 
   /** @param {string} action @returns {Promise<JobSummary>} */

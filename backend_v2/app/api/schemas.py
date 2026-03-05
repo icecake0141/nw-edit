@@ -186,3 +186,10 @@ class ActiveJobResponse(BaseModel):
 
     active: bool
     job: Optional[JobResponse] = None
+
+
+class RuntimeModesResponse(BaseModel):
+    """Runtime mode response."""
+
+    worker_mode: str
+    validator_mode: str

@@ -65,6 +65,12 @@ You may obtain a copy of the License at
       font-size: clamp(1.1rem, 1.8vw, 1.65rem);
       letter-spacing: 0.005em;
     }
+    .head-meta {
+      display: grid;
+      justify-items: end;
+      gap: 4px;
+      font-size: 0.88rem;
+    }
     .panel {
       background: var(--card);
       border: 1px solid var(--line);
@@ -397,7 +403,10 @@ You may obtain a copy of the License at
   <div class="wrap">
     <div class="head">
       <h1>nw-edit v2 operations console</h1>
-      <div id="status">idle</div>
+      <div class="head-meta">
+        <div id="status">idle</div>
+        <div id="modeStatus" class="muted">mode: worker=- / validator=-</div>
+      </div>
     </div>
 
     <section class="panel grid">
