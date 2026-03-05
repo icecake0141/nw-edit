@@ -22,6 +22,7 @@
  * @typedef {{ status: string, attempts: number, error?: string, error_code?: string, logs: string[], pre_output: string, apply_output: string, post_output: string, diff: string, diff_truncated: boolean, diff_original_size: number, log_trimmed?: boolean }} DeviceRunResponse
  * @typedef {{ job_id: string, status: string, commands: string[], verify_commands: string[], target_device_keys: string[], device_results: Record<string, DeviceRunResponse> }} RunJobResponse
  * @typedef {{ devices: DeviceProfile[], failed_rows: { row_number?: number, error: string }[] }} ImportDevicesResponse
+ * @typedef {{ output: string }} StatusCommandResponse
  * @typedef {{ active: boolean, job?: JobSummary }} ActiveJobResponse
  * @typedef {{ preset_id: string, name: string, os_model: string, commands: string[], verify_commands: string[], created_at: string, updated_at: string }} Preset
  */
@@ -52,11 +53,14 @@ export class NwEditApiClient {
           detail = parsed.detail;
         } else if (parsed?.detail?.failed_rows) {
           const failedRows = parsed.detail.failed_rows;
-          const top = failedRows
-            .slice(0, 5)
-            .map((item) => `row ${item.row_number || "?"}: ${item.error}`)
-            .join(" | ");
-          detail = `${parsed.detail.message || "CSV import failed"} (${failedRows.length} rows). ${top}`;
+          const maxRowsToShow = 20;
+          const lines = failedRows
+            .slice(0, maxRowsToShow)
+            .map((item) => `- row ${item.row_number || "?"}: ${item.error}`);
+          if (failedRows.length > maxRowsToShow) {
+            lines.push(`- ... and ${failedRows.length - maxRowsToShow} more row(s)`);
+          }
+          detail = `${parsed.detail.message || "CSV import failed"} (${failedRows.length} rows)\n${lines.join("\n")}`;
         } else if (parsed?.detail) {
           detail = JSON.stringify(parsed.detail);
         }
@@ -133,28 +137,44 @@ export class NwEditApiClient {
   }
 
   /**
+   * @param {string} host
+   * @param {number} port
+   * @param {string} commands
+   * @returns {Promise<StatusCommandResponse>}
+   */
+  async execStatusCommands(host, port, commands) {
+    return this.request("/api/v2/commands/exec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ host, port, commands }),
+    });
+  }
+
+  /**
    * @param {string} jobId
    * @param {string[]} commands
    * @param {DeviceTarget[]} devices
    * @param {boolean} useImported
-   * @param {{ verifyCommands?: string[], importedDeviceKeys?: string[] }=} options
+   * @param {{ verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
    * @returns {Promise<RunJobResponse>}
    */
   async runJob(jobId, commands, devices, useImported, options = {}) {
     const payload = {
       commands,
       verify_commands: options.verifyCommands,
-      concurrency_limit: 2,
-      stagger_delay: 0,
-      stop_on_error: true,
+      verify_mode: options.verifyMode || "all",
+      concurrency_limit: options.concurrencyLimit ?? 5,
+      stagger_delay: options.staggerDelay ?? 1.0,
+      stop_on_error: options.stopOnError ?? true,
       non_canary_retry_limit: 1,
       retry_backoff_seconds: 0,
+      canary: options.canary,
     };
     if (useImported) {
       payload.imported_device_keys = options.importedDeviceKeys;
     } else {
       payload.devices = devices;
-      payload.canary = devices[0];
+      payload.canary = options.canary || devices[0];
     }
     return this.request(`/api/v2/jobs/${jobId}/run`, {
       method: "POST",
@@ -168,24 +188,26 @@ export class NwEditApiClient {
    * @param {string[]} commands
    * @param {DeviceTarget[]} devices
    * @param {boolean} useImported
-   * @param {{ verifyCommands?: string[], importedDeviceKeys?: string[] }=} options
+   * @param {{ verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
    * @returns {Promise<JobSummary>}
    */
   async runJobAsync(jobId, commands, devices, useImported, options = {}) {
     const payload = {
       commands,
       verify_commands: options.verifyCommands,
-      concurrency_limit: 2,
-      stagger_delay: 0,
-      stop_on_error: true,
+      verify_mode: options.verifyMode || "all",
+      concurrency_limit: options.concurrencyLimit ?? 5,
+      stagger_delay: options.staggerDelay ?? 1.0,
+      stop_on_error: options.stopOnError ?? true,
       non_canary_retry_limit: 1,
       retry_backoff_seconds: 0,
+      canary: options.canary,
     };
     if (useImported) {
       payload.imported_device_keys = options.importedDeviceKeys;
     } else {
       payload.devices = devices;
-      payload.canary = devices[0];
+      payload.canary = options.canary || devices[0];
     }
     return this.request(`/api/v2/jobs/${jobId}/run/async`, {
       method: "POST",

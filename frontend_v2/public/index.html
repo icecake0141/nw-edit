@@ -179,6 +179,22 @@ You may obtain a copy of the License at
       border-radius: 8px;
       padding: 8px 10px;
       font-size: 0.86rem;
+      white-space: pre-wrap;
+    }
+    .active-job-banner {
+      border: 1px solid #f5d08b;
+      background: #fff8e8;
+      color: #7a4c00;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .active-job-banner.hidden {
+      display: none;
     }
     .muted { opacity: 0.72; font-size: 0.86rem; }
     button {
@@ -383,6 +399,7 @@ You may obtain a copy of the License at
       <button class="secondary nav-btn" data-page="create" aria-pressed="false">Create</button>
       <button class="secondary nav-btn" data-page="monitor" aria-pressed="false">Monitor</button>
       <button class="secondary nav-btn" data-page="history" aria-pressed="false">History</button>
+      <button class="secondary nav-btn" data-page="status-command" aria-pressed="false">Status Command</button>
       <button class="secondary nav-btn" data-page="detail" aria-pressed="false">Detail</button>
     </section>
 
@@ -397,12 +414,17 @@ You may obtain a copy of the License at
       </div>
       <div class="import-status">
         <progress id="importProgress" class="hidden"></progress>
+        <div id="importProgressText" class="muted hidden">Validating devices... 0/0</div>
         <div id="importErrors" class="error-box hidden"></div>
       </div>
       <p class="muted" id="deviceCount">imported devices: 0</p>
     </section>
 
     <section class="panel page" data-page="create">
+      <div id="activeJobBanner" class="active-job-banner hidden">
+        <span id="activeJobBannerText">A job is currently running.</span>
+        <button class="secondary" id="viewActiveJobBtn" type="button">View Active Job</button>
+      </div>
       <label class="checkbox-row"><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
       <div class="device-select-wrap">
         <div class="btn-row">
@@ -416,6 +438,10 @@ You may obtain a copy of the License at
       <textarea id="devices">10.0.0.1:22
 10.0.0.2:22
 10.0.0.3:22</textarea>
+      <label for="canaryDevice">Canary Device (required)</label>
+      <select id="canaryDevice">
+        <option value="">(select canary)</option>
+      </select>
       <label class="checkbox-row"><input type="checkbox" id="enablePresetMode" /> Enable Preset Mode (optional)</label>
       <div id="presetPanel" class="hidden">
         <label for="osModelSelect">Target OS Model</label>
@@ -432,6 +458,17 @@ You may obtain a copy of the License at
 show ip interface brief</textarea>
       <label for="verifyCommands">Verify Commands (one line each)</label>
       <textarea id="verifyCommands"></textarea>
+      <label for="verifyMode">Verify Mode</label>
+      <select id="verifyMode">
+        <option value="canary">Canary only</option>
+        <option value="all">All devices</option>
+        <option value="none">None</option>
+      </select>
+      <label for="concurrencyLimit">Concurrency Limit</label>
+      <input id="concurrencyLimit" type="number" min="1" max="100" value="5" />
+      <label for="staggerDelay">Stagger Delay (seconds)</label>
+      <input id="staggerDelay" type="number" min="0" max="60" step="0.1" value="1.0" />
+      <label class="checkbox-row"><input type="checkbox" id="stopOnError" checked /> Stop on Error</label>
       <div class="btn-row">
         <button class="primary" id="runBtn">Create + Run</button>
         <button class="primary" id="runAsyncBtn">Create + Run Async</button>
@@ -461,6 +498,22 @@ show ip interface brief</textarea>
       </div>
       <label>Job History</label>
       <div id="history" class="history-list"></div>
+    </section>
+
+    <section class="panel page" data-page="status-command">
+      <p class="muted">Run read-only checks on imported devices.</p>
+      <label for="statusDeviceSelect">Target Device</label>
+      <select id="statusDeviceSelect">
+        <option value="">(select device)</option>
+      </select>
+      <label for="statusCommands">Status Commands (one line each)</label>
+      <textarea id="statusCommands">show version
+show ip interface brief</textarea>
+      <div class="btn-row">
+        <button class="secondary" id="statusRunBtn">Run Status Command</button>
+      </div>
+      <label for="statusOutput">Output</label>
+      <pre id="statusOutput">No output yet</pre>
     </section>
 
     <section class="panel page" data-page="detail">

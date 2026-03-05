@@ -19,6 +19,7 @@ Japanese index: [INDEX.ja.md](INDEX.ja.md)
 
 - Quickstart v2: [QUICKSTART-v2.md](QUICKSTART-v2.md) / [QUICKSTART-v2.ja.md](QUICKSTART-v2.ja.md)
 - Migration notes: [MIGRATION-v1-to-v2.md](MIGRATION-v1-to-v2.md) / [MIGRATION-v1-to-v2.ja.md](MIGRATION-v1-to-v2.ja.md)
+- v0.1.0 regression re-evaluation report: [V0_1_0-REGRESSION-REPORT.md](V0_1_0-REGRESSION-REPORT.md)
 - Migration checklist: [V2-MIGRATION-CHECKLIST.md](V2-MIGRATION-CHECKLIST.md) / [V2-MIGRATION-CHECKLIST.ja.md](V2-MIGRATION-CHECKLIST.ja.md)
 - Specification: [SPECIFICATION.md](SPECIFICATION.md) / [SPECIFICATION.ja.md](SPECIFICATION.ja.md)
 - Testing/CI: [TESTING.md](TESTING.md) / [TESTING.ja.md](TESTING.ja.md)

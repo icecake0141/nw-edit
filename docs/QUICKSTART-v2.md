@@ -31,7 +31,7 @@ Modes:
 
 ```bash
 export NW_EDIT_V2_WORKER_MODE=simulated   # or netmiko
-export NW_EDIT_V2_VALIDATOR_MODE=simulated # or netmiko
+export NW_EDIT_V2_VALIDATOR_MODE=netmiko   # default is netmiko (set simulated for local dry runs)
 export NW_EDIT_V2_SIMULATED_DELAY_MS=200   # optional (slow down simulated worker)
 ```
 

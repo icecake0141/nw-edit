@@ -32,7 +32,7 @@ You may obtain a copy of the License at
 - CSVによるデバイス取り込みと接続検証
 - ジョブライフサイクル管理（`queued/running/paused/completed/failed/cancelled`）
 - 同期実行（`/run`）と非同期実行（`/run/async`）
-- 非同期制御（`pause/resume/cancel`）
+- 非同期制御（`pause/resume/cancel/terminate`）
 - WebSocketによるリアルタイムイベント配信
 - デバイス単位の `pre/apply/post/diff` 結果
 - OSモデル別の実行プリセット保存・再利用
@@ -69,6 +69,7 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
 
 - デバイス:
   - `POST /api/v2/devices/import`
+  - `POST /api/v2/devices/import/progress`（NDJSON進捗ストリーム）
   - `GET /api/v2/devices`
 - ジョブ:
   - `POST /api/v2/jobs`
@@ -83,6 +84,8 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
   - `POST /api/v2/jobs/{job_id}/pause`
   - `POST /api/v2/jobs/{job_id}/resume`
   - `POST /api/v2/jobs/{job_id}/cancel`
+  - `POST /api/v2/jobs/{job_id}/terminate`（`cancel` の互換エイリアス）
+  - `POST /api/v2/commands/exec`（読み取り専用ステータスコマンド実行）
 - プリセット:
   - `GET /api/v2/presets`
   - `GET /api/v2/presets/os-models`
@@ -94,6 +97,7 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
 ## 実行リクエスト拡張
 
 - `verify_commands`（任意）: 指定時は全対象デバイスへ共通適用。
+- `canary`（必須）: canary対象デバイス（`host`, `port`）を明示指定。
 - `imported_device_keys`（任意）: import済みデバイスの実行対象を `host:port` で明示。
   - ad-hoc の `devices` と同時指定不可
   - 空配列は `HTTP 400`

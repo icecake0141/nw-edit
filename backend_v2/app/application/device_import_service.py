@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import re
 from dataclasses import dataclass, field
+from typing import Callable
 from typing import Protocol
 
 from backend_v2.app.domain.models import DeviceProfile
@@ -79,14 +80,30 @@ class DeviceImportService:
             return alias
         return canonical
 
-    def import_csv(self, csv_content: str) -> DeviceImportResult:
+    @staticmethod
+    def _normalize_header_name(name: str) -> str:
+        return name.strip().lower()
+
+    def import_csv(
+        self,
+        csv_content: str,
+        progress_callback: Callable[[dict[str, object]], None] | None = None,
+    ) -> DeviceImportResult:
         reader = csv.DictReader(io.StringIO(csv_content))
         failures: list[FailedRow] = []
         parsed_entries: list[tuple[int, dict[str, str], DeviceProfile]] = []
         required_headers = ("host", "device_type", "username", "password")
 
         raw_headers = reader.fieldnames or []
-        headers = [header.strip() for header in raw_headers if header is not None]
+        normalized_fieldnames = [
+            self._normalize_header_name(header)
+            for header in raw_headers
+            if header is not None
+        ]
+        if reader.fieldnames:
+            # Canonicalize row keys so header whitespace/casing differences are tolerated.
+            reader.fieldnames = normalized_fieldnames
+        headers = normalized_fieldnames
         missing_headers = [name for name in required_headers if name not in headers]
         if missing_headers:
             return DeviceImportResult(
@@ -119,23 +136,16 @@ class DeviceImportService:
                     )
                 )
                 break
-            extra_values = row.get(None)
-            if extra_values:
-                failures.append(
-                    FailedRow(
-                        row_number=row_number,
-                        row={},
-                        error=(
-                            "CSV syntax error: unexpected extra column values: "
-                            + ", ".join(value for value in extra_values if value)
-                        ),
-                    )
-                )
-                continue
             normalized = {
-                (key or ""): ((value or "").strip() if isinstance(value, str) else "")
+                self._normalize_header_name(key): (
+                    (value or "").strip() if isinstance(value, str) else ""
+                )
                 for key, value in row.items()
+                if key is not None
             }
+            # Keep v0.1.0-compatible behavior for blank lines.
+            if not any(normalized.values()):
+                continue
             missing = [field for field in required_headers if not normalized.get(field)]
             if missing:
                 failures.append(
@@ -229,6 +239,8 @@ class DeviceImportService:
             int, tuple[int, dict[str, str], DeviceProfile, bool, str | None]
         ] = {}
         indexed_devices = list(enumerate(parsed_entries))
+        if progress_callback is not None:
+            progress_callback({"type": "start", "total": len(indexed_devices)})
         with ThreadPoolExecutor(max_workers=self.IMPORT_VALIDATION_WORKERS) as executor:
             future_map = {
                 executor.submit(self.validator.validate, entry[2]): (index, entry)
@@ -240,10 +252,23 @@ class DeviceImportService:
                 validation_results[index] = (row_number, row, device, ok, error)
 
         valid_devices: list[DeviceProfile] = []
+        processed = 0
         for index in sorted(validation_results):
             row_number, row, device, ok, error = validation_results[index]
+            processed += 1
             device.connection_ok = ok
             device.error_message = error
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "type": "progress",
+                        "processed": processed,
+                        "total": len(indexed_devices),
+                        "host": device.host,
+                        "port": device.port,
+                        "connection_ok": ok,
+                    }
+                )
             if ok:
                 valid_devices.append(device)
             else:

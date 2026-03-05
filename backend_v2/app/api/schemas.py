@@ -59,6 +59,7 @@ class RunJobRequest(BaseModel):
     canary: Optional[DeviceTargetPayload] = None
     commands: List[str] = Field(min_length=1)
     verify_commands: Optional[List[str]] = None
+    verify_mode: str = Field(default="all")
     imported_device_keys: Optional[List[str]] = None
     concurrency_limit: int = Field(default=5, ge=1, le=100)
     stagger_delay: float = Field(default=0.0, ge=0.0, le=60.0)
@@ -153,6 +154,20 @@ class DeviceImportResponse(BaseModel):
 
     devices: List[DeviceProfileResponse]
     failed_rows: List[FailedRowResponse]
+
+
+class StatusCommandRequest(BaseModel):
+    """Payload for read-only status command execution."""
+
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(default=22, ge=1, le=65535)
+    commands: str = Field(min_length=1)
+
+
+class StatusCommandResponse(BaseModel):
+    """Status command execution response."""
+
+    output: str
 
 
 class ExecutionEventResponse(BaseModel):

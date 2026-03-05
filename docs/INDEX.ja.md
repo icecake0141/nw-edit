@@ -19,6 +19,7 @@ You may obtain a copy of the License at
 
 - v2 クイックスタート: [QUICKSTART-v2.ja.md](QUICKSTART-v2.ja.md) / [QUICKSTART-v2.md](QUICKSTART-v2.md)
 - 移行ノート: [MIGRATION-v1-to-v2.ja.md](MIGRATION-v1-to-v2.ja.md) / [MIGRATION-v1-to-v2.md](MIGRATION-v1-to-v2.md)
+- v0.1.0回帰再評価レポート: [V0_1_0-REGRESSION-REPORT.md](V0_1_0-REGRESSION-REPORT.md)
 - 移行判定チェックリスト: [V2-MIGRATION-CHECKLIST.ja.md](V2-MIGRATION-CHECKLIST.ja.md) / [V2-MIGRATION-CHECKLIST.md](V2-MIGRATION-CHECKLIST.md)
 - 仕様: [SPECIFICATION.ja.md](SPECIFICATION.ja.md) / [SPECIFICATION.md](SPECIFICATION.md)
 - テスト/CI: [TESTING.ja.md](TESTING.ja.md) / [TESTING.md](TESTING.md)
