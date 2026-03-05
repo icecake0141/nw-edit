@@ -20,7 +20,11 @@ const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
 const detailMetaEl = document.getElementById("detailMeta");
 const detailDataEl = document.getElementById("detailData");
+const detailSummaryEl = document.getElementById("detailSummary");
+const detailDevicesEl = document.getElementById("detailDevices");
 const activeSummaryEl = document.getElementById("activeSummary");
+const monitorSummaryEl = document.getElementById("monitorSummary");
+const monitorDevicesEl = document.getElementById("monitorDevices");
 const historyEl = document.getElementById("history");
 const deviceCountEl = document.getElementById("deviceCount");
 const importProgressEl = document.getElementById("importProgress");
@@ -54,6 +58,16 @@ let selectedJobId = null;
 let importedDevices = [];
 /** @type {import("./api-client.js").Preset[]} */
 let currentPresets = [];
+let monitorResultLoading = false;
+const monitorState = {
+  job: null,
+  targetDeviceKeys: [],
+  canaryKey: null,
+  deviceStatuses: {},
+  streamLogs: {},
+  result: null,
+  eventCount: 0,
+};
 
 pauseBtn.disabled = true;
 resumeBtn.disabled = true;
@@ -232,11 +246,10 @@ function openJobSocket(apiBase, jobId) {
   activeSocket = new WebSocket(`${toWsBase(apiBase)}/ws/v2/jobs/${jobId}`);
   activeSocket.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    appendLog(
-      `${data.type} status=${data.status || "-"} device=${data.device || "-"} message=${data.message || "-"}`
-    );
+    handleJobSocketMessage(data).catch((error) => appendLog(String(error)));
   };
   activeSocket.onerror = () => appendLog("websocket error");
+  activeSocket.onclose = () => appendLog(`websocket closed for ${jobId}`);
 }
 
 function formatTimestamp(value) {
@@ -248,6 +261,250 @@ function formatTimestamp(value) {
     return value;
   }
   return date.toLocaleString();
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function normalizedStatus(status) {
+  switch (String(status || "").toLowerCase()) {
+    case "running":
+      return "running";
+    case "paused":
+      return "paused";
+    case "failed":
+      return "failed";
+    case "cancelled":
+      return "cancelled";
+    case "success":
+    case "completed":
+      return "completed";
+    default:
+      return "queued";
+  }
+}
+
+function statusLabel(status) {
+  switch (normalizedStatus(status)) {
+    case "running":
+      return "Running";
+    case "paused":
+      return "Paused";
+    case "failed":
+      return "Failed";
+    case "cancelled":
+      return "Cancelled";
+    case "completed":
+      return "Complete";
+    default:
+      return "Queue";
+  }
+}
+
+function ensureMonitorDevice(deviceKey) {
+  if (!monitorState.deviceStatuses[deviceKey]) {
+    monitorState.deviceStatuses[deviceKey] = "queued";
+  }
+  if (!monitorState.streamLogs[deviceKey]) {
+    monitorState.streamLogs[deviceKey] = [];
+  }
+}
+
+function pushDeviceStream(deviceKey, line) {
+  ensureMonitorDevice(deviceKey);
+  monitorState.streamLogs[deviceKey].push(line);
+  if (monitorState.streamLogs[deviceKey].length > 500) {
+    monitorState.streamLogs[deviceKey] = monitorState.streamLogs[deviceKey].slice(-500);
+  }
+}
+
+function resetMonitorState() {
+  monitorState.job = null;
+  monitorState.targetDeviceKeys = [];
+  monitorState.canaryKey = null;
+  monitorState.deviceStatuses = {};
+  monitorState.streamLogs = {};
+  monitorState.result = null;
+  monitorState.eventCount = 0;
+}
+
+function beginMonitor(job, targetDeviceKeys, canaryKey) {
+  resetMonitorState();
+  monitorState.job = { ...job };
+  monitorState.targetDeviceKeys = [...targetDeviceKeys];
+  monitorState.canaryKey = canaryKey || targetDeviceKeys[0] || null;
+  monitorState.targetDeviceKeys.forEach((key) => ensureMonitorDevice(key));
+  renderMonitorState();
+}
+
+function combineDeviceKeys(source) {
+  const ordered = [];
+  const seen = new Set();
+  const push = (key) => {
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    ordered.push(key);
+  };
+  (source.targetDeviceKeys || []).forEach(push);
+  Object.keys(source.deviceStatuses || {}).forEach(push);
+  Object.keys(source.streamLogs || {}).forEach(push);
+  Object.keys(source.result?.device_results || {}).forEach(push);
+  return ordered;
+}
+
+function formatDiffHtml(diffText) {
+  if (!diffText) {
+    return "";
+  }
+  return diffText
+    .split("\n")
+    .map((line) => {
+      if (line.startsWith("+")) {
+        return `<span class="diff-add">${escapeHtml(line)}</span>`;
+      }
+      if (line.startsWith("-")) {
+        return `<span class="diff-remove">${escapeHtml(line)}</span>`;
+      }
+      return escapeHtml(line);
+    })
+    .join("\n");
+}
+
+function buildExecutionSummaryHtml(source, eventCount) {
+  const keys = combineDeviceKeys(source);
+  let queue = 0;
+  let running = 0;
+  let complete = 0;
+  let failed = 0;
+  keys.forEach((key) => {
+    const resultStatus = source.result?.device_results?.[key]?.status;
+    const streamStatus = source.deviceStatuses?.[key];
+    const status = normalizedStatus(resultStatus || streamStatus || "queued");
+    if (status === "running") {
+      running += 1;
+    } else if (status === "completed") {
+      complete += 1;
+    } else if (status === "failed" || status === "cancelled") {
+      failed += 1;
+    } else {
+      queue += 1;
+    }
+  });
+  const status = source.job?.status || source.result?.status || "queued";
+  return `
+    <div><strong>${escapeHtml(source.job?.job_name || "job")} (${escapeHtml(source.job?.job_id || "-")})</strong></div>
+    <div class="muted">Status:
+      <span class="status-badge status-${normalizedStatus(status)}">${statusLabel(status)}</span>
+      / Created: ${escapeHtml(formatTimestamp(source.job?.created_at || ""))}
+      / Devices: ${keys.length}
+      / Events: ${eventCount}
+    </div>
+    <div class="muted">Queue: ${queue} / Running: ${running} / Complete: ${complete} / Failed: ${failed}</div>
+  `;
+}
+
+function buildDeviceCardsHtml(source) {
+  const keys = combineDeviceKeys(source);
+  if (keys.length === 0) {
+    return '<div class="muted">No target devices yet</div>';
+  }
+  return keys
+    .map((key) => {
+      const result = source.result?.device_results?.[key];
+      const streamStatus = source.deviceStatuses?.[key];
+      const status = normalizedStatus(result?.status || streamStatus || "queued");
+      const attempts = result?.attempts || 0;
+      const error = result?.error || "";
+      const streamLines = [
+        ...(source.streamLogs?.[key] || []),
+        ...((result?.logs || []).map((line) => `[result] ${line}`)),
+      ];
+      const streamText = streamLines.length > 0 ? streamLines.join("\n") : "No logs yet...";
+      const isCanary = source.canaryKey === key;
+      return `
+        <div class="device-card status-${status}" id="device-card-${key.replace(":", "-")}">
+          <h4>${escapeHtml(key)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
+          <div class="meta">Attempts: ${attempts || "-"} ${error ? `/ Error: ${escapeHtml(error)}` : ""}</div>
+          <div class="output-label">Command Stream</div>
+          <pre class="stream-output">${escapeHtml(streamText)}</pre>
+          ${result?.pre_output ? `<div class="output-label">Verify Pre</div><pre class="verify-output">${escapeHtml(result.pre_output)}</pre>` : ""}
+          ${result?.apply_output ? `<div class="output-label">Apply Output</div><pre class="verify-output">${escapeHtml(result.apply_output)}</pre>` : ""}
+          ${result?.post_output ? `<div class="output-label">Verify Post</div><pre class="verify-output">${escapeHtml(result.post_output)}</pre>` : ""}
+          ${result?.diff ? `<div class="output-label">Pre/Post Diff</div><div class="diff-output">${formatDiffHtml(result.diff)}</div>` : ""}
+          ${result?.diff_truncated ? `<div class="muted">diff truncated (original: ${result.diff_original_size} bytes)</div>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0) {
+  summaryEl.innerHTML = buildExecutionSummaryHtml(source, eventCount);
+  devicesEl.innerHTML = buildDeviceCardsHtml(source);
+}
+
+function renderMonitorState() {
+  renderExecutionPanel(monitorSummaryEl, monitorDevicesEl, monitorState, monitorState.eventCount);
+}
+
+async function handleJobSocketMessage(data) {
+  appendLog(
+    `${data.type} status=${data.status || "-"} device=${data.device || "-"} message=${data.message || "-"}`
+  );
+  if (!monitorState.job || data.job_id !== monitorState.job.job_id) {
+    return;
+  }
+  monitorState.eventCount += 1;
+  if (data.device) {
+    ensureMonitorDevice(data.device);
+    if (data.status) {
+      monitorState.deviceStatuses[data.device] = data.status;
+    }
+    if (data.message) {
+      pushDeviceStream(data.device, `[${data.type}] ${data.message}`);
+    } else if (data.status) {
+      pushDeviceStream(data.device, `[${data.type}] ${data.status}`);
+    }
+  } else if (data.status && monitorState.job) {
+    monitorState.job.status = data.status;
+  }
+  renderMonitorState();
+  if (data.type === "job_complete") {
+    await fetchRunResultForMonitor(data.job_id);
+  }
+}
+
+async function fetchRunResultForMonitor(jobId) {
+  if (monitorResultLoading) {
+    return;
+  }
+  monitorResultLoading = true;
+  try {
+    const [job, result] = await Promise.all([
+      client().getJob(jobId),
+      client().getJobResult(jobId),
+    ]);
+    if (!monitorState.job || monitorState.job.job_id !== jobId) {
+      return;
+    }
+    monitorState.job = { ...job };
+    monitorState.result = result;
+    monitorState.targetDeviceKeys = result.target_device_keys || monitorState.targetDeviceKeys;
+    Object.entries(result.device_results || {}).forEach(([deviceKey, value]) => {
+      ensureMonitorDevice(deviceKey);
+      monitorState.deviceStatuses[deviceKey] = value.status || monitorState.deviceStatuses[deviceKey];
+    });
+    renderMonitorState();
+  } catch (error) {
+    appendLog(`failed to fetch result for ${jobId}: ${String(error)}`);
+  } finally {
+    monitorResultLoading = false;
+  }
 }
 
 function formatJobDetailText(job, events, result) {
@@ -291,6 +548,15 @@ function formatJobDetailText(job, events, result) {
 function renderJobDetail(job, events, result) {
   detailMetaEl.textContent = `selected: ${job.job_id} (${job.status}) events=${events.length}`;
   detailDataEl.textContent = formatJobDetailText(job, events, result);
+  const detailSource = {
+    job,
+    result,
+    targetDeviceKeys: result?.target_device_keys || Object.keys(result?.device_results || {}),
+    canaryKey: null,
+    deviceStatuses: {},
+    streamLogs: {},
+  };
+  renderExecutionPanel(detailSummaryEl, detailDevicesEl, detailSource, events.length);
 }
 
 function switchPage(pageName) {
@@ -377,6 +643,9 @@ async function refreshActive() {
     pauseBtn.disabled = true;
     resumeBtn.disabled = true;
     cancelBtn.disabled = true;
+    if (monitorState.job && ["running", "queued", "paused"].includes(monitorState.job.status)) {
+      fetchRunResultForMonitor(monitorState.job.job_id).catch(() => {});
+    }
     return;
   }
 
@@ -385,6 +654,10 @@ async function refreshActive() {
   pauseBtn.disabled = active.job.status !== "running";
   resumeBtn.disabled = active.job.status !== "paused";
   cancelBtn.disabled = !["running", "paused", "queued"].includes(active.job.status);
+  if (monitorState.job && monitorState.job.job_id === active.job.job_id) {
+    monitorState.job = { ...monitorState.job, ...active.job };
+    renderMonitorState();
+  }
 }
 
 function resolveRunTargets(useImported, adHocDevices) {
@@ -403,6 +676,13 @@ function resolveRunTargets(useImported, adHocDevices) {
       chosen.length > 0 ? chosen : importedDevices.map((device) => importedDeviceKey(device)),
     adHocDevices: [],
   };
+}
+
+function resolveTargetDeviceKeys(useImported, targets) {
+  if (useImported) {
+    return targets.importedDeviceKeys;
+  }
+  return targets.adHocDevices.map((device) => `${device.host}:${device.port}`);
 }
 
 async function runSync() {
@@ -445,6 +725,8 @@ async function runSync() {
   try {
     const job = await client().createJob(jobName, creator, globalVars);
     selectedJobId = job.job_id;
+    const targetDeviceKeys = resolveTargetDeviceKeys(useImported, targets);
+    beginMonitor(job, targetDeviceKeys, targetDeviceKeys[0] || null);
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
 
@@ -458,6 +740,14 @@ async function runSync() {
         importedDeviceKeys: targets.importedDeviceKeys,
       }
     );
+    monitorState.result = result;
+    monitorState.job = { ...job, status: result.status };
+    monitorState.targetDeviceKeys = result.target_device_keys || monitorState.targetDeviceKeys;
+    Object.entries(result.device_results || {}).forEach(([deviceKey, value]) => {
+      ensureMonitorDevice(deviceKey);
+      monitorState.deviceStatuses[deviceKey] = value.status;
+    });
+    renderMonitorState();
     appendLog(`run completed: ${result.status}`);
     Object.entries(result.device_results).forEach(([key, value]) => {
       appendLog(`${key} => status=${value.status} attempts=${value.attempts}`);
@@ -522,6 +812,8 @@ async function runAsync() {
   try {
     const job = await client().createJob(jobName, creator, globalVars);
     selectedJobId = job.job_id;
+    const targetDeviceKeys = resolveTargetDeviceKeys(useImported, targets);
+    beginMonitor(job, targetDeviceKeys, targetDeviceKeys[0] || null);
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
     const started = await client().runJobAsync(
@@ -673,6 +965,7 @@ setInterval(() => {
 }, 4000);
 
 presetPanelEl.classList.add("hidden");
+renderMonitorState();
 refreshImportedDevices().catch(() => {});
 refreshJobs().catch(() => {});
 refreshActive().catch(() => {});
