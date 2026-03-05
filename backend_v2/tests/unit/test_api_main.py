@@ -26,6 +26,15 @@ import backend_v2.app.api.main as api_main
 from backend_v2.app.api.main import app
 
 
+class FailHostValidator:
+    """Validator that fails for a specific host."""
+
+    def validate(self, device):
+        if device.host == "does-not-exist.local":
+            return False, "connection failed"
+        return True, None
+
+
 def test_health_endpoint():
     client = TestClient(app)
     response = client.get("/health")
@@ -574,3 +583,38 @@ def test_run_uses_verify_commands_override_in_response():
     payload = run.json()
     assert payload["commands"] == ["show version"]
     assert payload["verify_commands"] == ["show ip interface brief"]
+
+
+def test_import_devices_returns_400_when_connection_validation_fails(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setattr(api_main.device_import_service, "validator", FailHostValidator())
+
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "does-not-exist.local,22,cisco_ios,admin,pass,edge-a,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 400
+    detail = imported.json()["detail"]
+    assert detail["message"] == "CSV import failed due to invalid rows"
+    assert len(detail["failed_rows"]) == 1
+    assert detail["failed_rows"][0]["row_number"] == 2
+
+
+def test_import_devices_returns_400_when_csv_has_syntax_error():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name\n"
+            "10.6.0.2,22,cisco_ios,admin,pass,edge-a,unexpected\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 400
+    detail = imported.json()["detail"]
+    assert len(detail["failed_rows"]) == 1
+    assert "CSV syntax error" in detail["failed_rows"][0]["error"]

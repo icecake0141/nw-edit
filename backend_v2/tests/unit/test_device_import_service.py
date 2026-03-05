@@ -148,11 +148,43 @@ def test_import_csv_does_not_store_failed_connection_devices():
         "10.0.2.2,22,cisco_ios,admin,pass\n"
     )
 
-    assert [d.host for d in result.devices] == ["10.0.2.1"]
-    assert [d.host for d in store.list()] == ["10.0.2.1"]
+    assert [d.host for d in result.devices] == []
+    assert [d.host for d in store.list()] == []
     assert len(result.failed_rows) == 1
     assert result.failed_rows[0].row_number == 3
     assert result.failed_rows[0].error == "connection failed"
+
+
+def test_import_csv_rejects_missing_required_headers():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,username,password\n"
+        "10.0.2.9,22,admin,pass\n"
+    )
+
+    assert result.devices == []
+    assert len(result.failed_rows) == 1
+    assert result.failed_rows[0].row_number == 1
+    assert "missing required columns" in result.failed_rows[0].error
+
+
+def test_import_csv_rejects_extra_column_values_as_syntax_error():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password\n"
+        "10.0.2.10,22,cisco_ios,admin,pass,unexpected\n"
+    )
+
+    assert result.devices == []
+    assert len(result.failed_rows) == 1
+    assert result.failed_rows[0].row_number == 2
+    assert "CSV syntax error" in result.failed_rows[0].error
 
 
 def test_import_csv_rejects_invalid_host_vars_json():

@@ -82,10 +82,16 @@ function appendLog(message) {
 }
 
 function setImportInProgress(inProgress) {
-  importProgressEl.classList.toggle("hidden", !inProgress);
   importBtn.disabled = inProgress;
   if (inProgress) {
+    importProgressEl.classList.remove("hidden");
+  }
+  if (inProgress) {
     importProgressEl.removeAttribute("value");
+    importProgressEl.removeAttribute("max");
+  } else {
+    importProgressEl.max = 100;
+    importProgressEl.value = 100;
   }
 }
 
@@ -233,14 +239,58 @@ function openJobSocket(apiBase, jobId) {
   activeSocket.onerror = () => appendLog("websocket error");
 }
 
+function formatTimestamp(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
+}
+
+function formatJobDetailText(job, events, result) {
+  const lines = [];
+  const deviceResults = result?.device_results || {};
+  const successCount = Object.values(deviceResults).filter((item) => item.status === "success").length;
+  const failedCount = Object.values(deviceResults).filter((item) => item.status !== "success").length;
+
+  lines.push("=== Job Overview ===");
+  lines.push(`Job ID: ${job.job_id}`);
+  lines.push(`Name: ${job.job_name}`);
+  lines.push(`Creator: ${job.creator}`);
+  lines.push(`Status: ${job.status}`);
+  lines.push(`Created: ${formatTimestamp(job.created_at)}`);
+  lines.push(`Started: ${formatTimestamp(job.started_at || "")}`);
+  lines.push(`Completed: ${formatTimestamp(job.completed_at || "")}`);
+  lines.push("");
+  lines.push("=== Summary ===");
+  lines.push(`Events: ${events.length}`);
+  lines.push(`Target devices: ${Object.keys(deviceResults).length}`);
+  lines.push(`Success: ${successCount}`);
+  lines.push(`Failed: ${failedCount}`);
+  lines.push("");
+  lines.push("=== Device Results ===");
+  Object.entries(deviceResults).forEach(([key, value]) => {
+    lines.push(`- ${key}`);
+    lines.push(`  status=${value.status} attempts=${value.attempts}`);
+    if (value.error_code || value.error) {
+      lines.push(`  error_code=${value.error_code || "-"} error=${value.error || "-"}`);
+    }
+    if (value.logs && value.logs.length > 0) {
+      lines.push(`  logs=${value.logs.slice(0, 2).join(" | ")}`);
+    }
+  });
+  if (Object.keys(deviceResults).length === 0) {
+    lines.push("(result is not ready yet)");
+  }
+  return lines.join("\n");
+}
+
 function renderJobDetail(job, events, result) {
-  const payload = {
-    job,
-    event_count: events.length,
-    result,
-  };
   detailMetaEl.textContent = `selected: ${job.job_id} (${job.status}) events=${events.length}`;
-  detailDataEl.textContent = JSON.stringify(payload, null, 2);
+  detailDataEl.textContent = formatJobDetailText(job, events, result);
 }
 
 function switchPage(pageName) {
@@ -293,9 +343,12 @@ async function refreshJobs() {
 
     const status = document.createElement("div");
     status.className = "muted";
-    status.textContent = `status: ${job.status}`;
+    status.textContent = `status: ${job.status} / creator: ${job.creator}`;
+    const timestamps = document.createElement("div");
+    timestamps.className = "muted";
+    timestamps.textContent = `created: ${formatTimestamp(job.created_at)}`;
 
-    div.append(titleWrap, id, status);
+    div.append(titleWrap, id, status, timestamps);
     div.addEventListener("click", async () => {
       try {
         selectedJobId = job.job_id;
@@ -353,6 +406,7 @@ function resolveRunTargets(useImported, adHocDevices) {
 }
 
 async function runSync() {
+  switchPage("monitor");
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
   const globalVarsText = document.getElementById("globalVars").value;
@@ -390,6 +444,7 @@ async function runSync() {
   setStatus("creating");
   try {
     const job = await client().createJob(jobName, creator, globalVars);
+    selectedJobId = job.job_id;
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
 
@@ -412,6 +467,8 @@ async function runSync() {
     });
 
     setStatus(result.status);
+    const events = await client().listJobEvents(job.job_id).catch(() => []);
+    renderJobDetail({ ...job, status: result.status }, events, result);
     await refreshJobs();
     await refreshActive();
   } catch (error) {
@@ -426,6 +483,7 @@ async function runSync() {
 }
 
 async function runAsync() {
+  switchPage("monitor");
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
   const globalVarsText = document.getElementById("globalVars").value;
@@ -463,6 +521,7 @@ async function runAsync() {
   setStatus("creating-async");
   try {
     const job = await client().createJob(jobName, creator, globalVars);
+    selectedJobId = job.job_id;
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
     const started = await client().runJobAsync(
@@ -497,15 +556,7 @@ importBtn.addEventListener("click", async () => {
   setImportInProgress(true);
   try {
     const result = await client().importDevices(csvInput);
-    appendLog(`import success: valid=${result.devices.length} failed_rows=${result.failed_rows.length}`);
-    if (result.failed_rows.length > 0) {
-      const top = result.failed_rows
-        .slice(0, 5)
-        .map((item) => `row ${item.row_number || "?"}: ${item.error}`)
-        .join(" | ");
-      showImportError(`Import completed with ${result.failed_rows.length} failed row(s). ${top}`);
-      appendLog(`first failure: ${result.failed_rows[0].error}`);
-    }
+    appendLog(`import success: valid=${result.devices.length}`);
     await refreshImportedDevices();
   } catch (error) {
     const message = String(error);
