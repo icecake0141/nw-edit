@@ -18,6 +18,7 @@
 """API-level tests for v2 scaffold."""
 
 import json
+import os
 import time
 
 from fastapi.testclient import TestClient
@@ -41,6 +42,11 @@ class FailHostValidator:
 @pytest.fixture(autouse=True)
 def reset_in_memory_runtime_state():
     """Ensure each test starts with a clean in-memory runtime state."""
+    original_worker_mode = os.environ.get("NW_EDIT_V2_WORKER_MODE")
+    original_validator_mode = os.environ.get("NW_EDIT_V2_VALIDATOR_MODE")
+    os.environ["NW_EDIT_V2_WORKER_MODE"] = "simulated"
+    os.environ["NW_EDIT_V2_VALIDATOR_MODE"] = "simulated"
+
     deadline = time.monotonic() + 2.0
     while True:
         with api_main.run_coordinator._lock:
@@ -68,7 +74,17 @@ def reset_in_memory_runtime_state():
         api_main.run_store._latest_by_job.clear()
     with api_main.control_store._lock:
         api_main.control_store._controls.clear()
+    api_main.engine.worker = api_main.SimulatedDeviceWorker()
     api_main.device_import_service.validator = api_main.SimulatedConnectionValidator()
+    yield
+    if original_worker_mode is None:
+        os.environ.pop("NW_EDIT_V2_WORKER_MODE", None)
+    else:
+        os.environ["NW_EDIT_V2_WORKER_MODE"] = original_worker_mode
+    if original_validator_mode is None:
+        os.environ.pop("NW_EDIT_V2_VALIDATOR_MODE", None)
+    else:
+        os.environ["NW_EDIT_V2_VALIDATOR_MODE"] = original_validator_mode
 
 
 def test_health_endpoint():
