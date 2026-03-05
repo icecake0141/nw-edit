@@ -17,6 +17,7 @@
 import { NwEditApiClient } from "./api-client.js";
 
 const statusEl = document.getElementById("status");
+const apiBaseFieldEl = document.getElementById("apiBaseField");
 const modeStatusEl = document.getElementById("modeStatus");
 const logEl = document.getElementById("log");
 const detailMetaEl = document.getElementById("detailMeta");
@@ -93,6 +94,33 @@ cancelBtn.disabled = true;
 
 function currentApiBase() {
   return document.getElementById("apiBase").value.trim();
+}
+
+function isPrivilegedModeEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  const mode = (params.get("mode") || "").toLowerCase();
+  const role = (params.get("role") || "").toLowerCase();
+  if (mode === "developer" || mode === "admin") {
+    return true;
+  }
+  if (role === "developer" || role === "admin") {
+    return true;
+  }
+  const boolLike = ["1", "true", "yes", "on"];
+  const developerEnabled = boolLike.includes(
+    (params.get("developer") || "").toLowerCase()
+  );
+  const adminEnabled = boolLike.includes(
+    (params.get("admin") || "").toLowerCase()
+  );
+  return developerEnabled || adminEnabled;
+}
+
+function applyApiBaseVisibility() {
+  if (!apiBaseFieldEl) {
+    return;
+  }
+  apiBaseFieldEl.classList.toggle("hidden", !isPrivilegedModeEnabled());
 }
 
 function client() {
@@ -1337,6 +1365,7 @@ setInterval(() => {
 }, 4000);
 
 presetPanelEl.classList.add("hidden");
+applyApiBaseVisibility();
 updateCreateActionState();
 renderMonitorState();
 refreshImportedDevices().catch(() => {});
