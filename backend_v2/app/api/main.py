@@ -329,6 +329,21 @@ def import_devices(
 ) -> DeviceImportResponse:
     """Import and validate devices from CSV text."""
     result = device_import_service.import_csv(csv_content=csv_content)
+    if result.failed_rows:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "CSV import failed due to invalid rows",
+                "failed_rows": [
+                    {
+                        "row_number": row.row_number,
+                        "row": row.row,
+                        "error": row.error,
+                    }
+                    for row in result.failed_rows
+                ],
+            },
+        )
     return DeviceImportResponse(
         devices=[
             DeviceProfileResponse(

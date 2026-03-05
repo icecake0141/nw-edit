@@ -83,14 +83,60 @@ class DeviceImportService:
         reader = csv.DictReader(io.StringIO(csv_content))
         failures: list[FailedRow] = []
         parsed_entries: list[tuple[int, dict[str, str], DeviceProfile]] = []
+        required_headers = ("host", "device_type", "username", "password")
 
-        for row_number, row in enumerate(reader, start=2):
+        raw_headers = reader.fieldnames or []
+        headers = [header.strip() for header in raw_headers if header is not None]
+        missing_headers = [name for name in required_headers if name not in headers]
+        if missing_headers:
+            return DeviceImportResult(
+                devices=[],
+                failed_rows=[
+                    FailedRow(
+                        row_number=1,
+                        row={},
+                        error=(
+                            "CSV header is invalid or missing required columns: "
+                            + ", ".join(missing_headers)
+                        ),
+                    )
+                ],
+            )
+
+        row_number = 1
+        while True:
+            row_number += 1
+            try:
+                row = next(reader)
+            except StopIteration:
+                break
+            except csv.Error as exc:
+                failures.append(
+                    FailedRow(
+                        row_number=row_number,
+                        row={},
+                        error=f"CSV syntax error: {str(exc)}",
+                    )
+                )
+                break
+            extra_values = row.get(None)
+            if extra_values:
+                failures.append(
+                    FailedRow(
+                        row_number=row_number,
+                        row={},
+                        error=(
+                            "CSV syntax error: unexpected extra column values: "
+                            + ", ".join(value for value in extra_values if value)
+                        ),
+                    )
+                )
+                continue
             normalized = {
                 (key or ""): ((value or "").strip() if isinstance(value, str) else "")
                 for key, value in row.items()
             }
-            required = ("host", "device_type", "username", "password")
-            missing = [field for field in required if not normalized.get(field)]
+            missing = [field for field in required_headers if not normalized.get(field)]
             if missing:
                 failures.append(
                     FailedRow(
@@ -209,5 +255,8 @@ class DeviceImportService:
                     )
                 )
 
+        if failures:
+            return DeviceImportResult(devices=[], failed_rows=failures)
+
         self.store.replace(valid_devices)
-        return DeviceImportResult(devices=valid_devices, failed_rows=failures)
+        return DeviceImportResult(devices=valid_devices, failed_rows=[])
