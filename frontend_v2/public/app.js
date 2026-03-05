@@ -217,6 +217,11 @@ function importedDeviceKey(device) {
   return `${device.host}:${device.port}`;
 }
 
+function canaryOptionLabel(item) {
+  const hostname = item.hostname || item.host;
+  return `${item.key} (${hostname})`;
+}
+
 function selectedImportedDeviceKeys() {
   return Array.from(
     document.querySelectorAll('input[name="importedDeviceKeys"]:checked')
@@ -288,8 +293,14 @@ function refreshCanaryOptions() {
     const uniqueKeys = Array.from(new Set(keys));
     candidates = uniqueKeys
       .map((key) => {
+        const matched = importedDevices.find((device) => importedDeviceKey(device) === key);
         const [host, rawPort] = key.split(":");
-        return { key, host, port: Number(rawPort || "22") };
+        return {
+          key,
+          host,
+          port: Number(rawPort || "22"),
+          hostname: matched?.name || host,
+        };
       })
       .filter((item) => item.host && Number.isFinite(item.port));
   } else {
@@ -302,6 +313,7 @@ function refreshCanaryOptions() {
       key: `${device.host}:${device.port}`,
       host: device.host,
       port: device.port,
+      hostname: device.host,
     }));
   }
 
@@ -309,7 +321,7 @@ function refreshCanaryOptions() {
   candidates.forEach((item) => {
     const option = document.createElement("option");
     option.value = item.key;
-    option.textContent = item.key;
+    option.textContent = canaryOptionLabel(item);
     canaryDeviceEl.append(option);
   });
   if (previous && candidates.some((item) => item.key === previous)) {
