@@ -395,12 +395,12 @@ You may obtain a copy of the License at
     </section>
 
     <section class="panel nav" aria-label="v2 pages">
-      <button class="secondary nav-btn" data-page="import" aria-pressed="true">Import</button>
-      <button class="secondary nav-btn" data-page="create" aria-pressed="false">Create</button>
-      <button class="secondary nav-btn" data-page="monitor" aria-pressed="false">Monitor</button>
-      <button class="secondary nav-btn" data-page="history" aria-pressed="false">History</button>
-      <button class="secondary nav-btn" data-page="status-command" aria-pressed="false">Status Command</button>
-      <button class="secondary nav-btn" data-page="detail" aria-pressed="false">Detail</button>
+      <button class="secondary nav-btn" data-page="import" aria-pressed="true" title="Open the import page to register devices from CSV.">Import</button>
+      <button class="secondary nav-btn" data-page="create" aria-pressed="false" title="Open the create page to define commands and start a job.">Create</button>
+      <button class="secondary nav-btn" data-page="monitor" aria-pressed="false" title="Open the monitor page to control and inspect the active job.">Monitor</button>
+      <button class="secondary nav-btn" data-page="history" aria-pressed="false" title="Open the history page to browse previously created jobs.">History</button>
+      <button class="secondary nav-btn" data-page="status-command" aria-pressed="false" title="Open the status command page for read-only checks on imported devices.">Status Command</button>
+      <button class="secondary nav-btn" data-page="detail" aria-pressed="false" title="Open the detail page to inspect one selected job result.">Detail</button>
     </section>
 
     <section class="panel page active" data-page="import">
@@ -423,13 +423,13 @@ You may obtain a copy of the License at
     <section class="panel page" data-page="create">
       <div id="activeJobBanner" class="active-job-banner hidden">
         <span id="activeJobBannerText">A job is currently running.</span>
-        <button class="secondary" id="viewActiveJobBtn" type="button">View Active Job</button>
+        <button class="secondary" id="viewActiveJobBtn" type="button" title="Jump to monitor view for the currently active job.">View Active Job</button>
       </div>
       <label class="checkbox-row"><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
       <div class="device-select-wrap">
         <div class="btn-row">
-          <button class="secondary" id="selectAllImportedBtn" type="button">Select All Imported</button>
-          <button class="secondary" id="clearImportedSelectionBtn" type="button">Clear Selection</button>
+          <button class="secondary" id="selectAllImportedBtn" type="button" title="Select all imported devices currently shown in the list.">Select All Imported</button>
+          <button class="secondary" id="clearImportedSelectionBtn" type="button" title="Clear all currently selected imported devices.">Clear Selection</button>
         </div>
         <div class="muted" id="importedDeviceHint">Imported target candidates: 0</div>
         <div id="importedDeviceList" class="device-select-list"></div>
@@ -470,17 +470,17 @@ show ip interface brief</textarea>
       <input id="staggerDelay" type="number" min="0" max="60" step="0.1" value="1.0" />
       <label class="checkbox-row"><input type="checkbox" id="stopOnError" checked /> Stop on Error</label>
       <div class="btn-row">
-        <button class="primary" id="runBtn">Create + Run</button>
-        <button class="primary" id="runAsyncBtn">Create + Run Async</button>
+        <button class="primary" id="runBtn" title="Create a job and start execution in the current page flow.">Create + Run</button>
+        <button class="primary" id="runAsyncBtn" title="Create a job and start execution asynchronously without blocking.">Create + Run Async</button>
       </div>
     </section>
 
     <section class="panel page" data-page="monitor">
       <div class="btn-row">
-        <button class="secondary" id="pauseBtn">Pause Active</button>
-        <button class="secondary" id="resumeBtn">Resume Active</button>
-        <button class="secondary" id="cancelBtn">Cancel Active</button>
-        <button class="secondary" id="refreshActiveBtn">Refresh Active</button>
+        <button class="secondary" id="pauseBtn" title="Pause the currently active running job.">Pause Active</button>
+        <button class="secondary" id="resumeBtn" title="Resume the currently paused active job.">Resume Active</button>
+        <button class="secondary" id="cancelBtn" title="Cancel the currently active job and stop further execution.">Cancel Active</button>
+        <button class="secondary" id="refreshActiveBtn" title="Refresh active job status and monitoring data from backend.">Refresh Active</button>
       </div>
       <p class="muted" id="activeSummary">active job: none</p>
       <div id="monitorSummary" class="job-summary-card">No active run selected</div>
@@ -488,13 +488,13 @@ show ip interface brief</textarea>
       <label>Activity Log</label>
       <pre id="log"></pre>
       <div class="btn-row" style="margin-top: 10px;">
-        <button class="secondary" id="clearBtn">Clear Logs</button>
+        <button class="secondary" id="clearBtn" title="Clear messages displayed in the activity log panel.">Clear Logs</button>
       </div>
     </section>
 
     <section class="panel page" data-page="history">
       <div class="btn-row">
-        <button class="secondary" id="listJobsBtn">Refresh Jobs</button>
+        <button class="secondary" id="listJobsBtn" title="Reload the saved job list from backend storage.">Refresh Jobs</button>
       </div>
       <label>Job History</label>
       <div id="history" class="history-list"></div>
@@ -510,7 +510,7 @@ show ip interface brief</textarea>
       <textarea id="statusCommands">show version
 show ip interface brief</textarea>
       <div class="btn-row">
-        <button class="secondary" id="statusRunBtn">Run Status Command</button>
+        <button class="secondary" id="statusRunBtn" title="Run status commands on the selected device and display read-only output.">Run Status Command</button>
       </div>
       <label for="statusOutput">Output</label>
       <pre id="statusOutput">No output yet</pre>
