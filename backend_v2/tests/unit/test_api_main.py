@@ -587,7 +587,9 @@ def test_run_uses_verify_commands_override_in_response():
 
 def test_import_devices_returns_400_when_connection_validation_fails(monkeypatch):
     client = TestClient(app)
-    monkeypatch.setattr(api_main.device_import_service, "validator", FailHostValidator())
+    monkeypatch.setattr(
+        api_main.device_import_service, "validator", FailHostValidator()
+    )
 
     imported = client.post(
         "/api/v2/devices/import",

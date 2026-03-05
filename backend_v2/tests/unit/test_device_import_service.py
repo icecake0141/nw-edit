@@ -161,8 +161,7 @@ def test_import_csv_rejects_missing_required_headers():
         validator=SimulatedConnectionValidator(),
     )
     result = service.import_csv(
-        "host,port,username,password\n"
-        "10.0.2.9,22,admin,pass\n"
+        "host,port,username,password\n" "10.0.2.9,22,admin,pass\n"
     )
 
     assert result.devices == []
