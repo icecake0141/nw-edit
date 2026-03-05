@@ -221,6 +221,125 @@ You may obtain a copy of the License at
       border-color: #98b3d0;
       background: #f8fbff;
     }
+    .job-summary-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fbfcfd;
+      margin-bottom: 12px;
+    }
+    .status-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .status-queued {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .status-running {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .status-success, .status-completed {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .status-failed, .status-cancelled {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .status-paused {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .monitor-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .device-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fff;
+    }
+    .device-card.status-queued {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+    .device-card.status-running {
+      border-color: #fbbf24;
+      background: #fffbeb;
+    }
+    .device-card.status-success, .device-card.status-completed {
+      border-color: #86efac;
+      background: #f0fdf4;
+    }
+    .device-card.status-failed, .device-card.status-cancelled {
+      border-color: #fca5a5;
+      background: #fef2f2;
+    }
+    .device-card h4 {
+      margin: 0 0 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .device-card .meta {
+      font-size: 0.84rem;
+      opacity: 0.75;
+      margin-bottom: 6px;
+    }
+    .output-label {
+      margin: 8px 0 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      opacity: 0.8;
+    }
+    .stream-output {
+      margin-top: 6px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+      background: #111827;
+      color: #e5e7eb;
+      white-space: pre-wrap;
+      max-height: 180px;
+      overflow: auto;
+      font-size: 0.82rem;
+      font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    }
+    .verify-output {
+      margin-top: 6px;
+      max-height: 200px;
+    }
+    .diff-output {
+      margin-top: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafafa;
+      padding: 10px;
+      max-height: 240px;
+      overflow: auto;
+      font-size: 0.82rem;
+      font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .diff-add {
+      color: #166534;
+      background: #dcfce7;
+    }
+    .diff-remove {
+      color: #991b1b;
+      background: #fee2e2;
+    }
     @media (max-width: 980px) {
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .field-wide { grid-column: span 2; }
@@ -327,6 +446,8 @@ show ip interface brief</textarea>
         <button class="secondary" id="refreshActiveBtn">Refresh Active</button>
       </div>
       <p class="muted" id="activeSummary">active job: none</p>
+      <div id="monitorSummary" class="job-summary-card">No active run selected</div>
+      <div id="monitorDevices" class="monitor-grid"></div>
       <label>Activity Log</label>
       <pre id="log"></pre>
       <div class="btn-row" style="margin-top: 10px;">
@@ -344,7 +465,9 @@ show ip interface brief</textarea>
 
     <section class="panel page" data-page="detail">
       <p class="muted" id="detailMeta">No job selected</p>
-      <label for="detailData">Selected Job Result</label>
+      <div id="detailSummary" class="job-summary-card">Select a job from history</div>
+      <div id="detailDevices" class="monitor-grid"></div>
+      <label for="detailData">Selected Job Raw Result</label>
       <pre id="detailData"></pre>
     </section>
   </div>
