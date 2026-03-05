@@ -22,7 +22,7 @@ uvicorn backend_v2.app.api.main:app --reload --port 8010
 モード設定:
 
 ```bash
-export NW_EDIT_V2_WORKER_MODE=simulated    # または netmiko
+export NW_EDIT_V2_WORKER_MODE=netmiko      # 既定値は netmiko（ローカル検証のみ simulated を指定）
 export NW_EDIT_V2_VALIDATOR_MODE=netmiko   # 既定値は netmiko（ローカル検証のみ simulated を指定）
 export NW_EDIT_V2_SIMULATED_DELAY_MS=200   # 任意（simulated worker の遅延）
 ```

@@ -18,6 +18,7 @@ import { NwEditApiClient } from "./api-client.js";
 
 const statusEl = document.getElementById("status");
 const apiBaseFieldEl = document.getElementById("apiBaseField");
+const modeStatusEl = document.getElementById("modeStatus");
 const logEl = document.getElementById("log");
 const detailMetaEl = document.getElementById("detailMeta");
 const detailDataEl = document.getElementById("detailData");
@@ -134,6 +135,12 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
+function setModeStatus(text) {
+  if (modeStatusEl) {
+    modeStatusEl.textContent = text;
+  }
+}
+
 function appendLog(message) {
   const line = `[${new Date().toLocaleTimeString()}] ${message}`;
   logEl.textContent += `${line}\n`;
@@ -245,6 +252,11 @@ function importedDeviceKey(device) {
   return `${device.host}:${device.port}`;
 }
 
+function canaryOptionLabel(item) {
+  const hostname = item.hostname || item.host;
+  return `${item.key} (${hostname})`;
+}
+
 function selectedImportedDeviceKeys() {
   return Array.from(
     document.querySelectorAll('input[name="importedDeviceKeys"]:checked')
@@ -316,8 +328,14 @@ function refreshCanaryOptions() {
     const uniqueKeys = Array.from(new Set(keys));
     candidates = uniqueKeys
       .map((key) => {
+        const matched = importedDevices.find((device) => importedDeviceKey(device) === key);
         const [host, rawPort] = key.split(":");
-        return { key, host, port: Number(rawPort || "22") };
+        return {
+          key,
+          host,
+          port: Number(rawPort || "22"),
+          hostname: matched?.name || host,
+        };
       })
       .filter((item) => item.host && Number.isFinite(item.port));
   } else {
@@ -330,6 +348,7 @@ function refreshCanaryOptions() {
       key: `${device.host}:${device.port}`,
       host: device.host,
       port: device.port,
+      hostname: device.host,
     }));
   }
 
@@ -337,7 +356,7 @@ function refreshCanaryOptions() {
   candidates.forEach((item) => {
     const option = document.createElement("option");
     option.value = item.key;
-    option.textContent = item.key;
+    option.textContent = canaryOptionLabel(item);
     canaryDeviceEl.append(option);
   });
   if (previous && candidates.some((item) => item.key === previous)) {
@@ -842,6 +861,16 @@ async function refreshActive() {
   }
 }
 
+async function refreshRuntimeModes() {
+  try {
+    const modes = await client().getRuntimeModes();
+    setModeStatus(`mode: worker=${modes.worker_mode} / validator=${modes.validator_mode}`);
+  } catch (error) {
+    setModeStatus("mode: worker=- / validator=-");
+    appendLog(`failed to load runtime modes: ${String(error)}`);
+  }
+}
+
 function resolveRunTargets(useImported, adHocDevices) {
   if (!useImported) {
     return {
@@ -1327,6 +1356,10 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
   });
 });
 
+document.getElementById("apiBase").addEventListener("change", () => {
+  refreshRuntimeModes().catch((error) => appendLog(String(error)));
+});
+
 setInterval(() => {
   refreshActive().catch((error) => appendLog(String(error)));
 }, 4000);
@@ -1338,3 +1371,4 @@ renderMonitorState();
 refreshImportedDevices().catch(() => {});
 refreshJobs().catch(() => {});
 refreshActive().catch(() => {});
+refreshRuntimeModes().catch(() => {});
