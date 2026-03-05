@@ -1073,6 +1073,7 @@ runAsyncBtn.addEventListener("click", runAsync);
 
 importBtn.addEventListener("click", async () => {
   const csvInput = document.getElementById("csvInput").value;
+  const importedCountBeforeImport = importedDevices.length;
   clearImportError();
   setImportInProgress(true);
   try {
@@ -1087,7 +1088,8 @@ importBtn.addEventListener("click", async () => {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let importedCount = 0;
+    let importedCount = importedCountBeforeImport;
+    let successfulProgressCount = 0;
     while (true) {
       const { value, done } = await reader.read();
       if (done) {
@@ -1112,12 +1114,18 @@ importBtn.addEventListener("click", async () => {
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = processed;
           importProgressTextEl.textContent = `Validating devices... ${processed}/${total}`;
+          if (event.connection_ok === true) {
+            successfulProgressCount += 1;
+          }
+          importedCount = successfulProgressCount;
+          deviceCountEl.textContent = `imported devices: ${importedCount}`;
         } else if (event.type === "complete") {
           importedCount = (event.devices || []).length;
           const total = Number(event.total || importedCount);
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = total;
           importProgressTextEl.textContent = `Validating devices... ${total}/${total}`;
+          deviceCountEl.textContent = `imported devices: ${importedCount}`;
         } else if (event.type === "error") {
           throw new Error(formatImportErrorDetail(event.detail));
         }
@@ -1127,6 +1135,7 @@ importBtn.addEventListener("click", async () => {
     await refreshImportedDevices();
   } catch (error) {
     const message = String(error);
+    deviceCountEl.textContent = `imported devices: ${importedCountBeforeImport}`;
     showImportError(message);
     appendLog(message);
   } finally {

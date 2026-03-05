@@ -22,6 +22,7 @@ from __future__ import annotations
 import csv
 import io
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 import json
 import re
 from dataclasses import dataclass, field
@@ -241,34 +242,35 @@ class DeviceImportService:
         indexed_devices = list(enumerate(parsed_entries))
         if progress_callback is not None:
             progress_callback({"type": "start", "total": len(indexed_devices)})
+        processed = 0
         with ThreadPoolExecutor(max_workers=self.IMPORT_VALIDATION_WORKERS) as executor:
             future_map = {
                 executor.submit(self.validator.validate, entry[2]): (index, entry)
                 for index, entry in indexed_devices
             }
-            for future, (index, entry) in future_map.items():
+            for future in as_completed(future_map):
+                index, entry = future_map[future]
                 ok, error = future.result()
                 row_number, row, device = entry
+                processed += 1
+                device.connection_ok = ok
+                device.error_message = error
+                if progress_callback is not None:
+                    progress_callback(
+                        {
+                            "type": "progress",
+                            "processed": processed,
+                            "total": len(indexed_devices),
+                            "host": device.host,
+                            "port": device.port,
+                            "connection_ok": ok,
+                        }
+                    )
                 validation_results[index] = (row_number, row, device, ok, error)
 
         valid_devices: list[DeviceProfile] = []
-        processed = 0
         for index in sorted(validation_results):
             row_number, row, device, ok, error = validation_results[index]
-            processed += 1
-            device.connection_ok = ok
-            device.error_message = error
-            if progress_callback is not None:
-                progress_callback(
-                    {
-                        "type": "progress",
-                        "processed": processed,
-                        "total": len(indexed_devices),
-                        "host": device.host,
-                        "port": device.port,
-                        "connection_ok": ok,
-                    }
-                )
             if ok:
                 valid_devices.append(device)
             else:
