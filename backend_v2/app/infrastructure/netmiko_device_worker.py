@@ -35,13 +35,23 @@ class NetmikoDeviceWorker(DeviceWorker):
     def __init__(self, profile_resolver: Callable[[str], DeviceProfile | None]):
         self.profile_resolver = profile_resolver
 
-    def run(self, device: DeviceTarget, commands: list[str]) -> DeviceExecutionResult:
+    def run(
+        self,
+        device: DeviceTarget,
+        commands: list[str],
+        verify_commands: list[str] | None = None,
+    ) -> DeviceExecutionResult:
         profile = self.profile_resolver(device.key)
         if profile is None:
             return DeviceExecutionResult(
                 status="failed",
                 error=f"Device profile not found for {device.key}",
             )
+        effective_verify_commands = (
+            list(verify_commands)
+            if verify_commands is not None
+            else list(profile.verify_cmds)
+        )
 
         from backend_v2.app.infrastructure.netmiko_executor import (
             execute_device_commands,
@@ -54,10 +64,10 @@ class NetmikoDeviceWorker(DeviceWorker):
                 "device_type": profile.device_type,
                 "username": profile.username,
                 "password": profile.password,
-                "verify_cmds": list(profile.verify_cmds),
+                "verify_cmds": effective_verify_commands,
             },
             commands=commands,
-            verify_cmds=list(profile.verify_cmds),
+            verify_cmds=effective_verify_commands,
             is_canary=True,
             retry_on_connection_error=False,
         )

@@ -105,6 +105,22 @@ class JobRunSummary:
     job_id: str
     status: JobStatus
     device_results: dict[str, DeviceExecutionResult] = field(default_factory=dict)
+    commands: list[str] = field(default_factory=list)
+    verify_commands: list[str] = field(default_factory=list)
+    target_device_keys: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ExecutionPreset:
+    """Reusable execution preset."""
+
+    preset_id: str
+    name: str
+    os_model: str
+    commands: list[str]
+    verify_commands: list[str]
+    created_at: str
+    updated_at: str
 
 
 @dataclass
