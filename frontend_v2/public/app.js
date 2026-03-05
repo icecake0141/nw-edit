@@ -501,7 +501,7 @@ importBtn.addEventListener("click", async () => {
     if (result.failed_rows.length > 0) {
       const top = result.failed_rows
         .slice(0, 5)
-        .map((item) => `row ${item.row_number}: ${item.error}`)
+        .map((item) => `row ${item.row_number || "?"}: ${item.error}`)
         .join(" | ");
       showImportError(`Import completed with ${result.failed_rows.length} failed row(s). ${top}`);
       appendLog(`first failure: ${result.failed_rows[0].error}`);

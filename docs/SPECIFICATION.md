@@ -35,6 +35,7 @@ Japanese version: [SPECIFICATION.ja.md](SPECIFICATION.ja.md)
 - Async controls (`pause/resume/cancel`).
 - WebSocket-based event stream for live status.
 - Pre/apply/post outputs and diff per device.
+- Execution preset save/reuse by OS model.
 
 ## CSV format
 
@@ -82,8 +83,20 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
   - `POST /api/v2/jobs/{job_id}/pause`
   - `POST /api/v2/jobs/{job_id}/resume`
   - `POST /api/v2/jobs/{job_id}/cancel`
+- Presets:
+  - `GET /api/v2/presets`
+  - `GET /api/v2/presets/os-models`
+  - `POST /api/v2/presets`
+  - `PUT /api/v2/presets/{preset_id}`
 - WebSocket:
   - `/ws/v2/jobs/{job_id}`
+
+## Run request extensions
+
+- `verify_commands` (optional): if provided, used for all target devices.
+- `imported_device_keys` (optional): explicit imported-device targets (`host:port` list).
+  - cannot be used together with ad-hoc `devices`
+  - empty list is rejected with `HTTP 400`
 
 ## Runtime configuration
 
