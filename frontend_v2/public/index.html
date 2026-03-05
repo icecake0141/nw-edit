@@ -356,6 +356,20 @@ You may obtain a copy of the License at
       color: #991b1b;
       background: #fee2e2;
     }
+    .help-content {
+      display: grid;
+      gap: 14px;
+    }
+    .help-content h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+    .help-content p {
+      margin: 0;
+    }
+    .help-content pre {
+      max-height: none;
+    }
     @media (max-width: 980px) {
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .field-wide { grid-column: span 2; }
@@ -401,6 +415,7 @@ You may obtain a copy of the License at
       <button class="secondary nav-btn" data-page="history" aria-pressed="false" title="Open the history page to browse previously created jobs.">History</button>
       <button class="secondary nav-btn" data-page="status-command" aria-pressed="false" title="Open the status command page for read-only checks on imported devices.">Status Command</button>
       <button class="secondary nav-btn" data-page="detail" aria-pressed="false" title="Open the detail page to inspect one selected job result.">Detail</button>
+      <button class="secondary nav-btn" data-page="help" aria-pressed="false" title="Open command variable usage examples for global and host vars.">Help</button>
     </section>
 
     <section class="panel page active" data-page="import">
@@ -522,6 +537,87 @@ show ip interface brief</textarea>
       <div id="detailDevices" class="monitor-grid"></div>
       <label for="detailData">Selected Job Raw Result</label>
       <pre id="detailData"></pre>
+    </section>
+
+    <section class="panel page" data-page="help">
+      <div class="help-content">
+        <h3>Command Variables Help</h3>
+        <p>
+          Variables let you reuse command templates across devices.
+          Use placeholders like <code>{{hostname}}</code> in command lines,
+          then provide values from <code>global_vars</code> or CSV <code>host_vars</code>.
+        </p>
+
+        <h3>1) Placeholder Format</h3>
+        <p>Use double braces in commands:</p>
+        <pre>configure terminal
+hostname {{hostname}}
+clock timezone JST {{tz_offset}}</pre>
+
+        <h3>2) Global Vars (job-level JSON)</h3>
+        <p>Set in the top input field: <strong>Global Vars (JSON)</strong>.</p>
+        <pre>{
+  "hostname_prefix": "edge",
+  "tz_offset": "9"
+}</pre>
+        <p>Equivalent API payload:</p>
+        <pre>{
+  "job_name": "nightly rollout",
+  "creator": "local",
+  "global_vars": {
+    "hostname_prefix": "edge",
+    "tz_offset": "9"
+  }
+}</pre>
+
+        <h3>3) Host Vars (per-device CSV)</h3>
+        <p>Use CSV column <code>host_vars</code> as a JSON object string:</p>
+        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1"",""tz_offset"":""9""}"
+10.0.0.2,22,cisco_ios,admin,pass,edge-2,show run,"{""hostname"":""edge-2""}"</pre>
+
+        <h3>4) Resolution Priority</h3>
+        <p>
+          If the same key exists in both places, device-level CSV value wins:
+          <code>host_vars &gt; global_vars</code>.
+        </p>
+
+        <h3>5) Missing Variable Behavior</h3>
+        <p>
+          If any placeholder has no value, preflight fails with <code>HTTP 400</code>.
+          Device commands are not executed.
+        </p>
+
+        <h3>6) Common Mistakes and Fixes</h3>
+        <pre>- Invalid JSON in Global Vars:
+  wrong: {"timezone":"Asia/Tokyo",}
+  fix:   {"timezone":"Asia/Tokyo"}
+
+- Global Vars must be an object:
+  wrong: ["x", "y"]
+  fix:   {"x":"1","y":"2"}
+
+- CSV host_vars quoting:
+  wrong: {"hostname":"edge-1"}   (not CSV-escaped)
+  fix:   "{""hostname"":""edge-1""}"</pre>
+
+        <h3>7) End-to-End Mini Example</h3>
+        <p>Inputs:</p>
+        <pre>global_vars:
+{"tz_offset":"9","ntp_server":"192.0.2.10"}
+
+command:
+clock timezone JST {{tz_offset}}
+ntp server {{ntp_server}}
+hostname {{hostname}}
+
+host_vars for 10.0.0.1:
+{"hostname":"edge-1","ntp_server":"192.0.2.20"}</pre>
+        <p>Resolved commands for 10.0.0.1:</p>
+        <pre>clock timezone JST 9
+ntp server 192.0.2.20
+hostname edge-1</pre>
+      </div>
     </section>
   </div>
 
