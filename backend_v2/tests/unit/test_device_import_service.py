@@ -112,6 +112,35 @@ def test_import_csv_parallel_validation_preserves_input_order():
     assert [d.host for d in store.list()] == ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
 
 
+def test_import_csv_progress_callback_streams_completion_order():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SlowOrderAwareValidator(
+            delays={"10.0.4.1": 0.20, "10.0.4.2": 0.08, "10.0.4.3": 0.01}
+        ),
+    )
+    events: list[dict[str, object]] = []
+
+    service.import_csv(
+        "host,port,device_type,username,password\n"
+        "10.0.4.1,22,cisco_ios,admin,pass\n"
+        "10.0.4.2,22,cisco_ios,admin,pass\n"
+        "10.0.4.3,22,cisco_ios,admin,pass\n",
+        progress_callback=events.append,
+    )
+
+    assert events[0]["type"] == "start"
+    progress_events = [event for event in events if event.get("type") == "progress"]
+    assert len(progress_events) == 3
+    assert [event["processed"] for event in progress_events] == [1, 2, 3]
+    assert {event["total"] for event in progress_events} == {3}
+    assert [event["host"] for event in progress_events] == [
+        "10.0.4.3",
+        "10.0.4.2",
+        "10.0.4.1",
+    ]
+
+
 def test_import_csv_parallel_validation_is_faster_than_serial_baseline():
     service = DeviceImportService(
         store=InMemoryDeviceStore(),
