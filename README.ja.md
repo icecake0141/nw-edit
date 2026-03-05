@@ -59,6 +59,7 @@ make check-integration
 - ホスト単位の `host_vars` は CSV 取込の `host_vars` 列（JSONオブジェクト文字列）で指定。
 - 解決優先順位は `host_vars > global_vars`。
 - 未定義変数がある場合、デバイス実行前の preflight で `HTTP 400` を返す。
+- フロントエンドの `Help` タブに、`global_vars` / `host_vars` と置換結果の実用例を掲載。
 
 ## 実行プリセット（v2）
 

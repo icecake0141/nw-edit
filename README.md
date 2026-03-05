@@ -61,6 +61,7 @@ make check-integration
 - Define per-host `host_vars` in CSV import (`host_vars` column as JSON object string).
 - Resolution order is `host_vars > global_vars`.
 - Missing variables fail preflight with `HTTP 400` before any device command runs.
+- The frontend `Help` tab includes practical variable examples (`global_vars` / `host_vars` / substitution results).
 
 ## Execution presets (v2)
 

@@ -22,6 +22,7 @@ You may obtain a copy of the License at
 - v0.1.0回帰再評価レポート: [V0_1_0-REGRESSION-REPORT.md](V0_1_0-REGRESSION-REPORT.md)
 - 移行判定チェックリスト: [V2-MIGRATION-CHECKLIST.ja.md](V2-MIGRATION-CHECKLIST.ja.md) / [V2-MIGRATION-CHECKLIST.md](V2-MIGRATION-CHECKLIST.md)
 - 仕様: [SPECIFICATION.ja.md](SPECIFICATION.ja.md) / [SPECIFICATION.md](SPECIFICATION.md)
+- フロントエンド注記: コマンド変数の実用例はアプリ内 `Help` タブを参照。
 - テスト/CI: [TESTING.ja.md](TESTING.ja.md) / [TESTING.md](TESTING.md)
 - 貢献ガイド: [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md) / [CONTRIBUTING.md](CONTRIBUTING.md)
 

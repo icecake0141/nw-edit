@@ -22,6 +22,7 @@ Japanese index: [INDEX.ja.md](INDEX.ja.md)
 - v0.1.0 regression re-evaluation report: [V0_1_0-REGRESSION-REPORT.md](V0_1_0-REGRESSION-REPORT.md)
 - Migration checklist: [V2-MIGRATION-CHECKLIST.md](V2-MIGRATION-CHECKLIST.md) / [V2-MIGRATION-CHECKLIST.ja.md](V2-MIGRATION-CHECKLIST.ja.md)
 - Specification: [SPECIFICATION.md](SPECIFICATION.md) / [SPECIFICATION.ja.md](SPECIFICATION.ja.md)
+- Frontend note: Command variable examples are available in the in-app `Help` tab.
 - Testing/CI: [TESTING.md](TESTING.md) / [TESTING.ja.md](TESTING.ja.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) / [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md)
 
