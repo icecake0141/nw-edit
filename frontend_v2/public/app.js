@@ -1282,7 +1282,9 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     switchPage(page);
     if (page === "status-command") {
       refreshImportedDevices().catch((error) => appendLog(String(error)));
-    } else if ((page === "monitor" || page === "detail") && selectedJobId) {
+    } else if (page === "monitor") {
+      await refreshActive().catch((error) => appendLog(String(error)));
+    } else if (page === "detail" && selectedJobId) {
       await loadAndRenderJob(selectedJobId, null);
     }
   });
