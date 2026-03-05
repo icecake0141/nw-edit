@@ -36,6 +36,7 @@ from backend_v2.app.api.schemas import (
     DeviceProfileResponse,
     DeviceRunResponse,
     ExecutionEventResponse,
+    RuntimeModesResponse,
     StatusCommandRequest,
     StatusCommandResponse,
     JobResponse,
@@ -126,7 +127,7 @@ service = JobService(repository=store, state_machine=JobStateMachine())
 
 
 def resolve_worker_mode() -> str:
-    return os.getenv("NW_EDIT_V2_WORKER_MODE", "simulated").strip().lower()
+    return os.getenv("NW_EDIT_V2_WORKER_MODE", "netmiko").strip().lower()
 
 
 def resolve_validator_mode() -> str:
@@ -351,6 +352,15 @@ def _to_preset_response(preset: ExecutionPreset) -> PresetResponse:
 def health() -> dict[str, str]:
     """Simple health endpoint."""
     return {"status": "ok"}
+
+
+@app.get("/api/v2/runtime/modes", response_model=RuntimeModesResponse)
+def get_runtime_modes() -> RuntimeModesResponse:
+    """Expose runtime worker/validator mode for UI."""
+    return RuntimeModesResponse(
+        worker_mode=resolve_worker_mode(),
+        validator_mode=resolve_validator_mode(),
+    )
 
 
 @app.post("/api/v2/devices/import", response_model=DeviceImportResponse)

@@ -80,7 +80,7 @@ Or run both backend/frontend:
 ```
 
 Modes:
-- `NW_EDIT_V2_WORKER_MODE=simulated|netmiko` (default: `simulated`)
+- `NW_EDIT_V2_WORKER_MODE=simulated|netmiko` (default: `netmiko`)
 - `NW_EDIT_V2_VALIDATOR_MODE=simulated|netmiko` (default: `netmiko`)
 - `NW_EDIT_V2_SIMULATED_DELAY_MS=<int>` (optional, for async-control testing)
 
