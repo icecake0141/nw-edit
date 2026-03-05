@@ -437,3 +437,140 @@ def test_duplicate_async_run_does_not_clear_pause_control(monkeypatch):
     )
     assert duplicate_async.status_code == 409
     assert control.pause_event.is_set() is True
+
+
+def test_presets_crud_and_duplicate_conflict():
+    client = TestClient(app)
+    name = f"ios-base-{time.time_ns()}"
+
+    create = client.post(
+        "/api/v2/presets",
+        json={
+            "name": name,
+            "os_model": "cisco_ios",
+            "commands": ["show version"],
+            "verify_commands": ["show run | sec snmp"],
+        },
+    )
+    assert create.status_code == 200
+    created = create.json()
+    assert created["name"] == name
+    assert created["os_model"] == "cisco_ios"
+
+    listed = client.get("/api/v2/presets?os_model=cisco_ios")
+    assert listed.status_code == 200
+    assert any(item["preset_id"] == created["preset_id"] for item in listed.json())
+
+    duplicate = client.post(
+        "/api/v2/presets",
+        json={
+            "name": name,
+            "os_model": "cisco_ios",
+            "commands": ["show clock"],
+            "verify_commands": [],
+        },
+    )
+    assert duplicate.status_code == 409
+
+    updated = client.put(
+        f"/api/v2/presets/{created['preset_id']}",
+        json={
+            "name": name,
+            "os_model": "cisco_ios",
+            "commands": ["show clock"],
+            "verify_commands": ["show interfaces"],
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["commands"] == ["show clock"]
+    assert updated.json()["verify_commands"] == ["show interfaces"]
+
+    models = client.get("/api/v2/presets/os-models")
+    assert models.status_code == 200
+    assert "cisco_ios" in models.json()
+
+
+def test_run_with_imported_device_keys_limits_targets():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.5.0.1,22,cisco_ios,admin,pass,edge-a,show run,\n"
+            "10.5.0.2,22,cisco_ios,admin,pass,edge-b,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+
+    create = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "imported-keys", "creator": "tester"},
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "commands": ["show version"],
+            "imported_device_keys": ["10.5.0.2:22"],
+        },
+    )
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["target_device_keys"] == ["10.5.0.2:22"]
+    assert list(payload["device_results"].keys()) == ["10.5.0.2:22"]
+
+
+def test_run_rejects_empty_imported_device_keys():
+    client = TestClient(app)
+    create = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "empty-imported-keys", "creator": "tester"},
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "commands": ["show version"],
+            "imported_device_keys": [],
+        },
+    )
+    assert run.status_code == 400
+    assert "imported_device_keys cannot be empty" in run.json()["detail"]
+
+
+def test_run_uses_verify_commands_override_in_response():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.6.0.1,22,cisco_ios,admin,pass,edge-a,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+
+    create = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "verify-override", "creator": "tester"},
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "commands": ["show version"],
+            "imported_device_keys": ["10.6.0.1:22"],
+            "verify_commands": ["show ip interface brief"],
+        },
+    )
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["commands"] == ["show version"]
+    assert payload["verify_commands"] == ["show ip interface brief"]
