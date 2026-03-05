@@ -93,6 +93,7 @@ class ExecutionEngine:
         retry_limit: int,
         backoff: float,
         control: ExecutionControl | None = None,
+        job_id: str | None = None,
     ) -> DeviceExecutionResult:
         attempts = 0
         last_result: DeviceExecutionResult | None = None
@@ -108,15 +109,58 @@ class ExecutionEngine:
             verify_commands: list[str] = []
             if verify_commands_by_device is not None:
                 verify_commands = verify_commands_by_device.get(device.key, [])
+            if job_id:
+                self._emit(
+                    event_type="log",
+                    job_id=job_id,
+                    device=device.key,
+                    message=(
+                        f"Attempt {attempt + 1}/{retry_limit + 1}: "
+                        f"{len(commands)} apply command(s), "
+                        f"{len(verify_commands)} verify command(s)"
+                    ),
+                )
+                for command in commands:
+                    self._emit(
+                        event_type="log",
+                        job_id=job_id,
+                        device=device.key,
+                        message=f"apply> {command}",
+                    )
+                for verify_command in verify_commands:
+                    self._emit(
+                        event_type="log",
+                        job_id=job_id,
+                        device=device.key,
+                        message=f"verify> {verify_command}",
+                    )
             result = self.worker.run(
                 device=device,
                 commands=commands,
                 verify_commands=verify_commands,
             )
+            if job_id:
+                for line in result.logs:
+                    self._emit(
+                        event_type="log",
+                        job_id=job_id,
+                        device=device.key,
+                        message=line,
+                    )
             result.attempts = attempts
             last_result = result
             if result.status == "success":
                 return result
+            if job_id and attempt < retry_limit:
+                self._emit(
+                    event_type="log",
+                    job_id=job_id,
+                    device=device.key,
+                    message=(
+                        f"Attempt {attempt + 1} failed, retrying in "
+                        f"{backoff:.1f}s"
+                    ),
+                )
             if attempt < retry_limit and backoff > 0:
                 time.sleep(backoff)
         if last_result is None:
@@ -173,6 +217,15 @@ class ExecutionEngine:
             self._emit(event_type="job_complete", job_id=job_id, status="failed")
             return summary
 
+        for device in devices:
+            self._emit(
+                event_type="device_status",
+                job_id=job_id,
+                device=device.key,
+                status="queued",
+                message="Queued for execution",
+            )
+
         # 1) Canary first, no retry.
         self._emit(
             event_type="device_status",
@@ -188,6 +241,7 @@ class ExecutionEngine:
             retry_limit=0,
             backoff=0.0,
             control=control,
+            job_id=job_id,
         )
         summary.device_results[canary.key] = canary_result
         self._emit(
@@ -256,6 +310,7 @@ class ExecutionEngine:
                         config.non_canary_retry_limit,
                         config.retry_backoff_seconds,
                         control,
+                        job_id,
                     )
                     in_flight[future] = device
                     if config.stagger_delay > 0:

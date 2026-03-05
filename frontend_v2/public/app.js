@@ -420,11 +420,10 @@ function buildDeviceCardsHtml(source) {
       const status = normalizedStatus(result?.status || streamStatus || "queued");
       const attempts = result?.attempts || 0;
       const error = result?.error || "";
-      const streamLines = [
-        ...(source.streamLogs?.[key] || []),
-        ...((result?.logs || []).map((line) => `[result] ${line}`)),
-      ];
-      const streamText = streamLines.length > 0 ? streamLines.join("\n") : "No logs yet...";
+      const streamLines = source.streamLogs?.[key] || [];
+      const fallbackResultLines = (result?.logs || []).map((line) => `[result] ${line}`);
+      const mergedLines = streamLines.length > 0 ? streamLines : fallbackResultLines;
+      const streamText = mergedLines.length > 0 ? mergedLines.join("\n") : "No logs yet...";
       const isCanary = source.canaryKey === key;
       return `
         <div class="device-card status-${status}" id="device-card-${key.replace(":", "-")}">

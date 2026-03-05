@@ -181,3 +181,24 @@ def test_engine_cancel_before_start():
     )
 
     assert summary.status == JobStatus.CANCELLED
+
+
+def test_engine_emits_queued_and_log_events_for_streaming():
+    canary = DeviceTarget(host="203.0.113.60", port=22)
+    worker = StubWorker(plan={})
+    event_store = InMemoryEventStore()
+    engine = ExecutionEngine(worker=worker, publisher=event_store)
+
+    summary = engine.run_job(
+        job_id="job-7",
+        devices=[canary],
+        canary=canary,
+        commands_by_device={canary.key: ["show version"]},
+        verify_commands_by_device={canary.key: ["show run"]},
+        config=ExecutionConfig(),
+    )
+
+    assert summary.status == JobStatus.COMPLETED
+    events = event_store.list_events("job-7")
+    assert any(e.type == "device_status" and e.status == "queued" for e in events)
+    assert any(e.type == "log" and e.device == canary.key for e in events)
