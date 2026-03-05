@@ -16,7 +16,7 @@ You may obtain a copy of the License at
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>nw-edit v2 scaffold</title>
+  <title>nw-edit v2 operations console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -130,11 +130,17 @@ You may obtain a copy of the License at
       margin: 10px 0 12px;
       opacity: 1;
     }
+    .checkbox-row input {
+      width: auto;
+      min-height: 0;
+      margin: 0;
+    }
     .device-select-wrap {
       border: 1px solid var(--line);
       border-radius: 10px;
       padding: 10px;
       background: #fbfcfd;
+      margin-bottom: 12px;
     }
     .device-select-list {
       display: grid;
@@ -154,28 +160,25 @@ You may obtain a copy of the License at
       min-height: 0;
       margin: 0;
     }
-    .modal {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 12px;
-      margin-top: 12px;
-      background: #f6faf9;
-    }
     .hidden {
       display: none !important;
     }
-    .checkbox-row input {
-      width: auto;
-      min-height: 0;
-      margin: 0;
-    }
-    .split {
+    .import-status {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 6px;
+      margin-top: 8px;
     }
-    @media (max-width: 900px) {
-      .split { grid-template-columns: 1fr; }
+    progress {
+      width: 100%;
+      height: 10px;
+    }
+    .error-box {
+      border: 1px solid #efc7c7;
+      background: #fff7f7;
+      color: #7f1d1d;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.86rem;
     }
     .muted { opacity: 0.72; font-size: 0.86rem; }
     button {
@@ -233,7 +236,7 @@ You may obtain a copy of the License at
 <body>
   <div class="wrap">
     <div class="head">
-      <h1>nw-edit v2 scaffold runner</h1>
+      <h1>nw-edit v2 operations console</h1>
       <div id="status">idle</div>
     </div>
 
@@ -270,30 +273,40 @@ You may obtain a copy of the License at
 10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1""}"
 10.0.0.2,22,cisco_ios,admin,pass,edge-2,show ip interface brief,"{""hostname"":""edge-2""}"</textarea>
       <div class="btn-row">
-        <button class="secondary" id="importBtn">Import CSV</button>
-        <button class="secondary" id="refreshDevicesBtn">Refresh Devices</button>
+        <button class="secondary" id="importBtn" title="Import devices from the CSV text above and validate each row.">Import CSV</button>
+        <button class="secondary" id="refreshDevicesBtn" title="Refresh the currently stored imported device list from backend memory.">Refresh Devices</button>
+      </div>
+      <div class="import-status">
+        <progress id="importProgress" class="hidden"></progress>
+        <div id="importErrors" class="error-box hidden"></div>
       </div>
       <p class="muted" id="deviceCount">imported devices: 0</p>
     </section>
 
     <section class="panel page" data-page="create">
-      <label for="devices">Ad-hoc Devices (host:port per line)</label>
+      <label class="checkbox-row"><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
+      <div class="device-select-wrap">
+        <div class="btn-row">
+          <button class="secondary" id="selectAllImportedBtn" type="button">Select All Imported</button>
+          <button class="secondary" id="clearImportedSelectionBtn" type="button">Clear Selection</button>
+        </div>
+        <div class="muted" id="importedDeviceHint">Imported target candidates: 0</div>
+        <div id="importedDeviceList" class="device-select-list"></div>
+      </div>
+      <label for="devices">Ad-hoc Devices (host:port per line, used when imported list is disabled)</label>
       <textarea id="devices">10.0.0.1:22
 10.0.0.2:22
 10.0.0.3:22</textarea>
-      <label class="checkbox-row"><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
-      <label for="osModelSelect">対象OSモデル</label>
-      <select id="osModelSelect">
-        <option value="">(未選択)</option>
-      </select>
-      <label for="presetSelect">実行プリセット</label>
-      <select id="presetSelect">
-        <option value="">(未選択)</option>
-      </select>
-      <div class="device-select-wrap">
-        <label>import済みデバイス選択（初期: 未選択）</label>
-        <div class="muted" id="importedDeviceHint">OSモデルを選択すると候補を表示します。</div>
-        <div id="importedDeviceList" class="device-select-list"></div>
+      <label class="checkbox-row"><input type="checkbox" id="enablePresetMode" /> Enable Preset Mode (optional)</label>
+      <div id="presetPanel" class="hidden">
+        <label for="osModelSelect">Target OS Model</label>
+        <select id="osModelSelect">
+          <option value="">(not selected)</option>
+        </select>
+        <label for="presetSelect">Execution Preset</label>
+        <select id="presetSelect">
+          <option value="">(not selected)</option>
+        </select>
       </div>
       <label for="commands">Commands (one line each)</label>
       <textarea id="commands">show version
@@ -303,21 +316,6 @@ show ip interface brief</textarea>
       <div class="btn-row">
         <button class="primary" id="runBtn">Create + Run</button>
         <button class="primary" id="runAsyncBtn">Create + Run Async</button>
-        <button class="secondary hidden" id="savePresetBtn">実行プリセットとして保存</button>
-      </div>
-      <div class="modal hidden" id="savePresetModal">
-        <label for="savePresetName">プリセット名</label>
-        <input id="savePresetName" />
-        <label for="savePresetOsModel">OSモデル</label>
-        <input id="savePresetOsModel" />
-        <label for="savePresetCommands">Commands</label>
-        <textarea id="savePresetCommands"></textarea>
-        <label for="savePresetVerifyCommands">Verify Commands</label>
-        <textarea id="savePresetVerifyCommands"></textarea>
-        <div class="btn-row">
-          <button class="primary" id="savePresetConfirmBtn">保存</button>
-          <button class="secondary" id="savePresetCancelBtn">キャンセル</button>
-        </div>
       </div>
     </section>
 
@@ -348,9 +346,6 @@ show ip interface brief</textarea>
       <p class="muted" id="detailMeta">No job selected</p>
       <label for="detailData">Selected Job Result</label>
       <pre id="detailData"></pre>
-      <div class="btn-row" style="margin-top: 10px;">
-        <button class="secondary hidden" id="savePresetFromDetailBtn">この結果から実行プリセット保存</button>
-      </div>
     </section>
   </div>
 

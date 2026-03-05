@@ -21,7 +21,7 @@
  * @typedef {{ job_id: string, job_name: string, creator: string, status: string, created_at: string, global_vars: VariableMap }} JobSummary
  * @typedef {{ status: string, attempts: number, error?: string, error_code?: string, logs: string[], pre_output: string, apply_output: string, post_output: string, diff: string, diff_truncated: boolean, diff_original_size: number }} DeviceRunResponse
  * @typedef {{ job_id: string, status: string, commands: string[], verify_commands: string[], target_device_keys: string[], device_results: Record<string, DeviceRunResponse> }} RunJobResponse
- * @typedef {{ devices: unknown[], failed_rows: { error: string }[] }} ImportDevicesResponse
+ * @typedef {{ devices: unknown[], failed_rows: { row_number?: number, error: string }[] }} ImportDevicesResponse
  * @typedef {{ active: boolean, job?: JobSummary }} ActiveJobResponse
  * @typedef {{ preset_id: string, name: string, os_model: string, commands: string[], verify_commands: string[], created_at: string, updated_at: string }} Preset
  */
