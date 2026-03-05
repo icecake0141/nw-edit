@@ -23,7 +23,15 @@ const detailDataEl = document.getElementById("detailData");
 const activeSummaryEl = document.getElementById("activeSummary");
 const historyEl = document.getElementById("history");
 const deviceCountEl = document.getElementById("deviceCount");
+const importProgressEl = document.getElementById("importProgress");
+const importErrorsEl = document.getElementById("importErrors");
+const importedDeviceListEl = document.getElementById("importedDeviceList");
+const importedDeviceHintEl = document.getElementById("importedDeviceHint");
 const useImportedEl = document.getElementById("useImported");
+const enablePresetModeEl = document.getElementById("enablePresetMode");
+const presetPanelEl = document.getElementById("presetPanel");
+const osModelSelectEl = document.getElementById("osModelSelect");
+const presetSelectEl = document.getElementById("presetSelect");
 const runBtn = document.getElementById("runBtn");
 const runAsyncBtn = document.getElementById("runAsyncBtn");
 const pauseBtn = document.getElementById("pauseBtn");
@@ -34,11 +42,18 @@ const importBtn = document.getElementById("importBtn");
 const refreshDevicesBtn = document.getElementById("refreshDevicesBtn");
 const listJobsBtn = document.getElementById("listJobsBtn");
 const refreshActiveBtn = document.getElementById("refreshActiveBtn");
+const selectAllImportedBtn = document.getElementById("selectAllImportedBtn");
+const clearImportedSelectionBtn = document.getElementById("clearImportedSelectionBtn");
+const verifyCommandsEl = document.getElementById("verifyCommands");
 
 /** @type {WebSocket|null} */
 let activeSocket = null;
 /** @type {string|null} */
 let selectedJobId = null;
+/** @type {import("./api-client.js").DeviceProfile[]} */
+let importedDevices = [];
+/** @type {import("./api-client.js").Preset[]} */
+let currentPresets = [];
 
 pauseBtn.disabled = true;
 resumeBtn.disabled = true;
@@ -64,6 +79,24 @@ function appendLog(message) {
   const line = `[${new Date().toLocaleTimeString()}] ${message}`;
   logEl.textContent += `${line}\n`;
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setImportInProgress(inProgress) {
+  importProgressEl.classList.toggle("hidden", !inProgress);
+  importBtn.disabled = inProgress;
+  if (inProgress) {
+    importProgressEl.removeAttribute("value");
+  }
+}
+
+function showImportError(text) {
+  importErrorsEl.textContent = text;
+  importErrorsEl.classList.remove("hidden");
+}
+
+function clearImportError() {
+  importErrorsEl.textContent = "";
+  importErrorsEl.classList.add("hidden");
 }
 
 function parseDevices(text) {
@@ -103,6 +136,88 @@ function parseGlobalVars(text) {
   );
 }
 
+function importedDeviceKey(device) {
+  return `${device.host}:${device.port}`;
+}
+
+function selectedImportedDeviceKeys() {
+  return Array.from(
+    document.querySelectorAll('input[name="importedDeviceKeys"]:checked')
+  ).map((el) => el.value);
+}
+
+function selectedOsModel() {
+  return osModelSelectEl.value.trim();
+}
+
+function renderImportedDeviceList() {
+  const osModel = enablePresetModeEl.checked ? selectedOsModel() : "";
+  const candidates = osModel
+    ? importedDevices.filter((device) => device.device_type === osModel)
+    : importedDevices;
+  importedDeviceListEl.replaceChildren();
+  candidates.forEach((device) => {
+    const label = document.createElement("label");
+    label.className = "device-option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "importedDeviceKeys";
+    input.value = importedDeviceKey(device);
+    const text = document.createElement("span");
+    text.textContent = `${importedDeviceKey(device)} (${device.name || "-"} / ${device.device_type})`;
+    label.append(input, text);
+    importedDeviceListEl.append(label);
+  });
+  importedDeviceHintEl.textContent = `Imported target candidates: ${candidates.length}`;
+}
+
+function selectAllImported() {
+  document.querySelectorAll('input[name="importedDeviceKeys"]').forEach((input) => {
+    input.checked = true;
+  });
+}
+
+function clearImportedSelection() {
+  document.querySelectorAll('input[name="importedDeviceKeys"]').forEach((input) => {
+    input.checked = false;
+  });
+}
+
+function populateOsModelSelect(models) {
+  const previous = selectedOsModel();
+  osModelSelectEl.innerHTML = '<option value="">(not selected)</option>';
+  models.forEach((model) => {
+    const option = document.createElement("option");
+    option.value = model;
+    option.textContent = model;
+    osModelSelectEl.append(option);
+  });
+  if (previous && models.includes(previous)) {
+    osModelSelectEl.value = previous;
+  }
+}
+
+async function refreshPresetOptions() {
+  if (!enablePresetModeEl.checked) {
+    currentPresets = [];
+    presetSelectEl.innerHTML = '<option value="">(not selected)</option>';
+    return;
+  }
+  const model = selectedOsModel();
+  presetSelectEl.innerHTML = '<option value="">(not selected)</option>';
+  if (!model) {
+    currentPresets = [];
+    return;
+  }
+  currentPresets = await client().listPresets(model);
+  currentPresets.forEach((preset) => {
+    const option = document.createElement("option");
+    option.value = preset.preset_id;
+    option.textContent = preset.name;
+    presetSelectEl.append(option);
+  });
+}
+
 function openJobSocket(apiBase, jobId) {
   if (activeSocket) {
     activeSocket.close();
@@ -139,9 +254,17 @@ function switchPage(pageName) {
 }
 
 async function refreshImportedDevices() {
-  const devices = await client().listDevices();
-  deviceCountEl.textContent = `imported devices: ${devices.length}`;
-  appendLog(`loaded imported devices: ${devices.length}`);
+  importedDevices = await client().listDevices();
+  deviceCountEl.textContent = `imported devices: ${importedDevices.length}`;
+  const importedModels = Array.from(
+    new Set(importedDevices.map((device) => device.device_type))
+  ).sort();
+  const presetModels = await client().listPresetOsModels().catch(() => []);
+  const allModels = Array.from(new Set([...importedModels, ...presetModels])).sort();
+  populateOsModelSelect(allModels);
+  renderImportedDeviceList();
+  await refreshPresetOptions().catch((error) => appendLog(String(error)));
+  appendLog(`loaded imported devices: ${importedDevices.length}`);
 }
 
 async function refreshJobs() {
@@ -211,20 +334,47 @@ async function refreshActive() {
   cancelBtn.disabled = !["running", "paused", "queued"].includes(active.job.status);
 }
 
+function resolveRunTargets(useImported, adHocDevices) {
+  if (!useImported) {
+    return {
+      importedDeviceKeys: [],
+      adHocDevices,
+    };
+  }
+  if (importedDevices.length === 0) {
+    throw new Error("imported devices are empty");
+  }
+  const chosen = selectedImportedDeviceKeys();
+  return {
+    importedDeviceKeys:
+      chosen.length > 0 ? chosen : importedDevices.map((device) => importedDeviceKey(device)),
+    adHocDevices: [],
+  };
+}
+
 async function runSync() {
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
   const globalVarsText = document.getElementById("globalVars").value;
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
+  const verifyCommands = parseCommands(verifyCommandsEl.value);
   const useImported = useImportedEl.checked;
 
   if (commands.length === 0) {
     appendLog("commands is empty");
     return;
   }
-  if (!useImported && devices.length === 0) {
-    appendLog("ad-hoc devices is empty");
+
+  let targets;
+  try {
+    targets = resolveRunTargets(useImported, devices);
+    if (!useImported && targets.adHocDevices.length === 0) {
+      appendLog("ad-hoc devices is empty");
+      return;
+    }
+  } catch (error) {
+    appendLog(String(error));
     return;
   }
 
@@ -243,7 +393,16 @@ async function runSync() {
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
 
-    const result = await client().runJob(job.job_id, commands, devices, useImported);
+    const result = await client().runJob(
+      job.job_id,
+      commands,
+      targets.adHocDevices,
+      useImported,
+      {
+        verifyCommands,
+        importedDeviceKeys: targets.importedDeviceKeys,
+      }
+    );
     appendLog(`run completed: ${result.status}`);
     Object.entries(result.device_results).forEach(([key, value]) => {
       appendLog(`${key} => status=${value.status} attempts=${value.attempts}`);
@@ -272,14 +431,23 @@ async function runAsync() {
   const globalVarsText = document.getElementById("globalVars").value;
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
+  const verifyCommands = parseCommands(verifyCommandsEl.value);
   const useImported = useImportedEl.checked;
 
   if (commands.length === 0) {
     appendLog("commands is empty");
     return;
   }
-  if (!useImported && devices.length === 0) {
-    appendLog("ad-hoc devices is empty");
+
+  let targets;
+  try {
+    targets = resolveRunTargets(useImported, devices);
+    if (!useImported && targets.adHocDevices.length === 0) {
+      appendLog("ad-hoc devices is empty");
+      return;
+    }
+  } catch (error) {
+    appendLog(String(error));
     return;
   }
 
@@ -297,7 +465,16 @@ async function runAsync() {
     const job = await client().createJob(jobName, creator, globalVars);
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
-    const started = await client().runJobAsync(job.job_id, commands, devices, useImported);
+    const started = await client().runJobAsync(
+      job.job_id,
+      commands,
+      targets.adHocDevices,
+      useImported,
+      {
+        verifyCommands,
+        importedDeviceKeys: targets.importedDeviceKeys,
+      }
+    );
     appendLog(`run async started: ${started.status}`);
     setStatus("running");
     await refreshJobs();
@@ -316,15 +493,26 @@ runAsyncBtn.addEventListener("click", runAsync);
 
 importBtn.addEventListener("click", async () => {
   const csvInput = document.getElementById("csvInput").value;
+  clearImportError();
+  setImportInProgress(true);
   try {
     const result = await client().importDevices(csvInput);
     appendLog(`import success: valid=${result.devices.length} failed_rows=${result.failed_rows.length}`);
     if (result.failed_rows.length > 0) {
+      const top = result.failed_rows
+        .slice(0, 5)
+        .map((item) => `row ${item.row_number}: ${item.error}`)
+        .join(" | ");
+      showImportError(`Import completed with ${result.failed_rows.length} failed row(s). ${top}`);
       appendLog(`first failure: ${result.failed_rows[0].error}`);
     }
     await refreshImportedDevices();
   } catch (error) {
-    appendLog(String(error));
+    const message = String(error);
+    showImportError(`CSV import failed. ${message}`);
+    appendLog(message);
+  } finally {
+    setImportInProgress(false);
   }
 });
 
@@ -338,6 +526,48 @@ listJobsBtn.addEventListener("click", () => {
 
 refreshActiveBtn.addEventListener("click", () => {
   refreshActive().catch((error) => appendLog(String(error)));
+});
+
+useImportedEl.addEventListener("change", () => {
+  importedDeviceListEl.parentElement.classList.toggle("hidden", !useImportedEl.checked);
+});
+
+enablePresetModeEl.addEventListener("change", async () => {
+  presetPanelEl.classList.toggle("hidden", !enablePresetModeEl.checked);
+  if (!enablePresetModeEl.checked) {
+    osModelSelectEl.value = "";
+    presetSelectEl.value = "";
+    await refreshPresetOptions().catch((error) => appendLog(String(error)));
+    renderImportedDeviceList();
+    return;
+  }
+  await refreshPresetOptions().catch((error) => appendLog(String(error)));
+  renderImportedDeviceList();
+});
+
+osModelSelectEl.addEventListener("change", () => {
+  renderImportedDeviceList();
+  refreshPresetOptions().catch((error) => appendLog(String(error)));
+});
+
+presetSelectEl.addEventListener("change", () => {
+  const selected = currentPresets.find(
+    (preset) => preset.preset_id === presetSelectEl.value
+  );
+  if (!selected) {
+    return;
+  }
+  document.getElementById("commands").value = selected.commands.join("\n");
+  verifyCommandsEl.value = selected.verify_commands.join("\n");
+  appendLog(`preset applied: ${selected.name} (${selected.os_model})`);
+});
+
+selectAllImportedBtn.addEventListener("click", () => {
+  selectAllImported();
+});
+
+clearImportedSelectionBtn.addEventListener("click", () => {
+  clearImportedSelection();
 });
 
 pauseBtn.addEventListener("click", async () => {
@@ -391,6 +621,7 @@ setInterval(() => {
   refreshActive().catch((error) => appendLog(String(error)));
 }, 4000);
 
+presetPanelEl.classList.add("hidden");
 refreshImportedDevices().catch(() => {});
 refreshJobs().catch(() => {});
 refreshActive().catch(() => {});
