@@ -170,7 +170,7 @@ def test_import_csv_rejects_missing_required_headers():
     assert "missing required columns" in result.failed_rows[0].error
 
 
-def test_import_csv_rejects_extra_column_values_as_syntax_error():
+def test_import_csv_accepts_extra_column_values_for_v0_1_0_compatibility():
     service = DeviceImportService(
         store=InMemoryDeviceStore(),
         validator=SimulatedConnectionValidator(),
@@ -180,10 +180,9 @@ def test_import_csv_rejects_extra_column_values_as_syntax_error():
         "10.0.2.10,22,cisco_ios,admin,pass,unexpected\n"
     )
 
-    assert result.devices == []
-    assert len(result.failed_rows) == 1
-    assert result.failed_rows[0].row_number == 2
-    assert "CSV syntax error" in result.failed_rows[0].error
+    assert len(result.devices) == 1
+    assert result.devices[0].host == "10.0.2.10"
+    assert len(result.failed_rows) == 0
 
 
 def test_import_csv_rejects_invalid_host_vars_json():

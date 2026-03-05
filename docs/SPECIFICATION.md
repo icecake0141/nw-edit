@@ -32,7 +32,7 @@ Japanese version: [SPECIFICATION.ja.md](SPECIFICATION.ja.md)
 - Device import and validation from CSV.
 - Job creation and lifecycle (`queued/running/paused/completed/failed/cancelled`).
 - Sync run (`/run`) and async run (`/run/async`).
-- Async controls (`pause/resume/cancel`).
+- Async controls (`pause/resume/cancel/terminate`).
 - WebSocket-based event stream for live status.
 - Pre/apply/post outputs and diff per device.
 - Execution preset save/reuse by OS model.
@@ -69,6 +69,7 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
 
 - Device import/list:
   - `POST /api/v2/devices/import`
+  - `POST /api/v2/devices/import/progress` (NDJSON progress stream)
   - `GET /api/v2/devices`
 - Job lifecycle/read:
   - `POST /api/v2/jobs`
@@ -83,6 +84,8 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
   - `POST /api/v2/jobs/{job_id}/pause`
   - `POST /api/v2/jobs/{job_id}/resume`
   - `POST /api/v2/jobs/{job_id}/cancel`
+  - `POST /api/v2/jobs/{job_id}/terminate` (alias of `cancel`)
+  - `POST /api/v2/commands/exec` (read-only status command execution)
 - Presets:
   - `GET /api/v2/presets`
   - `GET /api/v2/presets/os-models`
@@ -94,6 +97,7 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
 ## Run request extensions
 
 - `verify_commands` (optional): if provided, used for all target devices.
+- `canary` (required): explicit canary target (`host`, `port`).
 - `imported_device_keys` (optional): explicit imported-device targets (`host:port` list).
   - cannot be used together with ad-hoc `devices`
   - empty list is rejected with `HTTP 400`

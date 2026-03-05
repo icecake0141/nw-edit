@@ -15,7 +15,7 @@
 set -euo pipefail
 
 MODE_WORKER="${NW_EDIT_V2_WORKER_MODE:-simulated}"
-MODE_VALIDATOR="${NW_EDIT_V2_VALIDATOR_MODE:-simulated}"
+MODE_VALIDATOR="${NW_EDIT_V2_VALIDATOR_MODE:-netmiko}"
 MODE_SIM_DELAY_MS="${NW_EDIT_V2_SIMULATED_DELAY_MS:-0}"
 
 echo "[v2] worker mode: ${MODE_WORKER}"

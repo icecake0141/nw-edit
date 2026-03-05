@@ -18,12 +18,16 @@
 """FastAPI entrypoint for backend_v2 scaffold."""
 
 import asyncio
+import json
 import os
-from typing import Optional
+from queue import Queue
+from threading import Thread
+from typing import Iterator, Optional
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from backend_v2.app.api.schemas import (
     ActiveJobResponse,
@@ -32,6 +36,8 @@ from backend_v2.app.api.schemas import (
     DeviceProfileResponse,
     DeviceRunResponse,
     ExecutionEventResponse,
+    StatusCommandRequest,
+    StatusCommandResponse,
     JobResponse,
     PresetCreateRequest,
     PresetResponse,
@@ -74,6 +80,10 @@ from backend_v2.app.infrastructure.file_preset_store import (
     PresetConflictError,
 )
 from backend_v2.app.infrastructure.netmiko_device_worker import NetmikoDeviceWorker
+from backend_v2.app.infrastructure.netmiko_executor import (
+    parse_status_commands,
+    run_status_commands,
+)
 from backend_v2.app.infrastructure.run_coordinator import RunCoordinator
 from backend_v2.app.infrastructure.simulated_device_worker import SimulatedDeviceWorker
 
@@ -120,7 +130,7 @@ def resolve_worker_mode() -> str:
 
 
 def resolve_validator_mode() -> str:
-    return os.getenv("NW_EDIT_V2_VALIDATOR_MODE", "simulated").strip().lower()
+    return os.getenv("NW_EDIT_V2_VALIDATOR_MODE", "netmiko").strip().lower()
 
 
 if resolve_worker_mode() == "netmiko":
@@ -185,10 +195,17 @@ def _resolve_run_targets(
     if not devices:
         raise HTTPException(status_code=400, detail="No devices provided or imported")
 
-    if payload.canary:
-        canary = DeviceTarget(host=payload.canary.host, port=payload.canary.port)
-    else:
-        canary = devices[0]
+    if payload.canary is None:
+        raise HTTPException(
+            status_code=400,
+            detail="canary is required",
+        )
+    canary = DeviceTarget(host=payload.canary.host, port=payload.canary.port)
+    if canary.key not in {device.key for device in devices}:
+        raise HTTPException(
+            status_code=400,
+            detail="Canary device must be in the device list",
+        )
     return devices, canary
 
 
@@ -232,6 +249,12 @@ def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
         raise HTTPException(status_code=404, detail="Job not found")
 
     devices, canary = _resolve_run_targets(payload)
+    verify_mode = (payload.verify_mode or "all").strip().lower()
+    if verify_mode not in {"all", "canary", "none"}:
+        raise HTTPException(
+            status_code=400,
+            detail="verify_mode must be one of: all, canary, none",
+        )
     commands_by_device: dict[str, list[str]] = {}
     verify_commands_by_device: dict[str, list[str]] = {}
     for device in devices:
@@ -247,12 +270,19 @@ def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
                 detail=(f"Missing command variables for {device.key}: {missing_vars}"),
             )
         commands_by_device[device.key] = rendered
-        if payload.verify_commands is not None:
-            verify_commands_by_device[device.key] = list(payload.verify_commands)
+        if verify_mode == "none":
+            verify_commands_by_device[device.key] = []
+            continue
+
+        base_verify_commands = (
+            list(payload.verify_commands)
+            if payload.verify_commands is not None
+            else (list(profile.verify_cmds) if profile is not None else [])
+        )
+        if verify_mode == "canary" and device.key != canary.key:
+            verify_commands_by_device[device.key] = []
         else:
-            verify_commands_by_device[device.key] = (
-                list(profile.verify_cmds) if profile is not None else []
-            )
+            verify_commands_by_device[device.key] = base_verify_commands
 
     config = ExecutionConfig(
         concurrency_limit=payload.concurrency_limit,
@@ -371,6 +401,80 @@ def import_devices(
     )
 
 
+@app.post("/api/v2/devices/import/progress")
+def import_devices_with_progress(
+    csv_content: str = Body(..., media_type="text/plain")
+) -> StreamingResponse:
+    """Import devices and stream validation progress as NDJSON."""
+
+    done = object()
+    events: Queue[object] = Queue()
+
+    def publish(event: dict[str, object]) -> None:
+        events.put(event)
+
+    def worker() -> None:
+        try:
+            result = device_import_service.import_csv(
+                csv_content=csv_content, progress_callback=publish
+            )
+            if result.failed_rows:
+                events.put(
+                    {
+                        "type": "error",
+                        "detail": {
+                            "message": "CSV import failed due to invalid rows",
+                            "failed_rows": [
+                                {
+                                    "row_number": row.row_number,
+                                    "row": row.row,
+                                    "error": row.error,
+                                }
+                                for row in result.failed_rows
+                            ],
+                        },
+                    }
+                )
+            else:
+                events.put(
+                    {
+                        "type": "complete",
+                        "processed": len(result.devices),
+                        "total": len(result.devices),
+                        "devices": [
+                            DeviceProfileResponse(
+                                host=d.host,
+                                port=d.port,
+                                device_type=d.device_type,
+                                username=d.username,
+                                password=d.password,
+                                name=d.name,
+                                verify_cmds=d.verify_cmds,
+                                host_vars=d.host_vars,
+                                connection_ok=d.connection_ok,
+                                error_message=d.error_message,
+                            ).model_dump()
+                            for d in result.devices
+                        ],
+                    }
+                )
+        except Exception as exc:
+            events.put({"type": "error", "detail": str(exc)})
+        finally:
+            events.put(done)
+
+    Thread(target=worker, daemon=True).start()
+
+    def stream() -> Iterator[str]:
+        while True:
+            event = events.get()
+            if event is done:
+                break
+            yield json.dumps(event, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
 @app.get("/api/v2/devices", response_model=list[DeviceProfileResponse])
 def list_devices() -> list[DeviceProfileResponse]:
     """List currently imported valid devices."""
@@ -390,6 +494,36 @@ def list_devices() -> list[DeviceProfileResponse]:
         )
         for d in devices
     ]
+
+
+@app.post("/api/v2/commands/exec", response_model=StatusCommandResponse)
+def execute_status_command(payload: StatusCommandRequest) -> StatusCommandResponse:
+    """Execute read-only status commands on an imported device."""
+    key = f"{payload.host}:{payload.port}"
+    profile = device_store.get_by_key(key)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    try:
+        if resolve_worker_mode() == "netmiko":
+            output = run_status_commands(
+                {
+                    "host": profile.host,
+                    "port": profile.port,
+                    "device_type": profile.device_type,
+                    "username": profile.username,
+                    "password": profile.password,
+                },
+                payload.commands,
+            )
+        else:
+            commands = parse_status_commands(payload.commands)
+            output = "\n\n".join([f"$ {cmd}\n(simulated output)" for cmd in commands])
+        return StatusCommandResponse(output=output)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.get("/api/v2/presets", response_model=list[PresetResponse])
@@ -443,6 +577,18 @@ def update_preset(preset_id: str, payload: PresetUpdateRequest) -> PresetRespons
 @app.post("/api/v2/jobs", response_model=JobResponse)
 def create_job(payload: CreateJobRequest) -> JobResponse:
     """Create a queued job."""
+    jobs = store.list()
+    jobs.sort(key=lambda item: item.created_at, reverse=True)
+    for existing in jobs:
+        if existing.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}:
+            label = existing.job_name or existing.job_id
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Job '{label}' is already {existing.status.value}. "
+                    "Wait for it to finish or cancel it before starting another job."
+                ),
+            )
     job = service.create_job(
         job_name=payload.job_name,
         creator=payload.creator,
@@ -663,6 +809,12 @@ def cancel_job(job_id: str) -> JobResponse:
         )
     )
     return to_response(job)
+
+
+@app.post("/api/v2/jobs/{job_id}/terminate", response_model=JobResponse)
+def terminate_job(job_id: str) -> JobResponse:
+    """Backward-compatible alias of cancel endpoint."""
+    return cancel_job(job_id)
 
 
 @app.get("/api/v2/jobs/{job_id}/result", response_model=RunJobResponse)

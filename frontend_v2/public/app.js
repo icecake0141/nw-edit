@@ -28,6 +28,7 @@ const monitorDevicesEl = document.getElementById("monitorDevices");
 const historyEl = document.getElementById("history");
 const deviceCountEl = document.getElementById("deviceCount");
 const importProgressEl = document.getElementById("importProgress");
+const importProgressTextEl = document.getElementById("importProgressText");
 const importErrorsEl = document.getElementById("importErrors");
 const importedDeviceListEl = document.getElementById("importedDeviceList");
 const importedDeviceHintEl = document.getElementById("importedDeviceHint");
@@ -49,6 +50,18 @@ const refreshActiveBtn = document.getElementById("refreshActiveBtn");
 const selectAllImportedBtn = document.getElementById("selectAllImportedBtn");
 const clearImportedSelectionBtn = document.getElementById("clearImportedSelectionBtn");
 const verifyCommandsEl = document.getElementById("verifyCommands");
+const verifyModeEl = document.getElementById("verifyMode");
+const canaryDeviceEl = document.getElementById("canaryDevice");
+const concurrencyLimitEl = document.getElementById("concurrencyLimit");
+const staggerDelayEl = document.getElementById("staggerDelay");
+const stopOnErrorEl = document.getElementById("stopOnError");
+const statusDeviceSelectEl = document.getElementById("statusDeviceSelect");
+const statusCommandsEl = document.getElementById("statusCommands");
+const statusRunBtn = document.getElementById("statusRunBtn");
+const statusOutputEl = document.getElementById("statusOutput");
+const activeJobBannerEl = document.getElementById("activeJobBanner");
+const activeJobBannerTextEl = document.getElementById("activeJobBannerText");
+const viewActiveJobBtn = document.getElementById("viewActiveJobBtn");
 
 /** @type {WebSocket|null} */
 let activeSocket = null;
@@ -59,6 +72,10 @@ let importedDevices = [];
 /** @type {import("./api-client.js").Preset[]} */
 let currentPresets = [];
 let monitorResultLoading = false;
+let runSyncBusy = false;
+let runAsyncBusy = false;
+/** @type {import("./api-client.js").JobDetail|null} */
+let activeBlockingJob = null;
 const monitorState = {
   job: null,
   targetDeviceKeys: [],
@@ -95,10 +112,33 @@ function appendLog(message) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function isActiveRunBlocking(status) {
+  return ["queued", "running", "paused"].includes(String(status || "").toLowerCase());
+}
+
+function updateCreateActionState() {
+  const blocked = Boolean(activeBlockingJob);
+  runBtn.disabled = blocked || runSyncBusy;
+  runAsyncBtn.disabled = blocked || runAsyncBusy;
+  if (!activeJobBannerEl || !activeJobBannerTextEl) {
+    return;
+  }
+  if (!blocked) {
+    activeJobBannerEl.classList.add("hidden");
+    return;
+  }
+  activeJobBannerTextEl.textContent =
+    `Active job ${activeBlockingJob.job_id} (${activeBlockingJob.status}) is running. ` +
+    "New job creation is disabled.";
+  activeJobBannerEl.classList.remove("hidden");
+}
+
 function setImportInProgress(inProgress) {
   importBtn.disabled = inProgress;
   if (inProgress) {
     importProgressEl.classList.remove("hidden");
+    importProgressTextEl.classList.remove("hidden");
+    importProgressTextEl.textContent = "Validating devices... 0/0";
   }
   if (inProgress) {
     importProgressEl.removeAttribute("value");
@@ -106,6 +146,7 @@ function setImportInProgress(inProgress) {
   } else {
     importProgressEl.max = 100;
     importProgressEl.value = 100;
+    importProgressTextEl.classList.add("hidden");
   }
 }
 
@@ -117,6 +158,22 @@ function showImportError(text) {
 function clearImportError() {
   importErrorsEl.textContent = "";
   importErrorsEl.classList.add("hidden");
+}
+
+function formatImportErrorDetail(detail) {
+  if (!detail) {
+    return "CSV import failed";
+  }
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (detail.failed_rows && Array.isArray(detail.failed_rows)) {
+    const lines = detail.failed_rows.map(
+      (item) => `- row ${item.row_number || "?"}: ${item.error}`
+    );
+    return `${detail.message || "CSV import failed"} (${detail.failed_rows.length} rows)\n${lines.join("\n")}`;
+  }
+  return JSON.stringify(detail);
 }
 
 function parseDevices(text) {
@@ -191,6 +248,19 @@ function renderImportedDeviceList() {
   importedDeviceHintEl.textContent = `Imported target candidates: ${candidates.length}`;
 }
 
+function populateStatusDeviceSelect() {
+  if (!statusDeviceSelectEl) {
+    return;
+  }
+  statusDeviceSelectEl.innerHTML = '<option value="">(select device)</option>';
+  importedDevices.forEach((device) => {
+    const option = document.createElement("option");
+    option.value = importedDeviceKey(device);
+    option.textContent = `${importedDeviceKey(device)} (${device.name || "-"} / ${device.device_type})`;
+    statusDeviceSelectEl.append(option);
+  });
+}
+
 function selectAllImported() {
   document.querySelectorAll('input[name="importedDeviceKeys"]').forEach((input) => {
     input.checked = true;
@@ -201,6 +271,50 @@ function clearImportedSelection() {
   document.querySelectorAll('input[name="importedDeviceKeys"]').forEach((input) => {
     input.checked = false;
   });
+}
+
+function refreshCanaryOptions() {
+  if (!canaryDeviceEl) {
+    return;
+  }
+  const previous = canaryDeviceEl.value;
+  let candidates = [];
+  if (useImportedEl.checked) {
+    const selectedKeys = selectedImportedDeviceKeys();
+    const keys =
+      selectedKeys.length > 0
+        ? selectedKeys
+        : importedDevices.map((device) => importedDeviceKey(device));
+    const uniqueKeys = Array.from(new Set(keys));
+    candidates = uniqueKeys
+      .map((key) => {
+        const [host, rawPort] = key.split(":");
+        return { key, host, port: Number(rawPort || "22") };
+      })
+      .filter((item) => item.host && Number.isFinite(item.port));
+  } else {
+    const adHocDevices = parseDevices(document.getElementById("devices").value);
+    const unique = new Map();
+    adHocDevices.forEach((device) => {
+      unique.set(`${device.host}:${device.port}`, device);
+    });
+    candidates = Array.from(unique.values()).map((device) => ({
+      key: `${device.host}:${device.port}`,
+      host: device.host,
+      port: device.port,
+    }));
+  }
+
+  canaryDeviceEl.innerHTML = '<option value="">(select canary)</option>';
+  candidates.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.key;
+    option.textContent = item.key;
+    canaryDeviceEl.append(option);
+  });
+  if (previous && candidates.some((item) => item.key === previous)) {
+    canaryDeviceEl.value = previous;
+  }
 }
 
 function populateOsModelSelect(models) {
@@ -535,7 +649,24 @@ function formatJobDetailText(job, events, result) {
       lines.push(`  error_code=${value.error_code || "-"} error=${value.error || "-"}`);
     }
     if (value.logs && value.logs.length > 0) {
-      lines.push(`  logs=${value.logs.slice(0, 2).join(" | ")}`);
+      lines.push("  logs:");
+      value.logs.forEach((entry) => lines.push(`    ${entry}`));
+    }
+    if (value.pre_output) {
+      lines.push("  pre_output:");
+      String(value.pre_output).split("\n").forEach((entry) => lines.push(`    ${entry}`));
+    }
+    if (value.apply_output) {
+      lines.push("  apply_output:");
+      String(value.apply_output).split("\n").forEach((entry) => lines.push(`    ${entry}`));
+    }
+    if (value.post_output) {
+      lines.push("  post_output:");
+      String(value.post_output).split("\n").forEach((entry) => lines.push(`    ${entry}`));
+    }
+    if (value.diff) {
+      lines.push("  diff:");
+      String(value.diff).split("\n").forEach((entry) => lines.push(`    ${entry}`));
     }
   });
   if (Object.keys(deviceResults).length === 0) {
@@ -558,6 +689,32 @@ function renderJobDetail(job, events, result) {
   renderExecutionPanel(detailSummaryEl, detailDevicesEl, detailSource, events.length);
 }
 
+async function loadAndRenderJob(jobId, targetPage = "detail") {
+  try {
+    const [detail, events, result] = await Promise.all([
+      client().getJob(jobId),
+      client().listJobEvents(jobId),
+      client().getJobResult(jobId).catch(() => ({ job_id: jobId, status: "pending", device_results: {} })),
+    ]);
+    renderJobDetail(detail, events, result);
+    if (monitorState.job && monitorState.job.job_id === jobId) {
+      monitorState.job = { ...monitorState.job, ...detail, status: result.status || detail.status };
+      monitorState.result = result;
+      monitorState.targetDeviceKeys = result.target_device_keys || monitorState.targetDeviceKeys;
+      Object.entries(result.device_results || {}).forEach(([deviceKey, value]) => {
+        ensureMonitorDevice(deviceKey);
+        monitorState.deviceStatuses[deviceKey] = value.status || monitorState.deviceStatuses[deviceKey];
+      });
+      renderMonitorState();
+    }
+    if (targetPage) {
+      switchPage(targetPage);
+    }
+  } catch (error) {
+    appendLog(String(error));
+  }
+}
+
 function switchPage(pageName) {
   document.querySelectorAll(".page").forEach((el) => {
     el.classList.toggle("active", el.getAttribute("data-page") === pageName);
@@ -578,6 +735,8 @@ async function refreshImportedDevices() {
   const allModels = Array.from(new Set([...importedModels, ...presetModels])).sort();
   populateOsModelSelect(allModels);
   renderImportedDeviceList();
+  populateStatusDeviceSelect();
+  refreshCanaryOptions();
   await refreshPresetOptions().catch((error) => appendLog(String(error)));
   appendLog(`loaded imported devices: ${importedDevices.length}`);
 }
@@ -615,19 +774,9 @@ async function refreshJobs() {
 
     div.append(titleWrap, id, status, timestamps);
     div.addEventListener("click", async () => {
-      try {
-        selectedJobId = job.job_id;
-        const [detail, events, result] = await Promise.all([
-          client().getJob(job.job_id),
-          client().listJobEvents(job.job_id),
-          client().getJobResult(job.job_id).catch(() => ({ job_id: job.job_id, status: "pending", device_results: {} })),
-        ]);
-        renderJobDetail(detail, events, result);
-        appendLog(`history selected: ${job.job_id}`);
-        switchPage("detail");
-      } catch (error) {
-        appendLog(String(error));
-      }
+      selectedJobId = job.job_id;
+      await loadAndRenderJob(job.job_id, "detail");
+      appendLog(`history selected: ${job.job_id}`);
     });
     historyEl.append(div);
   });
@@ -638,7 +787,11 @@ async function refreshJobs() {
 async function refreshActive() {
   const active = await client().getActiveJob();
   if (!active.active || !active.job) {
+    activeBlockingJob = null;
+    updateCreateActionState();
     activeSummaryEl.textContent = "active job: none";
+    monitorSummaryEl.textContent = "No active job selected.";
+    monitorDevicesEl.innerHTML = "";
     pauseBtn.disabled = true;
     resumeBtn.disabled = true;
     cancelBtn.disabled = true;
@@ -650,6 +803,8 @@ async function refreshActive() {
 
   activeSummaryEl.textContent = `active job: ${active.job.job_id} (${active.job.status})`;
   setStatus(`active:${active.job.status}`);
+  activeBlockingJob = isActiveRunBlocking(active.job.status) ? active.job : null;
+  updateCreateActionState();
   pauseBtn.disabled = active.job.status !== "running";
   resumeBtn.disabled = active.job.status !== "paused";
   cancelBtn.disabled = !["running", "paused", "queued"].includes(active.job.status);
@@ -664,16 +819,25 @@ function resolveRunTargets(useImported, adHocDevices) {
     return {
       importedDeviceKeys: [],
       adHocDevices,
+      targetDevices: adHocDevices,
     };
   }
   if (importedDevices.length === 0) {
     throw new Error("imported devices are empty");
   }
   const chosen = selectedImportedDeviceKeys();
+  const importedDeviceKeys =
+    chosen.length > 0 ? chosen : importedDevices.map((device) => importedDeviceKey(device));
+  const targetDevices = importedDeviceKeys
+    .map((key) => {
+      const [host, rawPort] = key.split(":");
+      return { host, port: Number(rawPort || "22") };
+    })
+    .filter((device) => device.host && Number.isFinite(device.port));
   return {
-    importedDeviceKeys:
-      chosen.length > 0 ? chosen : importedDevices.map((device) => importedDeviceKey(device)),
+    importedDeviceKeys,
     adHocDevices: [],
+    targetDevices,
   };
 }
 
@@ -685,6 +849,13 @@ function resolveTargetDeviceKeys(useImported, targets) {
 }
 
 async function runSync() {
+  if (activeBlockingJob) {
+    appendLog(
+      `Cannot create a new job while active job ${activeBlockingJob.job_id} (${activeBlockingJob.status}) is running`
+    );
+    switchPage("monitor");
+    return;
+  }
   switchPage("monitor");
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
@@ -692,6 +863,10 @@ async function runSync() {
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
   const verifyCommands = parseCommands(verifyCommandsEl.value);
+  const verifyMode = verifyModeEl.value;
+  const concurrencyLimit = Number(concurrencyLimitEl.value || "5");
+  const staggerDelay = Number(staggerDelayEl.value || "1.0");
+  const stopOnError = stopOnErrorEl.checked;
   const useImported = useImportedEl.checked;
 
   if (commands.length === 0) {
@@ -706,10 +881,25 @@ async function runSync() {
       appendLog("ad-hoc devices is empty");
       return;
     }
+    if (targets.targetDevices.length === 0) {
+      appendLog("target devices is empty");
+      return;
+    }
   } catch (error) {
     appendLog(String(error));
     return;
   }
+  const canaryKey = canaryDeviceEl.value.trim();
+  if (!canaryKey) {
+    appendLog("canary device is required");
+    return;
+  }
+  if (!targets.targetDevices.some((device) => `${device.host}:${device.port}` === canaryKey)) {
+    appendLog("canary device must be included in target devices");
+    return;
+  }
+  const [canaryHost, canaryRawPort] = canaryKey.split(":");
+  const canary = { host: canaryHost, port: Number(canaryRawPort || "22") };
 
   let globalVars;
   try {
@@ -719,7 +909,8 @@ async function runSync() {
     return;
   }
 
-  runBtn.disabled = true;
+  runSyncBusy = true;
+  updateCreateActionState();
   setStatus("creating");
   try {
     const job = await client().createJob(jobName, creator, globalVars);
@@ -736,7 +927,12 @@ async function runSync() {
       useImported,
       {
         verifyCommands,
+        verifyMode,
         importedDeviceKeys: targets.importedDeviceKeys,
+        canary,
+        concurrencyLimit,
+        staggerDelay,
+        stopOnError,
       }
     );
     monitorState.result = result;
@@ -764,7 +960,8 @@ async function runSync() {
     setStatus("failed");
     appendLog(String(error));
   } finally {
-    runBtn.disabled = false;
+    runSyncBusy = false;
+    updateCreateActionState();
     if (activeSocket) {
       setTimeout(() => activeSocket && activeSocket.close(), 800);
     }
@@ -772,6 +969,13 @@ async function runSync() {
 }
 
 async function runAsync() {
+  if (activeBlockingJob) {
+    appendLog(
+      `Cannot create a new job while active job ${activeBlockingJob.job_id} (${activeBlockingJob.status}) is running`
+    );
+    switchPage("monitor");
+    return;
+  }
   switchPage("monitor");
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
@@ -779,6 +983,10 @@ async function runAsync() {
   const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
   const verifyCommands = parseCommands(verifyCommandsEl.value);
+  const verifyMode = verifyModeEl.value;
+  const concurrencyLimit = Number(concurrencyLimitEl.value || "5");
+  const staggerDelay = Number(staggerDelayEl.value || "1.0");
+  const stopOnError = stopOnErrorEl.checked;
   const useImported = useImportedEl.checked;
 
   if (commands.length === 0) {
@@ -793,10 +1001,25 @@ async function runAsync() {
       appendLog("ad-hoc devices is empty");
       return;
     }
+    if (targets.targetDevices.length === 0) {
+      appendLog("target devices is empty");
+      return;
+    }
   } catch (error) {
     appendLog(String(error));
     return;
   }
+  const canaryKey = canaryDeviceEl.value.trim();
+  if (!canaryKey) {
+    appendLog("canary device is required");
+    return;
+  }
+  if (!targets.targetDevices.some((device) => `${device.host}:${device.port}` === canaryKey)) {
+    appendLog("canary device must be included in target devices");
+    return;
+  }
+  const [canaryHost, canaryRawPort] = canaryKey.split(":");
+  const canary = { host: canaryHost, port: Number(canaryRawPort || "22") };
 
   let globalVars;
   try {
@@ -806,7 +1029,8 @@ async function runAsync() {
     return;
   }
 
-  runAsyncBtn.disabled = true;
+  runAsyncBusy = true;
+  updateCreateActionState();
   setStatus("creating-async");
   try {
     const job = await client().createJob(jobName, creator, globalVars);
@@ -822,7 +1046,12 @@ async function runAsync() {
       useImported,
       {
         verifyCommands,
+        verifyMode,
         importedDeviceKeys: targets.importedDeviceKeys,
+        canary,
+        concurrencyLimit,
+        staggerDelay,
+        stopOnError,
       }
     );
     appendLog(`run async started: ${started.status}`);
@@ -834,7 +1063,8 @@ async function runAsync() {
     setStatus("failed");
     appendLog(String(error));
   } finally {
-    runAsyncBtn.disabled = false;
+    runAsyncBusy = false;
+    updateCreateActionState();
   }
 }
 
@@ -846,12 +1076,58 @@ importBtn.addEventListener("click", async () => {
   clearImportError();
   setImportInProgress(true);
   try {
-    const result = await client().importDevices(csvInput);
-    appendLog(`import success: valid=${result.devices.length}`);
+    const response = await fetch(`${currentApiBase()}/api/v2/devices/import/progress`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: csvInput,
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`POST /api/v2/devices/import/progress failed: ${response.status}`);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let importedCount = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.trim()) {
+          continue;
+        }
+        const event = JSON.parse(line);
+        if (event.type === "start") {
+          const total = Number(event.total || 0);
+          importProgressEl.max = total > 0 ? total : 1;
+          importProgressEl.value = 0;
+          importProgressTextEl.textContent = `Validating devices... 0/${total}`;
+        } else if (event.type === "progress") {
+          const processed = Number(event.processed || 0);
+          const total = Number(event.total || 0);
+          importProgressEl.max = total > 0 ? total : 1;
+          importProgressEl.value = processed;
+          importProgressTextEl.textContent = `Validating devices... ${processed}/${total}`;
+        } else if (event.type === "complete") {
+          importedCount = (event.devices || []).length;
+          const total = Number(event.total || importedCount);
+          importProgressEl.max = total > 0 ? total : 1;
+          importProgressEl.value = total;
+          importProgressTextEl.textContent = `Validating devices... ${total}/${total}`;
+        } else if (event.type === "error") {
+          throw new Error(formatImportErrorDetail(event.detail));
+        }
+      }
+    }
+    appendLog(`import success: valid=${importedCount}`);
     await refreshImportedDevices();
   } catch (error) {
     const message = String(error);
-    showImportError(`CSV import failed. ${message}`);
+    showImportError(message);
     appendLog(message);
   } finally {
     setImportInProgress(false);
@@ -872,6 +1148,7 @@ refreshActiveBtn.addEventListener("click", () => {
 
 useImportedEl.addEventListener("change", () => {
   importedDeviceListEl.parentElement.classList.toggle("hidden", !useImportedEl.checked);
+  refreshCanaryOptions();
 });
 
 enablePresetModeEl.addEventListener("change", async () => {
@@ -889,6 +1166,7 @@ enablePresetModeEl.addEventListener("change", async () => {
 
 osModelSelectEl.addEventListener("change", () => {
   renderImportedDeviceList();
+  refreshCanaryOptions();
   refreshPresetOptions().catch((error) => appendLog(String(error)));
 });
 
@@ -906,10 +1184,55 @@ presetSelectEl.addEventListener("change", () => {
 
 selectAllImportedBtn.addEventListener("click", () => {
   selectAllImported();
+  refreshCanaryOptions();
 });
 
 clearImportedSelectionBtn.addEventListener("click", () => {
   clearImportedSelection();
+  refreshCanaryOptions();
+});
+
+importedDeviceListEl.addEventListener("change", () => {
+  refreshCanaryOptions();
+});
+
+document.getElementById("devices").addEventListener("input", () => {
+  if (!useImportedEl.checked) {
+    refreshCanaryOptions();
+  }
+});
+
+statusRunBtn.addEventListener("click", async () => {
+  const selected = statusDeviceSelectEl.value.trim();
+  const commands = statusCommandsEl.value.trim();
+  if (!selected) {
+    statusOutputEl.textContent = "Please select a target device.";
+    return;
+  }
+  if (!commands) {
+    statusOutputEl.textContent = "Please enter at least one command.";
+    return;
+  }
+  const [host, rawPort] = selected.split(":");
+  const port = Number(rawPort || "22");
+  statusRunBtn.disabled = true;
+  statusOutputEl.textContent = "Running...";
+  try {
+    const result = await client().execStatusCommands(host, port, commands);
+    statusOutputEl.textContent = result.output || "(empty output)";
+    appendLog(`status command succeeded for ${host}:${port}`);
+  } catch (error) {
+    const text = String(error);
+    statusOutputEl.textContent = `Error: ${text}`;
+    appendLog(text);
+  } finally {
+    statusRunBtn.disabled = false;
+  }
+});
+
+viewActiveJobBtn?.addEventListener("click", async () => {
+  switchPage("monitor");
+  await refreshActive().catch((error) => appendLog(String(error)));
 });
 
 pauseBtn.addEventListener("click", async () => {
@@ -954,8 +1277,14 @@ clearBtn.addEventListener("click", () => {
 });
 
 document.querySelectorAll(".nav-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    switchPage(btn.getAttribute("data-page") || "import");
+  btn.addEventListener("click", async () => {
+    const page = btn.getAttribute("data-page") || "import";
+    switchPage(page);
+    if (page === "status-command") {
+      refreshImportedDevices().catch((error) => appendLog(String(error)));
+    } else if ((page === "monitor" || page === "detail") && selectedJobId) {
+      await loadAndRenderJob(selectedJobId, null);
+    }
   });
 });
 
@@ -964,6 +1293,7 @@ setInterval(() => {
 }, 4000);
 
 presetPanelEl.classList.add("hidden");
+updateCreateActionState();
 renderMonitorState();
 refreshImportedDevices().catch(() => {});
 refreshJobs().catch(() => {});

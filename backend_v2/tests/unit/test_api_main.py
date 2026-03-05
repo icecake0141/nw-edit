@@ -17,13 +17,16 @@
 # Review required for correctness, security, and licensing.
 """API-level tests for v2 scaffold."""
 
+import json
 import time
 
 from fastapi.testclient import TestClient
+import pytest
 
 import backend_v2.app.api.main as api_main
 
 from backend_v2.app.api.main import app
+from backend_v2.app.domain.models import DeviceExecutionResult, JobRunSummary, JobStatus
 
 
 class FailHostValidator:
@@ -33,6 +36,39 @@ class FailHostValidator:
         if device.host == "does-not-exist.local":
             return False, "connection failed"
         return True, None
+
+
+@pytest.fixture(autouse=True)
+def reset_in_memory_runtime_state():
+    """Ensure each test starts with a clean in-memory runtime state."""
+    deadline = time.monotonic() + 2.0
+    while True:
+        with api_main.run_coordinator._lock:
+            alive = [
+                thread
+                for thread in api_main.run_coordinator._threads.values()
+                if thread.is_alive()
+            ]
+        if not alive or time.monotonic() >= deadline:
+            break
+        time.sleep(0.05)
+    with api_main.run_coordinator._lock:
+        api_main.run_coordinator._threads = {
+            job_id: thread
+            for job_id, thread in api_main.run_coordinator._threads.items()
+            if thread.is_alive()
+        }
+    with api_main.store._lock:
+        api_main.store._jobs.clear()
+    with api_main.device_store._lock:
+        api_main.device_store._devices.clear()
+    with api_main.event_store._lock:
+        api_main.event_store._events_by_job.clear()
+    with api_main.run_store._lock:
+        api_main.run_store._latest_by_job.clear()
+    with api_main.control_store._lock:
+        api_main.control_store._controls.clear()
+    api_main.device_import_service.validator = api_main.SimulatedConnectionValidator()
 
 
 def test_health_endpoint():
@@ -146,6 +182,7 @@ def test_device_import_and_run_with_imported_devices():
         f"/api/v2/jobs/{job_id}/run",
         json={
             "commands": ["show version"],
+            "canary": {"host": "10.2.0.1", "port": 22},
         },
     )
     assert run_response.status_code == 200
@@ -200,14 +237,17 @@ def test_run_prefers_host_vars_over_global_vars():
 
     run_response = client.post(
         f"/api/v2/jobs/{job_id}/run",
-        json={"commands": ["hostname {{hostname}}"]},
+        json={
+            "commands": ["hostname {{hostname}}"],
+            "canary": {"host": "10.7.0.1", "port": 22},
+        },
     )
     assert run_response.status_code == 200
     payload = run_response.json()
     assert payload["status"] == "completed"
 
 
-def test_run_response_fields_are_consistent_strings():
+def test_run_rejects_when_canary_is_not_in_target_devices():
     client = TestClient(app)
     create_response = client.post(
         "/api/v2/jobs",
@@ -224,32 +264,65 @@ def test_run_response_fields_are_consistent_strings():
             "commands": ["show version"],
         },
     )
-    assert run_response.status_code == 200
-    payload = run_response.json()
-    assert payload["status"] == "failed"
-    device_result = payload["device_results"]["10.3.0.99:22"]
-    assert isinstance(device_result["pre_output"], str)
-    assert isinstance(device_result["apply_output"], str)
-    assert isinstance(device_result["post_output"], str)
-    assert isinstance(device_result["diff"], str)
-    assert isinstance(device_result["diff_truncated"], bool)
-    assert isinstance(device_result["diff_original_size"], int)
-    assert device_result["pre_output"] == ""
-    assert device_result["apply_output"] == ""
-    assert device_result["post_output"] == ""
-    assert device_result["diff"] == ""
+    assert run_response.status_code == 400
+    assert run_response.json()["detail"] == "Canary device must be in the device list"
 
 
 def test_list_jobs_endpoint():
     client = TestClient(app)
-    client.post("/api/v2/jobs", json={"job_name": "first", "creator": "a"})
-    client.post("/api/v2/jobs", json={"job_name": "second", "creator": "b"})
+    first = client.post("/api/v2/jobs", json={"job_name": "first", "creator": "a"})
+    assert first.status_code == 200
+    first_id = first.json()["job_id"]
+
+    run_first = client.post(
+        f"/api/v2/jobs/{first_id}/run",
+        json={
+            "devices": [{"host": "10.10.0.1", "port": 22}],
+            "canary": {"host": "10.10.0.1", "port": 22},
+            "commands": ["show version"],
+        },
+    )
+    assert run_first.status_code == 200
+
+    second = client.post("/api/v2/jobs", json={"job_name": "second", "creator": "b"})
+    assert second.status_code == 200
 
     response = client.get("/api/v2/jobs")
     assert response.status_code == 200
     jobs = response.json()
     assert len(jobs) >= 2
     assert all("job_id" in item and "status" in item for item in jobs)
+
+
+def test_create_job_returns_409_when_active_job_exists():
+    client = TestClient(app)
+    first = client.post("/api/v2/jobs", json={"job_name": "first", "creator": "ops"})
+    assert first.status_code == 200
+
+    second = client.post("/api/v2/jobs", json={"job_name": "second", "creator": "ops"})
+    assert second.status_code == 409
+    assert "already queued" in second.json()["detail"]
+
+
+def test_create_job_allowed_after_active_job_is_terminal():
+    client = TestClient(app)
+    first = client.post("/api/v2/jobs", json={"job_name": "first", "creator": "ops"})
+    assert first.status_code == 200
+    first_id = first.json()["job_id"]
+
+    run_first = client.post(
+        f"/api/v2/jobs/{first_id}/run",
+        json={
+            "devices": [{"host": "10.10.0.9", "port": 22}],
+            "canary": {"host": "10.10.0.9", "port": 22},
+            "commands": ["show version"],
+        },
+    )
+    assert run_first.status_code == 200
+    assert run_first.json()["status"] in {"completed", "failed", "cancelled"}
+
+    second = client.post("/api/v2/jobs", json={"job_name": "second", "creator": "ops"})
+    assert second.status_code == 200
 
 
 def test_active_job_endpoint():
@@ -309,9 +382,11 @@ def test_pause_resume_cancel_routes_exist():
     pause = client.post(f"/api/v2/jobs/{job_id}/pause")
     resume = client.post(f"/api/v2/jobs/{job_id}/resume")
     cancel = client.post(f"/api/v2/jobs/{job_id}/cancel")
+    terminate = client.post(f"/api/v2/jobs/{job_id}/terminate")
     assert pause.status_code in {200, 400, 409}
     assert resume.status_code in {200, 400, 409}
     assert cancel.status_code in {200, 400, 409}
+    assert terminate.status_code in {200, 400, 409}
 
 
 def test_async_pause_resume_cancel_flow(monkeypatch):
@@ -366,6 +441,43 @@ def test_async_pause_resume_cancel_flow(monkeypatch):
     assert cancel.status_code == 200
     assert cancel.json()["status"] == "cancelled"
     assert control.cancel_event.is_set() is True
+
+
+def test_terminate_alias_cancels_async_run(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+
+    create = client.post(
+        "/api/v2/jobs", json={"job_name": "async-terminate-flow", "creator": "ops"}
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    start = client.post(
+        f"/api/v2/jobs/{job_id}/run/async",
+        json={
+            "devices": [
+                {"host": "10.9.2.10", "port": 22},
+                {"host": "10.9.2.11", "port": 22},
+            ],
+            "canary": {"host": "10.9.2.10", "port": 22},
+            "commands": ["show version"],
+            "concurrency_limit": 1,
+            "stagger_delay": 0.0,
+        },
+    )
+    assert start.status_code == 200
+
+    for _ in range(20):
+        current = client.get(f"/api/v2/jobs/{job_id}")
+        assert current.status_code == 200
+        if current.json()["status"] == "running":
+            break
+        time.sleep(0.1)
+
+    terminate = client.post(f"/api/v2/jobs/{job_id}/terminate")
+    assert terminate.status_code == 200
+    assert terminate.json()["status"] == "cancelled"
 
 
 def test_sync_run_rejected_while_same_job_is_running_async(monkeypatch):
@@ -524,6 +636,7 @@ def test_run_with_imported_device_keys_limits_targets():
         json={
             "commands": ["show version"],
             "imported_device_keys": ["10.5.0.2:22"],
+            "canary": {"host": "10.5.0.2", "port": 22},
         },
     )
     assert run.status_code == 200
@@ -577,6 +690,7 @@ def test_run_uses_verify_commands_override_in_response():
             "commands": ["show version"],
             "imported_device_keys": ["10.6.0.1:22"],
             "verify_commands": ["show ip interface brief"],
+            "canary": {"host": "10.6.0.1", "port": 22},
         },
     )
     assert run.status_code == 200
@@ -606,7 +720,7 @@ def test_import_devices_returns_400_when_connection_validation_fails(monkeypatch
     assert detail["failed_rows"][0]["row_number"] == 2
 
 
-def test_import_devices_returns_400_when_csv_has_syntax_error():
+def test_import_devices_accepts_extra_column_values_for_v0_1_0_compatibility():
     client = TestClient(app)
     imported = client.post(
         "/api/v2/devices/import",
@@ -616,7 +730,247 @@ def test_import_devices_returns_400_when_csv_has_syntax_error():
         ),
         headers={"Content-Type": "text/plain"},
     )
-    assert imported.status_code == 400
-    detail = imported.json()["detail"]
-    assert len(detail["failed_rows"]) == 1
-    assert "CSV syntax error" in detail["failed_rows"][0]["error"]
+    assert imported.status_code == 200
+    payload = imported.json()
+    assert len(payload["devices"]) == 1
+    assert payload["devices"][0]["host"] == "10.6.0.2"
+
+
+def test_import_devices_skips_blank_lines_for_v0_1_0_compatibility():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "\n"
+            "10.6.0.3,22,cisco_ios,admin,pass,edge-a,show run,\n"
+            "\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+    payload = imported.json()
+    assert len(payload["devices"]) == 1
+    assert payload["devices"][0]["host"] == "10.6.0.3"
+
+
+def test_import_devices_accepts_header_casing_and_whitespace_variants():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            " Host ,Port,Device_Type,Username,Password,Name,Verify_Cmds,Host_Vars\n"
+            "10.6.0.4,22,cisco_ios,admin,pass,edge-a,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+    payload = imported.json()
+    assert len(payload["devices"]) == 1
+    assert payload["devices"][0]["host"] == "10.6.0.4"
+
+
+def test_status_command_exec_returns_output_for_imported_device():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.11.0.1,22,cisco_ios,admin,pass,edge,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+
+    response = client.post(
+        "/api/v2/commands/exec",
+        json={
+            "host": "10.11.0.1",
+            "port": 22,
+            "commands": "show version\nshow ip interface brief",
+        },
+    )
+    assert response.status_code == 200
+    output = response.json()["output"]
+    assert "$ show version" in output
+    assert "$ show ip interface brief" in output
+
+
+def test_status_command_exec_returns_404_for_unknown_device():
+    client = TestClient(app)
+    response = client.post(
+        "/api/v2/commands/exec",
+        json={"host": "10.11.9.9", "port": 22, "commands": "show version"},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Device not found"
+
+
+def test_status_command_exec_rejects_disruptive_commands():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.11.0.2,22,cisco_ios,admin,pass,edge,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+
+    response = client.post(
+        "/api/v2/commands/exec",
+        json={"host": "10.11.0.2", "port": 22, "commands": "reload"},
+    )
+    assert response.status_code == 400
+    assert "Potentially disruptive commands" in response.json()["detail"]
+
+
+def test_import_devices_progress_stream_success():
+    client = TestClient(app)
+    response = client.post(
+        "/api/v2/devices/import/progress",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.14.0.1,22,cisco_ios,admin,pass,edge-a,show run,\n"
+            "10.14.0.2,22,cisco_ios,admin,pass,edge-b,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 200
+    events = [json.loads(line) for line in response.text.splitlines() if line.strip()]
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "complete"
+    assert events[-1]["total"] == 2
+    assert len(events[-1]["devices"]) == 2
+
+
+def test_import_devices_progress_stream_emits_error_for_invalid_rows():
+    client = TestClient(app)
+    response = client.post(
+        "/api/v2/devices/import/progress",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.14.1.1,22,cisco_ios,admin,pass,edge-a,show run,\n"
+            "10.14.1.2,abc,cisco_ios,admin,pass,edge-b,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 200
+    events = [json.loads(line) for line in response.text.splitlines() if line.strip()]
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "error"
+    assert events[-1]["detail"]["message"] == "CSV import failed due to invalid rows"
+    assert len(events[-1]["detail"]["failed_rows"]) >= 1
+
+
+def test_run_verify_mode_none_disables_verify_commands(monkeypatch):
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.12.0.1,22,cisco_ios,admin,pass,edge-a,show run,\n"
+            "10.12.0.2,22,cisco_ios,admin,pass,edge-b,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+    created = client.post(
+        "/api/v2/jobs", json={"job_name": "verify-none", "creator": "t"}
+    )
+    assert created.status_code == 200
+    job_id = created.json()["job_id"]
+    captured: dict[str, object] = {}
+
+    def fake_run_job(**kwargs):
+        captured.update(kwargs)
+        return JobRunSummary(
+            job_id=job_id,
+            status=JobStatus.COMPLETED,
+            device_results={
+                "10.12.0.1:22": DeviceExecutionResult(status="success"),
+                "10.12.0.2:22": DeviceExecutionResult(status="success"),
+            },
+        )
+
+    monkeypatch.setattr(api_main.engine, "run_job", fake_run_job)
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "commands": ["show version"],
+            "verify_commands": ["show run"],
+            "verify_mode": "none",
+            "canary": {"host": "10.12.0.1", "port": 22},
+        },
+    )
+    assert run.status_code == 200
+    verify_by_device = captured["verify_commands_by_device"]
+    assert verify_by_device["10.12.0.1:22"] == []
+    assert verify_by_device["10.12.0.2:22"] == []
+
+
+def test_run_rejects_missing_canary():
+    client = TestClient(app)
+    create = client.post(
+        "/api/v2/jobs", json={"job_name": "missing-canary", "creator": "tester"}
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "devices": [{"host": "10.16.0.1", "port": 22}],
+            "commands": ["show version"],
+        },
+    )
+    assert run.status_code == 400
+    assert run.json()["detail"] == "canary is required"
+
+
+def test_run_verify_mode_canary_targets_only_canary(monkeypatch):
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.13.0.1,22,cisco_ios,admin,pass,edge-a,show run,\n"
+            "10.13.0.2,22,cisco_ios,admin,pass,edge-b,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+    created = client.post(
+        "/api/v2/jobs", json={"job_name": "verify-canary", "creator": "t"}
+    )
+    assert created.status_code == 200
+    job_id = created.json()["job_id"]
+    captured: dict[str, object] = {}
+
+    def fake_run_job(**kwargs):
+        captured.update(kwargs)
+        return JobRunSummary(
+            job_id=job_id,
+            status=JobStatus.COMPLETED,
+            device_results={
+                "10.13.0.1:22": DeviceExecutionResult(status="success"),
+                "10.13.0.2:22": DeviceExecutionResult(status="success"),
+            },
+        )
+
+    monkeypatch.setattr(api_main.engine, "run_job", fake_run_job)
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "imported_device_keys": ["10.13.0.1:22", "10.13.0.2:22"],
+            "canary": {"host": "10.13.0.2", "port": 22},
+            "commands": ["show version"],
+            "verify_commands": ["show run"],
+            "verify_mode": "canary",
+        },
+    )
+    assert run.status_code == 200
+    verify_by_device = captured["verify_commands_by_device"]
+    assert verify_by_device["10.13.0.1:22"] == []
+    assert verify_by_device["10.13.0.2:22"] == ["show run"]
