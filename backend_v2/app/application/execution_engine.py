@@ -157,8 +157,7 @@ class ExecutionEngine:
                     job_id=job_id,
                     device=device.key,
                     message=(
-                        f"Attempt {attempt + 1} failed, retrying in "
-                        f"{backoff:.1f}s"
+                        f"Attempt {attempt + 1} failed, retrying in " f"{backoff:.1f}s"
                     ),
                 )
             if attempt < retry_limit and backoff > 0:
