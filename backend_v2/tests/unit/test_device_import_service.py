@@ -51,8 +51,9 @@ def test_import_csv_parses_and_stores_valid_devices():
         validator=SimulatedConnectionValidator(),
     )
     result = service.import_csv(
-        "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
-        '10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run;show ip int br,"{""hostname"":""edge-1"",""site"":100}"\n'
+        "host,port,device_type,username,password,name,verify_cmds,host_vars,prod\n"
+        "10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run;show ip int br,"
+        '"{""hostname"":""edge-1"",""site"":100}",true\n'
     )
 
     assert len(result.devices) == 1
@@ -60,8 +61,25 @@ def test_import_csv_parses_and_stores_valid_devices():
     assert device.host == "10.0.0.1"
     assert device.verify_cmds == ["show run", "show ip int br"]
     assert device.host_vars == {"hostname": "edge-1", "site": "100"}
+    assert device.prod is True
     assert device.connection_ok is True
     assert result.failed_rows == []
+
+
+def test_import_csv_prod_defaults_false_for_blank_and_invalid_values():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password,prod\n"
+        "10.0.9.1,22,cisco_ios,admin,pass,\n"
+        "10.0.9.2,22,cisco_ios,admin,pass,maybe\n"
+        "10.0.9.3,22,cisco_ios,admin,pass,false\n"
+    )
+
+    assert len(result.devices) == 3
+    assert [device.prod for device in result.devices] == [False, False, False]
 
 
 def test_import_csv_normalizes_generic_linux_device_type():

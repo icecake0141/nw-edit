@@ -49,6 +49,42 @@ You may obtain a copy of the License at
       background: #fff;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      position: relative;
+      z-index: 1;
+    }
+    .prod-warning-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 160ms ease-in-out;
+      z-index: 0;
+      background:
+        repeating-linear-gradient(
+          135deg,
+          rgba(255, 176, 64, 0.14) 0px,
+          rgba(255, 176, 64, 0.14) 20px,
+          rgba(20, 20, 20, 0.05) 20px,
+          rgba(20, 20, 20, 0.05) 38px
+        );
+    }
+    .prod-warning-overlay.active {
+      opacity: 1;
+    }
+    .prod-warning-labels {
+      position: absolute;
+      inset: 0;
+      font-weight: 700;
+      color: rgba(110, 54, 0, 0.3);
+      letter-spacing: 0.04em;
+      font-size: clamp(11px, 1.1vw, 16px);
+      text-transform: uppercase;
+    }
+    .prod-warning-labels span {
+      position: absolute;
+      transform: rotate(-15deg);
+      white-space: nowrap;
+      text-shadow: 0 0 1px rgba(255, 255, 255, 0.28);
     }
     .head {
       display: flex;
@@ -486,6 +522,20 @@ You may obtain a copy of the License at
   </style>
 </head>
 <body>
+  <div id="prodWarningOverlay" class="prod-warning-overlay" aria-hidden="true">
+    <div class="prod-warning-labels">
+      <span style="top: 4%; left: 5%;">本番環境 / Production Environment</span>
+      <span style="top: 11%; left: 57%;">生产环境 / Production Environment</span>
+      <span style="top: 20%; left: 23%;">Environnement de Production</span>
+      <span style="top: 30%; left: 67%;">Produktionsumgebung</span>
+      <span style="top: 40%; left: 10%;">Среда Продакшн</span>
+      <span style="top: 49%; left: 50%;">Entorno de Produccion</span>
+      <span style="top: 58%; left: 31%;">Ambiente de Producao</span>
+      <span style="top: 66%; left: 72%;">بيئة الإنتاج</span>
+      <span style="top: 78%; left: 15%;">สภาพแวดล้อมการผลิต</span>
+      <span style="top: 88%; left: 49%;">Ambiente di Produzione</span>
+    </div>
+  </div>
   <div class="wrap">
     <div class="head">
       <h1>nw-edit v2 operations console</h1>
@@ -525,10 +575,10 @@ You may obtain a copy of the License at
     </section>
 
     <section class="panel page active" data-page="import">
-      <label for="csvInput">CSV Import (host,port,device_type,username,password,name,verify_cmds,host_vars)</label>
-      <textarea id="csvInput">host,port,device_type,username,password,name,verify_cmds,host_vars
-10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1""}"
-10.0.0.2,22,cisco_ios,admin,pass,edge-2,show ip interface brief,"{""hostname"":""edge-2""}"</textarea>
+      <label for="csvInput">CSV Import (host,port,device_type,username,password,name,verify_cmds,host_vars,prod)</label>
+      <textarea id="csvInput">host,port,device_type,username,password,name,verify_cmds,host_vars,prod
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1""}",false
+10.0.0.2,22,cisco_ios,admin,pass,edge-2,show ip interface brief,"{""hostname"":""edge-2""}",true</textarea>
       <div class="btn-row">
         <button class="secondary" id="importBtn" title="Import devices from the CSV text above and validate each row.">Import CSV</button>
         <button class="secondary" id="refreshDevicesBtn" title="Refresh the currently stored imported device list from backend memory.">Refresh Devices</button>
@@ -719,9 +769,9 @@ clock timezone JST {{tz_offset}}</pre>
 
         <h3>3) Host Vars (per-device CSV)</h3>
         <p>Use CSV column <code>host_vars</code> as a JSON object string:</p>
-        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars
-10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1"",""tz_offset"":""9""}"
-10.0.0.2,22,cisco_ios,admin,pass,edge-2,show run,"{""hostname"":""edge-2""}"</pre>
+        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1"",""tz_offset"":""9""}",true
+10.0.0.2,22,cisco_ios,admin,pass,edge-2,show run,"{""hostname"":""edge-2""}",false</pre>
 
         <h3>4) Resolution Priority</h3>
         <p>
@@ -764,6 +814,15 @@ host_vars for 10.0.0.1:
         <pre>clock timezone JST 9
 ntp server 192.0.2.20
 hostname edge-1</pre>
+
+        <h3>8) Production Host Flag</h3>
+        <p>
+          Optional CSV column <code>prod</code> marks production hosts.
+          <code>true</code> enables production warning UI in Create/Monitor/Detail pages when selected targets include that host.
+        </p>
+        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
+10.0.0.10,22,cisco_ios,admin,pass,core-prod,show run,"{""hostname"":""core-prod""}",true
+10.0.0.20,22,cisco_ios,admin,pass,edge-dev,show run,"{""hostname"":""edge-dev""}",false</pre>
       </div>
     </section>
   </div>

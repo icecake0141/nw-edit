@@ -59,6 +59,7 @@ make check-integration
 - Use `{{var}}` placeholders in run commands.
 - Define job-level `global_vars` at `POST /api/v2/jobs`.
 - Define per-host `host_vars` in CSV import (`host_vars` column as JSON object string).
+- Optional CSV column `prod` flags production hosts (`true` means production, others are treated as `false`).
 - Resolution order is `host_vars > global_vars`.
 - Missing variables fail preflight with `HTTP 400` before any device command runs.
 - The frontend `Help` tab includes practical variable examples (`global_vars` / `host_vars` / substitution results).

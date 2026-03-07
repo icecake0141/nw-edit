@@ -137,6 +137,7 @@ class DeviceProfileResponse(BaseModel):
     name: Optional[str] = None
     verify_cmds: List[str]
     host_vars: Dict[str, str] = Field(default_factory=dict)
+    prod: bool = False
     connection_ok: bool
     error_message: Optional[str] = None
 

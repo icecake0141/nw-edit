@@ -40,8 +40,8 @@ You may obtain a copy of the License at
 ## CSV形式
 
 ```csv
-host,port,device_type,username,password,name,verify_cmds,host_vars
-192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp,"{""hostname"":""router-1""}"
+host,port,device_type,username,password,name,verify_cmds,host_vars,prod
+192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp,"{""hostname"":""router-1""}",true
 ```
 
 ### カラム
@@ -56,6 +56,7 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
 | `name` | いいえ | 表示名 | - |
 | `verify_cmds` | いいえ | `;` 区切りの検証コマンド | - |
 | `host_vars` | いいえ | ホスト毎テンプレート変数(JSONオブジェクト文字列) | - |
+| `prod` | いいえ | 本番ホストフラグ（`true` で本番） | `false` |
 
 ## コマンドテンプレート変数
 

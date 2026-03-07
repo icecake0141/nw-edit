@@ -217,6 +217,7 @@ class DeviceImportService:
                     )
                     continue
                 host_vars = {str(key): str(value) for key, value in loaded.items()}
+            prod = (normalized.get("prod") or "").strip().lower() == "true"
             parsed_entries.append(
                 (
                     row_number,
@@ -232,6 +233,7 @@ class DeviceImportService:
                         name=normalized.get("name") or None,
                         verify_cmds=verify_cmds,
                         host_vars=host_vars,
+                        prod=prod,
                     ),
                 )
             )
