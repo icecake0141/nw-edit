@@ -487,6 +487,12 @@ You may obtain a copy of the License at
         <select id="presetSelect">
           <option value="">(not selected)</option>
         </select>
+        <label for="presetName">Preset Name</label>
+        <input id="presetName" type="text" placeholder="e.g. ios baseline" />
+        <div class="btn-row">
+          <button class="secondary" id="presetSaveNewBtn" type="button" title="Save current commands as a new preset for selected OS model.">Save New Preset</button>
+          <button class="secondary" id="presetUpdateBtn" type="button" title="Update currently selected preset with current commands/verify commands." disabled>Update Selected Preset</button>
+        </div>
       </div>
       <label for="commands">Commands (one line each)</label>
       <textarea id="commands">show version

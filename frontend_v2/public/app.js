@@ -38,6 +38,9 @@ const enablePresetModeEl = document.getElementById("enablePresetMode");
 const presetPanelEl = document.getElementById("presetPanel");
 const osModelSelectEl = document.getElementById("osModelSelect");
 const presetSelectEl = document.getElementById("presetSelect");
+const presetNameEl = document.getElementById("presetName");
+const presetSaveNewBtn = document.getElementById("presetSaveNewBtn");
+const presetUpdateBtn = document.getElementById("presetUpdateBtn");
 const runBtn = document.getElementById("runBtn");
 const runAsyncBtn = document.getElementById("runAsyncBtn");
 const pauseBtn = document.getElementById("pauseBtn");
@@ -75,6 +78,7 @@ let currentPresets = [];
 let monitorResultLoading = false;
 let runSyncBusy = false;
 let runAsyncBusy = false;
+let presetActionBusy = false;
 /** @type {import("./api-client.js").JobDetail|null} */
 let activeBlockingJob = null;
 const monitorState = {
@@ -127,6 +131,7 @@ function updateCreateActionState() {
   const blocked = Boolean(activeBlockingJob);
   runBtn.disabled = blocked || runSyncBusy;
   runAsyncBtn.disabled = blocked || runAsyncBusy;
+  setPresetActionState();
   if (!activeJobBannerEl || !activeJobBannerTextEl) {
     return;
   }
@@ -351,15 +356,18 @@ function populateOsModelSelect(models) {
 }
 
 async function refreshPresetOptions() {
+  const preferredPresetId = presetSelectEl.value;
   if (!enablePresetModeEl.checked) {
     currentPresets = [];
     presetSelectEl.innerHTML = '<option value="">(not selected)</option>';
+    setPresetActionState();
     return;
   }
   const model = selectedOsModel();
   presetSelectEl.innerHTML = '<option value="">(not selected)</option>';
   if (!model) {
     currentPresets = [];
+    setPresetActionState();
     return;
   }
   currentPresets = await client().listPresets(model);
@@ -369,6 +377,107 @@ async function refreshPresetOptions() {
     option.textContent = preset.name;
     presetSelectEl.append(option);
   });
+  if (preferredPresetId && currentPresets.some((preset) => preset.preset_id === preferredPresetId)) {
+    presetSelectEl.value = preferredPresetId;
+  }
+  setPresetActionState();
+}
+
+function setPresetActionState() {
+  if (!presetSaveNewBtn || !presetUpdateBtn || !presetNameEl) {
+    return;
+  }
+  const modeEnabled = enablePresetModeEl.checked;
+  const blocked = Boolean(activeBlockingJob) || presetActionBusy;
+  presetNameEl.disabled = !modeEnabled || blocked;
+  presetSaveNewBtn.disabled = !modeEnabled || blocked;
+  presetUpdateBtn.disabled =
+    !modeEnabled || blocked || !presetSelectEl.value || currentPresets.length === 0;
+}
+
+function buildPresetPayloadFromForm() {
+  const osModel = selectedOsModel();
+  if (!enablePresetModeEl.checked) {
+    throw new Error("Preset Mode is disabled");
+  }
+  if (!osModel) {
+    throw new Error("os_model is required");
+  }
+  const name = presetNameEl.value.trim();
+  if (!name) {
+    throw new Error("preset name is required");
+  }
+  const commands = parseCommands(document.getElementById("commands").value);
+  if (commands.length === 0) {
+    throw new Error("commands is empty");
+  }
+  const verifyCommands = parseCommands(verifyCommandsEl.value);
+  return {
+    name,
+    os_model: osModel,
+    commands,
+    verify_commands: verifyCommands,
+  };
+}
+
+async function savePresetNew() {
+  let payload;
+  try {
+    payload = buildPresetPayloadFromForm();
+  } catch (error) {
+    appendLog(String(error));
+    return;
+  }
+
+  presetActionBusy = true;
+  setPresetActionState();
+  try {
+    const created = await client().createPreset(payload);
+    await refreshPresetOptions();
+    if (currentPresets.some((preset) => preset.preset_id === created.preset_id)) {
+      presetSelectEl.value = created.preset_id;
+    }
+    setPresetActionState();
+    appendLog(`preset saved: ${created.name} (${created.os_model})`);
+  } catch (error) {
+    appendLog(String(error));
+  } finally {
+    presetActionBusy = false;
+    setPresetActionState();
+  }
+}
+
+async function updateSelectedPreset() {
+  const presetId = presetSelectEl.value.trim();
+  if (!presetId) {
+    appendLog("preset selection is required for update");
+    return;
+  }
+
+  let payload;
+  try {
+    payload = buildPresetPayloadFromForm();
+  } catch (error) {
+    appendLog(String(error));
+    return;
+  }
+
+  presetActionBusy = true;
+  setPresetActionState();
+  try {
+    const updated = await client().updatePreset(presetId, payload);
+    await refreshPresetOptions();
+    if (currentPresets.some((preset) => preset.preset_id === updated.preset_id)) {
+      presetSelectEl.value = updated.preset_id;
+    }
+    setPresetActionState();
+    appendLog(`preset updated: ${updated.name} (${updated.os_model})`);
+  } catch (error) {
+    appendLog(String(error));
+  } finally {
+    presetActionBusy = false;
+    setPresetActionState();
+  }
 }
 
 function openJobSocket(apiBase, jobId) {
@@ -1194,17 +1303,21 @@ enablePresetModeEl.addEventListener("change", async () => {
   if (!enablePresetModeEl.checked) {
     osModelSelectEl.value = "";
     presetSelectEl.value = "";
+    presetNameEl.value = "";
     await refreshPresetOptions().catch((error) => appendLog(String(error)));
+    setPresetActionState();
     renderImportedDeviceList();
     return;
   }
   await refreshPresetOptions().catch((error) => appendLog(String(error)));
+  setPresetActionState();
   renderImportedDeviceList();
 });
 
 osModelSelectEl.addEventListener("change", () => {
   renderImportedDeviceList();
   refreshCanaryOptions();
+  presetNameEl.value = "";
   refreshPresetOptions().catch((error) => appendLog(String(error)));
 });
 
@@ -1213,11 +1326,22 @@ presetSelectEl.addEventListener("change", () => {
     (preset) => preset.preset_id === presetSelectEl.value
   );
   if (!selected) {
+    setPresetActionState();
     return;
   }
+  presetNameEl.value = selected.name;
   document.getElementById("commands").value = selected.commands.join("\n");
   verifyCommandsEl.value = selected.verify_commands.join("\n");
+  setPresetActionState();
   appendLog(`preset applied: ${selected.name} (${selected.os_model})`);
+});
+
+presetSaveNewBtn?.addEventListener("click", () => {
+  savePresetNew().catch((error) => appendLog(String(error)));
+});
+
+presetUpdateBtn?.addEventListener("click", () => {
+  updateSelectedPreset().catch((error) => appendLog(String(error)));
 });
 
 selectAllImportedBtn.addEventListener("click", () => {
@@ -1338,6 +1462,7 @@ setInterval(() => {
 
 presetPanelEl.classList.add("hidden");
 updateCreateActionState();
+setPresetActionState();
 renderMonitorState();
 refreshImportedDevices().catch(() => {});
 refreshJobs().catch(() => {});

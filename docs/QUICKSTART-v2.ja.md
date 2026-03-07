@@ -88,6 +88,16 @@ curl -s -X POST http://127.0.0.1:8010/api/v2/presets \
 curl -s "http://127.0.0.1:8010/api/v2/presets?os_model=cisco_ios"
 ```
 
+7. Create画面のプリセット運用（手動保存のみ）
+
+- Create画面で `Preset Mode` を有効化。
+- `Target OS Model` を選択。
+- `Preset Name` を入力し、次を利用:
+  - `Save New Preset`: 新規保存
+  - `Update Selected Preset`: 選択中プリセットを上書き更新
+- `Save New Preset` で同一 `name + os_model` が存在する場合は `HTTP 409`。
+- Run成功時の自動保存は行われません。
+
 ## 4. ローカル検証ショートカット
 
 ```bash

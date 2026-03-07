@@ -96,6 +96,16 @@ curl -s -X POST http://127.0.0.1:8010/api/v2/presets \
 curl -s "http://127.0.0.1:8010/api/v2/presets?os_model=cisco_ios"
 ```
 
+7. Create page preset workflow (manual save only)
+
+- Enable `Preset Mode` on Create page.
+- Select `Target OS Model`.
+- Enter `Preset Name`, then click:
+  - `Save New Preset` to create a new preset.
+  - `Update Selected Preset` to overwrite selected preset.
+- Duplicate `name + os_model` on `Save New Preset` returns `HTTP 409`.
+- Presets are not auto-saved when a run succeeds.
+
 ## 4. Local validation shortcuts
 
 ```bash

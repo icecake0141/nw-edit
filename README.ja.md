@@ -63,14 +63,20 @@ make check-integration
 
 ## 実行プリセット（v2）
 
-- 成功した実行条件を `実行プリセット` として保存し、再利用できます。
+- 実行画面（Create）で実行条件を `実行プリセット` として保存し、再利用できます。
 - プリセットは `os_model`（`device_type`）単位で管理し、次を保持します。
   - `commands`
   - `verify_commands`
 - 保存先はローカルJSONファイルです（`NW_EDIT_V2_PRESET_FILE`、既定: `backend_v2/data/run_presets.json`）。
+- 実行画面のプリセット操作:
+  - `Save New Preset`: 現在の `os_model` / `name` / `commands` / `verify_commands` で新規保存
+  - `Update Selected Preset`: 選択中プリセットを現在のコマンド内容で更新
+  - 同一 `name + os_model` で新規保存すると `HTTP 409`
+  - Run成功時の自動保存は未対応
 - 実行画面では次の順で利用します。
   - 対象OSモデルを選択
   - 実行プリセットを選択
+  - 保存/更新時はプリセット名を入力
   - import済みデバイスから適用対象を選択（初期未選択）
 
 ## ドキュメント
