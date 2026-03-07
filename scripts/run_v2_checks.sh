@@ -14,6 +14,8 @@
 
 set -euo pipefail
 
+PYTHON_BIN="${PYTHON:-python3.12}"
+
 compose_cmd=""
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   compose_cmd="docker compose"
@@ -22,7 +24,7 @@ elif command -v docker-compose >/dev/null 2>&1; then
 fi
 
 missing=()
-for cmd in python3; do
+for cmd in "${PYTHON_BIN}"; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
     missing+=("${cmd}")
   fi
@@ -30,29 +32,32 @@ done
 
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "[v2-checks] missing required commands: ${missing[*]}"
-  echo "[v2-checks] install dev dependencies first: python3 -m pip install -r backend_v2/requirements-dev.txt"
+  echo "[v2-checks] set PYTHON=python3.12 or install Python 3.12 and dev dependencies"
+  echo "[v2-checks] example: ${PYTHON_BIN} -m pip install -r backend_v2/requirements-dev.txt"
   exit 2
 fi
 
+echo "[v2-checks] python: $(${PYTHON_BIN} --version)"
+
 echo "[v2-checks] black"
-python3 -m black --check backend_v2/app backend_v2/tests
+"${PYTHON_BIN}" -m black --check backend_v2/app backend_v2/tests
 
 echo "[v2-checks] flake8"
-python3 -m flake8 backend_v2/app backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
+"${PYTHON_BIN}" -m flake8 backend_v2/app backend_v2/tests --max-line-length=120 --extend-ignore=E203,W503
 
 echo "[v2-checks] mypy (backend_v2)"
-python3 -m mypy --explicit-package-bases backend_v2/app
+"${PYTHON_BIN}" -m mypy --explicit-package-bases backend_v2/app
 
 echo "[v2-checks] pre-commit"
-PRE_COMMIT_HOME="${PRE_COMMIT_HOME:-.pre-commit-cache}" python3 -m pre_commit run --all-files
+PRE_COMMIT_HOME="${PRE_COMMIT_HOME:-.pre-commit-cache}" "${PYTHON_BIN}" -m pre_commit run --all-files
 
 echo "[v2-checks] py_compile"
-PYTHONPYCACHEPREFIX=.pycache python3 -m py_compile \
+PYTHONPYCACHEPREFIX=.pycache "${PYTHON_BIN}" -m py_compile \
   backend_v2/app/api/main.py \
   backend_v2/app/application/execution_engine.py
 
 echo "[v2-checks] pytest"
-PYTHONPATH=. python3 -m pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=term
+PYTHONPATH=. "${PYTHON_BIN}" -m pytest backend_v2/tests/unit -v --cov=backend_v2/app --cov-report=term
 
 if [[ "${RUN_INTEGRATION:-0}" == "1" ]]; then
   if [[ "${AUTO_START_MOCK_SSH:-1}" == "1" ]]; then
@@ -61,7 +66,7 @@ if [[ "${RUN_INTEGRATION:-0}" == "1" ]]; then
       ${compose_cmd} --profile test up -d mock-ssh >/dev/null
       trap "${compose_cmd} --profile test down >/dev/null || true" EXIT
       echo "[v2-checks] waiting for mock SSH on localhost:2222"
-      python3 - <<'PY'
+      "${PYTHON_BIN}" - <<'PY'
 import socket
 import time
 
@@ -88,5 +93,5 @@ PY
   fi
 
   echo "[v2-checks] integration"
-  PYTHONPATH=. python3 -m pytest backend_v2/tests/integration -v -m integration
+  PYTHONPATH=. "${PYTHON_BIN}" -m pytest backend_v2/tests/integration -v -m integration
 fi
