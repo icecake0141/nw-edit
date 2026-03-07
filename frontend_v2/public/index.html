@@ -423,6 +423,54 @@ You may obtain a copy of the License at
     .help-content pre {
       max-height: none;
     }
+    .review-panel {
+      border: 1px solid #98b3d0;
+      background: #f8fbff;
+      border-radius: 6px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .review-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .review-block {
+      border: 1px solid #c9d8ea;
+      background: #fff;
+      border-radius: 4px;
+      padding: 10px;
+    }
+    .review-block h4 {
+      margin: 0 0 6px;
+      font-size: 0.9rem;
+    }
+    .review-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.86rem;
+      line-height: 1.4;
+      max-height: 220px;
+      overflow: auto;
+      word-break: break-word;
+    }
+    .review-flow {
+      border: 1px dashed #90a9c7;
+      border-radius: 4px;
+      padding: 10px;
+      font-size: 0.85rem;
+      background: #f4f8fd;
+      overflow: auto;
+      white-space: pre;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    @media (max-width: 700px) {
+      .review-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     @media (max-width: 980px) {
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .field-wide { grid-column: span 2; }
@@ -460,7 +508,7 @@ You may obtain a copy of the License at
     </div>
 
     <section class="panel grid">
-      <div>
+      <div id="apiBaseField">
         <label for="apiBase">API Base</label>
         <input id="apiBase" value="http://127.0.0.1:8010" />
       </div>
@@ -554,9 +602,45 @@ show ip interface brief</textarea>
       <label for="staggerDelay">Stagger Delay (seconds)</label>
       <input id="staggerDelay" type="number" min="0" max="60" step="0.1" value="1.0" />
       <label class="checkbox-row"><input type="checkbox" id="stopOnError" checked /> Stop on Error</label>
+      <label class="checkbox-row"><input type="checkbox" id="enableRunConfirmation" checked /> 実行前確認を使う（default ON）</label>
+      <label for="postCanaryStrategy">Canary後の実行方式</label>
+      <select id="postCanaryStrategy">
+        <option value="parallel" selected>Canary → Async Parallel</option>
+        <option value="sequential">Canary → Sequential (1台ずつ)</option>
+      </select>
       <div class="btn-row">
         <button class="primary" id="runBtn" title="Create a job and start execution in the current page flow.">Create + Run</button>
         <button class="primary" id="runAsyncBtn" title="Create a job and start execution asynchronously without blocking.">Create + Run Async</button>
+      </div>
+      <div id="runReviewPanel" class="review-panel hidden">
+        <div><strong>実行前最終確認</strong></div>
+        <div class="muted" id="reviewModeText">Execution mode: -</div>
+        <div class="review-grid">
+          <div class="review-block">
+            <h4>対象ホスト <button class="secondary" id="reviewToggleHostsBtn" type="button" title="Toggle host list visibility.">Collapse</button></h4>
+            <ol id="reviewTargetHosts" class="review-list"></ol>
+          </div>
+          <div class="review-block">
+            <h4>実行コマンド</h4>
+            <ol id="reviewCommands" class="review-list"></ol>
+          </div>
+          <div class="review-block">
+            <h4>確認用コマンド</h4>
+            <ol id="reviewVerifyCommands" class="review-list"></ol>
+          </div>
+          <div class="review-block">
+            <h4>実行設定</h4>
+            <ul id="reviewSettings" class="review-list"></ul>
+          </div>
+        </div>
+        <div class="review-block">
+          <h4>実行順の説明（ブロック図）</h4>
+          <div id="reviewFlowDiagram" class="review-flow"></div>
+        </div>
+        <div class="btn-row">
+          <button class="primary" id="reviewExecuteBtn" type="button" title="Approve current review and execute run.">この内容で実行</button>
+          <button class="secondary" id="reviewCancelBtn" type="button" title="Cancel review panel and return to edit mode.">確認を閉じる</button>
+        </div>
       </div>
     </section>
 
