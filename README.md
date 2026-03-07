@@ -75,6 +75,23 @@ make check-integration
   - choose preset
   - choose imported target devices (initially unselected)
 
+## Pre-run review flow (v2)
+
+- Create page now supports a final review step before execution.
+- `実行前確認を使う` toggle is enabled by default (UI-state only; resets on page reload).
+- Existing buttons are unchanged:
+  - `Create + Run` uses `/api/v2/jobs/{job_id}/run`
+  - `Create + Run Async` uses `/api/v2/jobs/{job_id}/run/async`
+- If review is enabled, both buttons open a review panel first and list:
+  - target hosts
+  - run commands
+  - verify commands
+  - effective run settings
+- `Canary後の実行方式` controls post-canary fanout:
+  - `Canary -> Async Parallel` uses input `concurrency_limit`
+  - `Canary -> Sequential (1台ずつ)` forces `concurrency_limit=1`
+- No backend API changes were added; strategy is mapped only to `concurrency_limit`.
+
 ## Documentation
 
 - Full index (EN/JA): [docs/INDEX.md](docs/INDEX.md)
