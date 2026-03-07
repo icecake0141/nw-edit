@@ -31,6 +31,8 @@ const historyEl = document.getElementById("history");
 const deviceCountEl = document.getElementById("deviceCount");
 const importProgressEl = document.getElementById("importProgress");
 const importProgressTextEl = document.getElementById("importProgressText");
+const importLoadingEl = document.getElementById("importLoading");
+const importStreamLogEl = document.getElementById("importStreamLog");
 const importErrorsEl = document.getElementById("importErrors");
 const importedDeviceListEl = document.getElementById("importedDeviceList");
 const importedDeviceHintEl = document.getElementById("importedDeviceHint");
@@ -167,6 +169,30 @@ function appendLog(message) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function appendImportStreamLog(message) {
+  if (!importStreamLogEl) {
+    return;
+  }
+  const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+  importStreamLogEl.textContent += `${line}\n`;
+  importStreamLogEl.scrollTop = importStreamLogEl.scrollHeight;
+}
+
+function resetImportStreamLog() {
+  if (!importStreamLogEl) {
+    return;
+  }
+  importStreamLogEl.textContent = "";
+}
+
+function setImportStreamVisible(visible) {
+  if (!importLoadingEl || !importStreamLogEl) {
+    return;
+  }
+  importLoadingEl.classList.toggle("hidden", !visible);
+  importStreamLogEl.classList.toggle("hidden", !visible);
+}
+
 function isActiveRunBlocking(status) {
   return ["queued", "running", "paused"].includes(String(status || "").toLowerCase());
 }
@@ -190,6 +216,7 @@ function updateCreateActionState() {
 
 function setImportInProgress(inProgress) {
   importBtn.disabled = inProgress;
+  setImportStreamVisible(inProgress);
   if (inProgress) {
     importProgressEl.classList.remove("hidden");
     importProgressTextEl.classList.remove("hidden");
@@ -270,6 +297,32 @@ function parseGlobalVars(text) {
 
 function importedDeviceKey(device) {
   return `${device.host}:${device.port}`;
+}
+
+function resolveHostname(device) {
+  const name = String(device?.name || "").trim();
+  if (name) {
+    return name;
+  }
+  const hostVarsHostname = String(device?.host_vars?.hostname || "").trim();
+  if (hostVarsHostname) {
+    return hostVarsHostname;
+  }
+  return String(device?.host || "");
+}
+
+function buildDeviceDisplayMap(devices) {
+  return Object.fromEntries(
+    devices.map((device) => [importedDeviceKey(device), resolveHostname(device)])
+  );
+}
+
+function hostFromDeviceKey(deviceKey) {
+  const delimiter = String(deviceKey || "").lastIndexOf(":");
+  if (delimiter <= 0) {
+    return String(deviceKey || "");
+  }
+  return deviceKey.slice(0, delimiter);
 }
 
 function canaryOptionLabel(item) {
@@ -631,7 +684,7 @@ function buildExecutionSummaryHtml(source, eventCount) {
   `;
 }
 
-function buildDeviceCardsHtml(source) {
+function buildDeviceCardsHtml(source, deviceNameMap = {}) {
   const keys = combineDeviceKeys(source);
   if (keys.length === 0) {
     return '<div class="muted">No target devices yet</div>';
@@ -648,9 +701,10 @@ function buildDeviceCardsHtml(source) {
       const mergedLines = streamLines.length > 0 ? streamLines : fallbackResultLines;
       const streamText = mergedLines.length > 0 ? mergedLines.join("\n") : "No logs yet...";
       const isCanary = source.canaryKey === key;
+      const hostname = String(deviceNameMap[key] || "").trim() || hostFromDeviceKey(key);
       return `
         <div class="device-card status-${status}" id="device-card-${key.replace(":", "-")}">
-          <h4>${escapeHtml(key)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
+          <h4>${escapeHtml(`${key} (${hostname})`)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
           <div class="meta">Attempts: ${attempts || "-"} ${error ? `/ Error: ${escapeHtml(error)}` : ""}</div>
           <div class="output-label">Command Stream</div>
           <pre class="stream-output">${escapeHtml(streamText)}</pre>
@@ -665,13 +719,19 @@ function buildDeviceCardsHtml(source) {
     .join("");
 }
 
-function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0) {
+function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0, deviceNameMap = {}) {
   summaryEl.innerHTML = buildExecutionSummaryHtml(source, eventCount);
-  devicesEl.innerHTML = buildDeviceCardsHtml(source);
+  devicesEl.innerHTML = buildDeviceCardsHtml(source, deviceNameMap);
 }
 
 function renderMonitorState() {
-  renderExecutionPanel(monitorSummaryEl, monitorDevicesEl, monitorState, monitorState.eventCount);
+  renderExecutionPanel(
+    monitorSummaryEl,
+    monitorDevicesEl,
+    monitorState,
+    monitorState.eventCount,
+    buildDeviceDisplayMap(importedDevices)
+  );
 }
 
 async function handleJobSocketMessage(data) {
@@ -796,7 +856,13 @@ function renderJobDetail(job, events, result) {
     deviceStatuses: {},
     streamLogs: {},
   };
-  renderExecutionPanel(detailSummaryEl, detailDevicesEl, detailSource, events.length);
+  renderExecutionPanel(
+    detailSummaryEl,
+    detailDevicesEl,
+    detailSource,
+    events.length,
+    buildDeviceDisplayMap(importedDevices)
+  );
   refreshProdWarningOverlay();
 }
 
@@ -1266,7 +1332,9 @@ importBtn.addEventListener("click", async () => {
   const csvInput = document.getElementById("csvInput").value;
   const importedCountBeforeImport = importedDevices.length;
   clearImportError();
+  resetImportStreamLog();
   setImportInProgress(true);
+  appendImportStreamLog("Import started");
   try {
     const response = await fetch(`${currentApiBase()}/api/v2/devices/import/progress`, {
       method: "POST",
@@ -1299,12 +1367,17 @@ importBtn.addEventListener("click", async () => {
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = 0;
           importProgressTextEl.textContent = `Validating devices... 0/${total}`;
+          appendImportStreamLog(`Validation started (total=${total})`);
         } else if (event.type === "progress") {
           const processed = Number(event.processed || 0);
           const total = Number(event.total || 0);
+          const host = String(event.host || "?");
+          const port = Number(event.port || 0);
+          const result = event.connection_ok === true ? "OK" : "NG";
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = processed;
           importProgressTextEl.textContent = `Validating devices... ${processed}/${total}`;
+          appendImportStreamLog(`${host}:${port || "?"} ${result} (${processed}/${total})`);
           if (event.connection_ok === true) {
             successfulProgressCount += 1;
           }
@@ -1317,8 +1390,11 @@ importBtn.addEventListener("click", async () => {
           importProgressEl.value = total;
           importProgressTextEl.textContent = `Validating devices... ${total}/${total}`;
           deviceCountEl.textContent = `imported devices: ${importedCount}`;
+          appendImportStreamLog(`Import completed (valid=${importedCount}, total=${total})`);
         } else if (event.type === "error") {
-          throw new Error(formatImportErrorDetail(event.detail));
+          const message = formatImportErrorDetail(event.detail);
+          appendImportStreamLog(`Import error: ${message}`);
+          throw new Error(message);
         }
       }
     }
@@ -1328,6 +1404,7 @@ importBtn.addEventListener("click", async () => {
     const message = String(error);
     deviceCountEl.textContent = `imported devices: ${importedCountBeforeImport}`;
     showImportError(message);
+    appendImportStreamLog(`Import failed: ${message}`);
     appendLog(message);
   } finally {
     setImportInProgress(false);
