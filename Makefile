@@ -11,18 +11,19 @@
 # Review required for correctness, security, and licensing.
 
 .PHONY: check check-integration typecheck precommit start-v2 verify
+PYTHON ?= python3.12
 
 check:
-	./scripts/run_v2_checks.sh
+	PYTHON=$(PYTHON) ./scripts/run_v2_checks.sh
 
 check-integration:
-	RUN_INTEGRATION=1 ./scripts/run_v2_checks.sh
+	PYTHON=$(PYTHON) RUN_INTEGRATION=1 ./scripts/run_v2_checks.sh
 
 typecheck:
-	python3 -m mypy --explicit-package-bases backend_v2/app
+	$(PYTHON) -m mypy --explicit-package-bases backend_v2/app
 
 precommit:
-	PRE_COMMIT_HOME=.pre-commit-cache python3 -m pre_commit run --all-files
+	PRE_COMMIT_HOME=.pre-commit-cache $(PYTHON) -m pre_commit run --all-files
 
 start-v2:
 	./start_v2.sh
