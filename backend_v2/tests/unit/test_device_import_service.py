@@ -52,10 +52,8 @@ def test_import_csv_parses_and_stores_valid_devices():
     )
     result = service.import_csv(
         "host,port,device_type,username,password,name,verify_cmds,host_vars,prod\n"
-        (
-            '10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run;show ip int br,'
-            '"{""hostname"":""edge-1"",""site"":100}",true\n'
-        )
+        "10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run;show ip int br,"
+        '"{""hostname"":""edge-1"",""site"":100}",true\n'
     )
 
     assert len(result.devices) == 1
