@@ -66,14 +66,20 @@ make check-integration
 
 ## Execution presets (v2)
 
-- Save successful run conditions as reusable `実行プリセット` (execution presets).
+- Save and reuse execution conditions as `実行プリセット` (execution presets) from the Create page.
 - Presets are scoped by `os_model` (`device_type`) and contain:
   - `commands`
   - `verify_commands`
 - Presets are stored in local JSON file (`NW_EDIT_V2_PRESET_FILE`, default: `backend_v2/data/run_presets.json`).
+- Create page preset actions:
+  - `Save New Preset`: create a new preset from current `os_model`, `name`, `commands`, and `verify_commands`
+  - `Update Selected Preset`: update currently selected preset with current command inputs
+  - duplicate `name + os_model` on save returns `HTTP 409`
+  - auto-save on run success is not supported
 - Create page flow:
   - choose OS model
   - choose preset
+  - enter preset name when saving/updating
   - choose imported target devices (initially unselected)
 
 ## Pre-run review flow (v2)
