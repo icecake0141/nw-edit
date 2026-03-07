@@ -30,6 +30,8 @@ const historyEl = document.getElementById("history");
 const deviceCountEl = document.getElementById("deviceCount");
 const importProgressEl = document.getElementById("importProgress");
 const importProgressTextEl = document.getElementById("importProgressText");
+const importLoadingEl = document.getElementById("importLoading");
+const importStreamLogEl = document.getElementById("importStreamLog");
 const importErrorsEl = document.getElementById("importErrors");
 const importedDeviceListEl = document.getElementById("importedDeviceList");
 const importedDeviceHintEl = document.getElementById("importedDeviceHint");
@@ -119,6 +121,30 @@ function appendLog(message) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function appendImportStreamLog(message) {
+  if (!importStreamLogEl) {
+    return;
+  }
+  const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+  importStreamLogEl.textContent += `${line}\n`;
+  importStreamLogEl.scrollTop = importStreamLogEl.scrollHeight;
+}
+
+function resetImportStreamLog() {
+  if (!importStreamLogEl) {
+    return;
+  }
+  importStreamLogEl.textContent = "";
+}
+
+function setImportStreamVisible(visible) {
+  if (!importLoadingEl || !importStreamLogEl) {
+    return;
+  }
+  importLoadingEl.classList.toggle("hidden", !visible);
+  importStreamLogEl.classList.toggle("hidden", !visible);
+}
+
 function isActiveRunBlocking(status) {
   return ["queued", "running", "paused"].includes(String(status || "").toLowerCase());
 }
@@ -142,6 +168,7 @@ function updateCreateActionState() {
 
 function setImportInProgress(inProgress) {
   importBtn.disabled = inProgress;
+  setImportStreamVisible(inProgress);
   if (inProgress) {
     importProgressEl.classList.remove("hidden");
     importProgressTextEl.classList.remove("hidden");
@@ -1104,7 +1131,9 @@ importBtn.addEventListener("click", async () => {
   const csvInput = document.getElementById("csvInput").value;
   const importedCountBeforeImport = importedDevices.length;
   clearImportError();
+  resetImportStreamLog();
   setImportInProgress(true);
+  appendImportStreamLog("Import started");
   try {
     const response = await fetch(`${currentApiBase()}/api/v2/devices/import/progress`, {
       method: "POST",
@@ -1137,12 +1166,17 @@ importBtn.addEventListener("click", async () => {
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = 0;
           importProgressTextEl.textContent = `Validating devices... 0/${total}`;
+          appendImportStreamLog(`Validation started (total=${total})`);
         } else if (event.type === "progress") {
           const processed = Number(event.processed || 0);
           const total = Number(event.total || 0);
+          const host = String(event.host || "?");
+          const port = Number(event.port || 0);
+          const result = event.connection_ok === true ? "OK" : "NG";
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = processed;
           importProgressTextEl.textContent = `Validating devices... ${processed}/${total}`;
+          appendImportStreamLog(`${host}:${port || "?"} ${result} (${processed}/${total})`);
           if (event.connection_ok === true) {
             successfulProgressCount += 1;
           }
@@ -1155,8 +1189,11 @@ importBtn.addEventListener("click", async () => {
           importProgressEl.value = total;
           importProgressTextEl.textContent = `Validating devices... ${total}/${total}`;
           deviceCountEl.textContent = `imported devices: ${importedCount}`;
+          appendImportStreamLog(`Import completed (valid=${importedCount}, total=${total})`);
         } else if (event.type === "error") {
-          throw new Error(formatImportErrorDetail(event.detail));
+          const message = formatImportErrorDetail(event.detail);
+          appendImportStreamLog(`Import error: ${message}`);
+          throw new Error(message);
         }
       }
     }
@@ -1166,6 +1203,7 @@ importBtn.addEventListener("click", async () => {
     const message = String(error);
     deviceCountEl.textContent = `imported devices: ${importedCountBeforeImport}`;
     showImportError(message);
+    appendImportStreamLog(`Import failed: ${message}`);
     appendLog(message);
   } finally {
     setImportInProgress(false);
