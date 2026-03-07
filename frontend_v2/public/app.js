@@ -294,6 +294,32 @@ function importedDeviceKey(device) {
   return `${device.host}:${device.port}`;
 }
 
+function resolveHostname(device) {
+  const name = String(device?.name || "").trim();
+  if (name) {
+    return name;
+  }
+  const hostVarsHostname = String(device?.host_vars?.hostname || "").trim();
+  if (hostVarsHostname) {
+    return hostVarsHostname;
+  }
+  return String(device?.host || "");
+}
+
+function buildDeviceDisplayMap(devices) {
+  return Object.fromEntries(
+    devices.map((device) => [importedDeviceKey(device), resolveHostname(device)])
+  );
+}
+
+function hostFromDeviceKey(deviceKey) {
+  const delimiter = String(deviceKey || "").lastIndexOf(":");
+  if (delimiter <= 0) {
+    return String(deviceKey || "");
+  }
+  return deviceKey.slice(0, delimiter);
+}
+
 function canaryOptionLabel(item) {
   const hostname = item.hostname || item.host;
   return `${item.key} (${hostname})`;
@@ -611,7 +637,7 @@ function buildExecutionSummaryHtml(source, eventCount) {
   `;
 }
 
-function buildDeviceCardsHtml(source) {
+function buildDeviceCardsHtml(source, deviceNameMap = {}) {
   const keys = combineDeviceKeys(source);
   if (keys.length === 0) {
     return '<div class="muted">No target devices yet</div>';
@@ -628,9 +654,10 @@ function buildDeviceCardsHtml(source) {
       const mergedLines = streamLines.length > 0 ? streamLines : fallbackResultLines;
       const streamText = mergedLines.length > 0 ? mergedLines.join("\n") : "No logs yet...";
       const isCanary = source.canaryKey === key;
+      const hostname = String(deviceNameMap[key] || "").trim() || hostFromDeviceKey(key);
       return `
         <div class="device-card status-${status}" id="device-card-${key.replace(":", "-")}">
-          <h4>${escapeHtml(key)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
+          <h4>${escapeHtml(`${key} (${hostname})`)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
           <div class="meta">Attempts: ${attempts || "-"} ${error ? `/ Error: ${escapeHtml(error)}` : ""}</div>
           <div class="output-label">Command Stream</div>
           <pre class="stream-output">${escapeHtml(streamText)}</pre>
@@ -645,13 +672,19 @@ function buildDeviceCardsHtml(source) {
     .join("");
 }
 
-function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0) {
+function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0, deviceNameMap = {}) {
   summaryEl.innerHTML = buildExecutionSummaryHtml(source, eventCount);
-  devicesEl.innerHTML = buildDeviceCardsHtml(source);
+  devicesEl.innerHTML = buildDeviceCardsHtml(source, deviceNameMap);
 }
 
 function renderMonitorState() {
-  renderExecutionPanel(monitorSummaryEl, monitorDevicesEl, monitorState, monitorState.eventCount);
+  renderExecutionPanel(
+    monitorSummaryEl,
+    monitorDevicesEl,
+    monitorState,
+    monitorState.eventCount,
+    buildDeviceDisplayMap(importedDevices)
+  );
 }
 
 async function handleJobSocketMessage(data) {
@@ -775,7 +808,13 @@ function renderJobDetail(job, events, result) {
     deviceStatuses: {},
     streamLogs: {},
   };
-  renderExecutionPanel(detailSummaryEl, detailDevicesEl, detailSource, events.length);
+  renderExecutionPanel(
+    detailSummaryEl,
+    detailDevicesEl,
+    detailSource,
+    events.length,
+    buildDeviceDisplayMap(importedDevices)
+  );
 }
 
 async function loadAndRenderJob(jobId, targetPage = "detail") {
