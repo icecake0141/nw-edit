@@ -17,7 +17,7 @@
 /**
  * @typedef {{ host: string, port: number }} DeviceTarget
  * @typedef {{ [key: string]: string }} VariableMap
- * @typedef {{ host: string, port: number, device_type: string, username: string, password: string, name?: string, verify_cmds: string[], host_vars: VariableMap, connection_ok: boolean, error_message?: string }} DeviceProfile
+ * @typedef {{ host: string, port: number, device_type: string, username: string, password: string, name?: string, verify_cmds: string[], host_vars: VariableMap, prod: boolean, connection_ok: boolean, error_message?: string }} DeviceProfile
  * @typedef {{ job_id: string, job_name: string, creator: string, status: string, created_at: string, global_vars: VariableMap }} JobSummary
  * @typedef {{ status: string, attempts: number, error?: string, error_code?: string, logs: string[], pre_output: string, apply_output: string, post_output: string, diff: string, diff_truncated: boolean, diff_original_size: number, log_trimmed?: boolean }} DeviceRunResponse
  * @typedef {{ job_id: string, status: string, commands: string[], verify_commands: string[], target_device_keys: string[], device_results: Record<string, DeviceRunResponse> }} RunJobResponse

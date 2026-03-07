@@ -63,6 +63,7 @@ const statusOutputEl = document.getElementById("statusOutput");
 const activeJobBannerEl = document.getElementById("activeJobBanner");
 const activeJobBannerTextEl = document.getElementById("activeJobBannerText");
 const viewActiveJobBtn = document.getElementById("viewActiveJobBtn");
+const prodWarningOverlayEl = document.getElementById("prodWarningOverlay");
 
 /** @type {WebSocket|null} */
 let activeSocket = null;
@@ -72,6 +73,10 @@ let selectedJobId = null;
 let importedDevices = [];
 /** @type {import("./api-client.js").Preset[]} */
 let currentPresets = [];
+/** @type {Set<string>} */
+let prodDeviceKeys = new Set();
+/** @type {string[]} */
+let detailTargetDeviceKeys = [];
 let monitorResultLoading = false;
 let runSyncBusy = false;
 let runAsyncBusy = false;
@@ -229,6 +234,46 @@ function canaryOptionLabel(item) {
   return `${item.key} (${hostname})`;
 }
 
+function setProdWarningVisible(visible) {
+  if (!prodWarningOverlayEl) {
+    return;
+  }
+  prodWarningOverlayEl.classList.toggle("active", visible);
+}
+
+function currentPageName() {
+  const activePage = document.querySelector(".page.active");
+  return activePage?.getAttribute("data-page") || "import";
+}
+
+function hasProdDevice(keys) {
+  return keys.some((key) => prodDeviceKeys.has(key));
+}
+
+function createPageTargetKeysForWarning() {
+  if (!useImportedEl.checked) {
+    return [];
+  }
+  const selectedKeys = selectedImportedDeviceKeys();
+  if (selectedKeys.length > 0) {
+    return selectedKeys;
+  }
+  return importedDevices.map((device) => importedDeviceKey(device));
+}
+
+function refreshProdWarningOverlay() {
+  const page = currentPageName();
+  let visible = false;
+  if (page === "create") {
+    visible = hasProdDevice(createPageTargetKeysForWarning());
+  } else if (page === "monitor") {
+    visible = hasProdDevice(monitorState.targetDeviceKeys || []);
+  } else if (page === "detail") {
+    visible = hasProdDevice(detailTargetDeviceKeys || []);
+  }
+  setProdWarningVisible(visible);
+}
+
 function selectedImportedDeviceKeys() {
   return Array.from(
     document.querySelectorAll('input[name="importedDeviceKeys"]:checked')
@@ -253,11 +298,12 @@ function renderImportedDeviceList() {
     input.name = "importedDeviceKeys";
     input.value = importedDeviceKey(device);
     const text = document.createElement("span");
-    text.textContent = `${importedDeviceKey(device)} (${device.name || "-"} / ${device.device_type})`;
+    text.textContent = `${importedDeviceKey(device)} (${device.name || "-"} / ${device.device_type}${device.prod ? " / PROD" : ""})`;
     label.append(input, text);
     importedDeviceListEl.append(label);
   });
   importedDeviceHintEl.textContent = `Imported target candidates: ${candidates.length}`;
+  refreshProdWarningOverlay();
 }
 
 function populateStatusDeviceSelect() {
@@ -268,7 +314,7 @@ function populateStatusDeviceSelect() {
   importedDevices.forEach((device) => {
     const option = document.createElement("option");
     option.value = importedDeviceKey(device);
-    option.textContent = `${importedDeviceKey(device)} (${device.name || "-"} / ${device.device_type})`;
+    option.textContent = `${importedDeviceKey(device)} (${device.name || "-"} / ${device.device_type}${device.prod ? " / PROD" : ""})`;
     statusDeviceSelectEl.append(option);
   });
 }
@@ -471,6 +517,7 @@ function beginMonitor(job, targetDeviceKeys, canaryKey) {
   monitorState.canaryKey = canaryKey || targetDeviceKeys[0] || null;
   monitorState.targetDeviceKeys.forEach((key) => ensureMonitorDevice(key));
   renderMonitorState();
+  refreshProdWarningOverlay();
 }
 
 function combineDeviceKeys(source) {
@@ -695,17 +742,19 @@ function formatJobDetailText(job, events, result) {
 }
 
 function renderJobDetail(job, events, result) {
+  detailTargetDeviceKeys = result?.target_device_keys || Object.keys(result?.device_results || {});
   detailMetaEl.textContent = `selected: ${job.job_id} (${job.status}) events=${events.length}`;
   detailDataEl.textContent = formatJobDetailText(job, events, result);
   const detailSource = {
     job,
     result,
-    targetDeviceKeys: result?.target_device_keys || Object.keys(result?.device_results || {}),
+    targetDeviceKeys: detailTargetDeviceKeys,
     canaryKey: null,
     deviceStatuses: {},
     streamLogs: {},
   };
   renderExecutionPanel(detailSummaryEl, detailDevicesEl, detailSource, events.length);
+  refreshProdWarningOverlay();
 }
 
 async function loadAndRenderJob(jobId, targetPage = "detail") {
@@ -742,10 +791,16 @@ function switchPage(pageName) {
     const pressed = el.getAttribute("data-page") === pageName;
     el.setAttribute("aria-pressed", pressed ? "true" : "false");
   });
+  refreshProdWarningOverlay();
 }
 
 async function refreshImportedDevices() {
   importedDevices = await client().listDevices();
+  prodDeviceKeys = new Set(
+    importedDevices
+      .filter((device) => Boolean(device.prod))
+      .map((device) => importedDeviceKey(device))
+  );
   deviceCountEl.textContent = `imported devices: ${importedDevices.length}`;
   const importedModels = Array.from(
     new Set(importedDevices.map((device) => device.device_type))
@@ -758,6 +813,7 @@ async function refreshImportedDevices() {
   refreshCanaryOptions();
   await refreshPresetOptions().catch((error) => appendLog(String(error)));
   appendLog(`loaded imported devices: ${importedDevices.length}`);
+  refreshProdWarningOverlay();
 }
 
 async function refreshJobs() {
@@ -817,6 +873,7 @@ async function refreshActive() {
     if (monitorState.job && ["running", "queued", "paused"].includes(monitorState.job.status)) {
       fetchRunResultForMonitor(monitorState.job.job_id).catch(() => {});
     }
+    refreshProdWarningOverlay();
     return;
   }
 
@@ -831,6 +888,7 @@ async function refreshActive() {
     monitorState.job = { ...monitorState.job, ...active.job };
     renderMonitorState();
   }
+  refreshProdWarningOverlay();
 }
 
 async function refreshRuntimeModes() {
@@ -1187,6 +1245,7 @@ refreshActiveBtn.addEventListener("click", () => {
 useImportedEl.addEventListener("change", () => {
   importedDeviceListEl.parentElement.classList.toggle("hidden", !useImportedEl.checked);
   refreshCanaryOptions();
+  refreshProdWarningOverlay();
 });
 
 enablePresetModeEl.addEventListener("change", async () => {
@@ -1196,16 +1255,19 @@ enablePresetModeEl.addEventListener("change", async () => {
     presetSelectEl.value = "";
     await refreshPresetOptions().catch((error) => appendLog(String(error)));
     renderImportedDeviceList();
+    refreshProdWarningOverlay();
     return;
   }
   await refreshPresetOptions().catch((error) => appendLog(String(error)));
   renderImportedDeviceList();
+  refreshProdWarningOverlay();
 });
 
 osModelSelectEl.addEventListener("change", () => {
   renderImportedDeviceList();
   refreshCanaryOptions();
   refreshPresetOptions().catch((error) => appendLog(String(error)));
+  refreshProdWarningOverlay();
 });
 
 presetSelectEl.addEventListener("change", () => {
@@ -1223,21 +1285,25 @@ presetSelectEl.addEventListener("change", () => {
 selectAllImportedBtn.addEventListener("click", () => {
   selectAllImported();
   refreshCanaryOptions();
+  refreshProdWarningOverlay();
 });
 
 clearImportedSelectionBtn.addEventListener("click", () => {
   clearImportedSelection();
   refreshCanaryOptions();
+  refreshProdWarningOverlay();
 });
 
 importedDeviceListEl.addEventListener("change", () => {
   refreshCanaryOptions();
+  refreshProdWarningOverlay();
 });
 
 document.getElementById("devices").addEventListener("input", () => {
   if (!useImportedEl.checked) {
     refreshCanaryOptions();
   }
+  refreshProdWarningOverlay();
 });
 
 statusRunBtn.addEventListener("click", async () => {
@@ -1339,6 +1405,7 @@ setInterval(() => {
 presetPanelEl.classList.add("hidden");
 updateCreateActionState();
 renderMonitorState();
+refreshProdWarningOverlay();
 refreshImportedDevices().catch(() => {});
 refreshJobs().catch(() => {});
 refreshActive().catch(() => {});

@@ -395,6 +395,7 @@ def import_devices(
                 name=d.name,
                 verify_cmds=d.verify_cmds,
                 host_vars=d.host_vars,
+                prod=d.prod,
                 connection_ok=d.connection_ok,
                 error_message=d.error_message,
             )
@@ -461,6 +462,7 @@ def import_devices_with_progress(
                                 name=d.name,
                                 verify_cmds=d.verify_cmds,
                                 host_vars=d.host_vars,
+                                prod=d.prod,
                                 connection_ok=d.connection_ok,
                                 error_message=d.error_message,
                             ).model_dump()
@@ -499,6 +501,7 @@ def list_devices() -> list[DeviceProfileResponse]:
             name=d.name,
             verify_cmds=d.verify_cmds,
             host_vars=d.host_vars,
+            prod=d.prod,
             connection_ok=d.connection_ok,
             error_message=d.error_message,
         )

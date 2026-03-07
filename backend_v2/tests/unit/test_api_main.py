@@ -221,6 +221,45 @@ def test_device_import_and_run_with_imported_devices():
     assert "10.2.0.1:22" in payload["device_results"]
 
 
+def test_import_devices_includes_prod_attribute_in_response():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars,prod\n"
+            "10.2.9.1,22,cisco_ios,admin,pass,edge-prod,show run,,true\n"
+            "10.2.9.2,22,cisco_ios,admin,pass,edge-nonprod,show run,,invalid\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+    payload = imported.json()
+    assert len(payload["devices"]) == 2
+    assert payload["devices"][0]["prod"] is True
+    assert payload["devices"][1]["prod"] is False
+
+
+def test_list_devices_includes_prod_attribute():
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars,prod\n"
+            "10.2.10.1,22,cisco_ios,admin,pass,edge-prod,show run,,TRUE\n"
+            "10.2.10.2,22,cisco_ios,admin,pass,edge-nonprod,show run,,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+
+    listed = client.get("/api/v2/devices")
+    assert listed.status_code == 200
+    payload = listed.json()
+    prod_flags = {f"{item['host']}:{item['port']}": item["prod"] for item in payload}
+    assert prod_flags["10.2.10.1:22"] is True
+    assert prod_flags["10.2.10.2:22"] is False
+
+
 def test_run_fails_preflight_when_command_variable_is_missing():
     client = TestClient(app)
     create_response = client.post(

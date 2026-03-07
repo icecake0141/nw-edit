@@ -135,6 +135,7 @@ class DeviceProfile:
     name: Optional[str] = None
     verify_cmds: list[str] = field(default_factory=list)
     host_vars: dict[str, str] = field(default_factory=dict)
+    prod: bool = False
     connection_ok: bool = False
     error_message: Optional[str] = None
 

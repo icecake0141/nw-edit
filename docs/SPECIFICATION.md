@@ -40,8 +40,8 @@ Japanese version: [SPECIFICATION.ja.md](SPECIFICATION.ja.md)
 ## CSV format
 
 ```csv
-host,port,device_type,username,password,name,verify_cmds,host_vars
-192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp,"{""hostname"":""router-1""}"
+host,port,device_type,username,password,name,verify_cmds,host_vars,prod
+192.168.1.1,22,cisco_ios,admin,password123,Router1,show running-config | section snmp,"{""hostname"":""router-1""}",true
 ```
 
 ### Columns
@@ -56,6 +56,7 @@ host,port,device_type,username,password,name,verify_cmds,host_vars
 | `name` | No | Friendly name | - |
 | `verify_cmds` | No | `;`-separated verification commands | - |
 | `host_vars` | No | JSON object string for per-host template vars | - |
+| `prod` | No | Production-host flag (`true` means production) | `false` |
 
 ## Command template variables
 
