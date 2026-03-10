@@ -354,11 +354,7 @@ function createPageTargetKeysForWarning() {
   if (!useImportedEl.checked) {
     return [];
   }
-  const selectedKeys = selectedImportedDeviceKeys();
-  if (selectedKeys.length > 0) {
-    return selectedKeys;
-  }
-  return importedDevices.map((device) => importedDeviceKey(device));
+  return selectedImportedDeviceKeys();
 }
 
 function refreshProdWarningOverlay() {
@@ -479,6 +475,10 @@ function refreshCanaryOptions() {
   });
   if (previous && candidates.some((item) => item.key === previous)) {
     canaryDeviceEl.value = previous;
+    return;
+  }
+  if (candidates.length > 0) {
+    canaryDeviceEl.value = candidates[0].key;
   }
 }
 
@@ -1367,7 +1367,9 @@ async function requestRun() {
     appendLog("run review opened (async)");
     switchPage("create");
   } catch (error) {
-    appendLog(String(error));
+    const message = String(error);
+    setStatus(`input-error: ${message}`);
+    appendLog(message);
   }
 }
 

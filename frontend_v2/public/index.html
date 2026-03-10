@@ -551,16 +551,36 @@ You may obtain a copy of the License at
 <body>
   <div id="prodWarningOverlay" class="prod-warning-overlay" aria-hidden="true">
     <div class="prod-warning-labels">
-      <span style="top: 4%; left: 5%;">本番環境 / Production Environment</span>
-      <span style="top: 11%; left: 57%;">生产环境 / Production Environment</span>
-      <span style="top: 20%; left: 23%;">Environnement de Production</span>
-      <span style="top: 30%; left: 67%;">Produktionsumgebung</span>
-      <span style="top: 40%; left: 10%;">Среда Продакшн</span>
-      <span style="top: 49%; left: 50%;">Entorno de Produccion</span>
-      <span style="top: 58%; left: 31%;">Ambiente de Producao</span>
-      <span style="top: 66%; left: 72%;">بيئة الإنتاج</span>
-      <span style="top: 78%; left: 15%;">สภาพแวดล้อมการผลิต</span>
-      <span style="top: 88%; left: 49%;">Ambiente di Produzione</span>
+      <span style="top: 2%; left: 3%;">本番環境 / Production Environment</span>
+      <span style="top: 5%; left: 38%;">生产环境 / Production Environment</span>
+      <span style="top: 8%; left: 68%;">Environnement de Production</span>
+      <span style="top: 12%; left: 14%;">Produktionsumgebung</span>
+      <span style="top: 15%; left: 49%;">Среда Продакшн</span>
+      <span style="top: 18%; left: 76%;">Entorno de Produccion</span>
+      <span style="top: 22%; left: 6%;">Ambiente de Producao</span>
+      <span style="top: 25%; left: 33%;">بيئة الإنتاج</span>
+      <span style="top: 28%; left: 61%;">สภาพแวดล้อมการผลิต</span>
+      <span style="top: 31%; left: 83%;">Ambiente di Produzione</span>
+      <span style="top: 35%; left: 4%;">本番環境 / Production Environment</span>
+      <span style="top: 38%; left: 42%;">生产环境 / Production Environment</span>
+      <span style="top: 41%; left: 71%;">Environnement de Production</span>
+      <span style="top: 45%; left: 18%;">Produktionsumgebung</span>
+      <span style="top: 48%; left: 51%;">Среда Продакшн</span>
+      <span style="top: 51%; left: 79%;">Entorno de Produccion</span>
+      <span style="top: 55%; left: 9%;">Ambiente de Producao</span>
+      <span style="top: 58%; left: 36%;">بيئة الإنتاج</span>
+      <span style="top: 61%; left: 63%;">สภาพแวดล้อมการผลิต</span>
+      <span style="top: 64%; left: 84%;">Ambiente di Produzione</span>
+      <span style="top: 68%; left: 5%;">本番環境 / Production Environment</span>
+      <span style="top: 71%; left: 39%;">生产环境 / Production Environment</span>
+      <span style="top: 74%; left: 69%;">Environnement de Production</span>
+      <span style="top: 78%; left: 13%;">Produktionsumgebung</span>
+      <span style="top: 81%; left: 47%;">Среда Продакшн</span>
+      <span style="top: 84%; left: 75%;">Entorno de Produccion</span>
+      <span style="top: 88%; left: 7%;">Ambiente de Producao</span>
+      <span style="top: 91%; left: 34%;">بيئة الإنتاج</span>
+      <span style="top: 94%; left: 59%;">สภาพแวดล้อมการผลิต</span>
+      <span style="top: 97%; left: 80%;">Ambiente di Produzione</span>
     </div>
   </div>
   <div class="wrap">
@@ -678,7 +698,7 @@ show ip interface brief</textarea>
       <label for="staggerDelay">Stagger Delay (seconds)</label>
       <input id="staggerDelay" type="number" min="0" max="60" step="0.1" value="1.0" />
       <label class="checkbox-row"><input type="checkbox" id="stopOnError" checked /> Stop on Error</label>
-      <label class="checkbox-row"><input type="checkbox" id="enableRunConfirmation" checked /> 実行前確認を使う（default ON）</label>
+      <label class="checkbox-row"><input type="checkbox" id="enableRunConfirmation" checked /> Use pre-run confirmation (default ON)</label>
       <fieldset class="radio-group">
         <legend>Canary success after</legend>
         <label class="radio-option">
@@ -694,33 +714,33 @@ show ip interface brief</textarea>
         <button class="primary" id="runBtn" title="Create a job and start execution asynchronously.">Run</button>
       </div>
       <div id="runReviewPanel" class="review-panel hidden">
-        <div><strong>実行前最終確認</strong></div>
+        <div><strong>Final review before execution</strong></div>
         <div class="muted" id="reviewModeText">Execution mode: -</div>
         <div class="review-grid">
           <div class="review-block">
-            <h4>対象ホスト <button class="secondary" id="reviewToggleHostsBtn" type="button" title="Toggle host list visibility.">Collapse</button></h4>
+            <h4>Target Hosts <button class="secondary" id="reviewToggleHostsBtn" type="button" title="Toggle host list visibility.">Collapse</button></h4>
             <ol id="reviewTargetHosts" class="review-list"></ol>
           </div>
           <div class="review-block">
-            <h4>実行コマンド</h4>
+            <h4>Execution Commands</h4>
             <ol id="reviewCommands" class="review-list"></ol>
           </div>
           <div class="review-block">
-            <h4>確認用コマンド</h4>
+            <h4>Verify Commands</h4>
             <ol id="reviewVerifyCommands" class="review-list"></ol>
           </div>
           <div class="review-block">
-            <h4>実行設定</h4>
+            <h4>Execution Settings</h4>
             <ul id="reviewSettings" class="review-list"></ul>
           </div>
         </div>
         <div class="review-block">
-          <h4>実行順の説明（ブロック図）</h4>
+          <h4>Execution flow (block diagram)</h4>
           <div id="reviewFlowDiagram" class="review-flow"></div>
         </div>
         <div class="btn-row">
-          <button class="primary" id="reviewExecuteBtn" type="button" title="Approve current review and execute run asynchronously.">この内容で実行</button>
-          <button class="secondary" id="reviewCancelBtn" type="button" title="Cancel review panel and return to edit mode.">確認を閉じる</button>
+          <button class="primary" id="reviewExecuteBtn" type="button" title="Approve current review and execute run asynchronously.">Execute with this configuration</button>
+          <button class="secondary" id="reviewCancelBtn" type="button" title="Cancel review panel and return to edit mode.">Close Review</button>
         </div>
       </div>
     </section>
