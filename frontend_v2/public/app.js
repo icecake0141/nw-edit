@@ -45,7 +45,6 @@ const presetNameEl = document.getElementById("presetName");
 const presetSaveNewBtn = document.getElementById("presetSaveNewBtn");
 const presetUpdateBtn = document.getElementById("presetUpdateBtn");
 const runBtn = document.getElementById("runBtn");
-const runAsyncBtn = document.getElementById("runAsyncBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 const resumeBtn = document.getElementById("resumeBtn");
 const cancelBtn = document.getElementById("cancelBtn");
@@ -63,7 +62,9 @@ const concurrencyLimitEl = document.getElementById("concurrencyLimit");
 const staggerDelayEl = document.getElementById("staggerDelay");
 const stopOnErrorEl = document.getElementById("stopOnError");
 const enableRunConfirmationEl = document.getElementById("enableRunConfirmation");
-const postCanaryStrategyEl = document.getElementById("postCanaryStrategy");
+const postCanaryStrategyEls = Array.from(
+  document.querySelectorAll('input[name="postCanaryStrategy"]')
+);
 const statusDeviceSelectEl = document.getElementById("statusDeviceSelect");
 const statusCommandsEl = document.getElementById("statusCommands");
 const statusRunBtn = document.getElementById("statusRunBtn");
@@ -96,13 +97,12 @@ let prodDeviceKeys = new Set();
 /** @type {string[]} */
 let detailTargetDeviceKeys = [];
 let monitorResultLoading = false;
-let runSyncBusy = false;
-let runAsyncBusy = false;
+let runBusy = false;
 let presetActionBusy = false;
 /** @type {import("./api-client.js").JobDetail|null} */
 let activeBlockingJob = null;
 let reviewHostsCollapsed = false;
-/** @type {{mode: string, runInput: any}|null} */
+/** @type {{runInput: any}|null} */
 let pendingRunReview = null;
 const monitorState = {
   job: null,
@@ -203,8 +203,7 @@ function isActiveRunBlocking(status) {
 
 function updateCreateActionState() {
   const blocked = Boolean(activeBlockingJob);
-  runBtn.disabled = blocked || runSyncBusy;
-  runAsyncBtn.disabled = blocked || runAsyncBusy;
+  runBtn.disabled = blocked || runBusy;
   setPresetActionState();
   if (!activeJobBannerEl || !activeJobBannerTextEl) {
     return;
@@ -1153,6 +1152,18 @@ function resolveTargetDeviceKeys(useImported, targets) {
   return targets.adHocDevices.map((device) => `${device.host}:${device.port}`);
 }
 
+function selectedPostCanaryStrategy() {
+  const selected = postCanaryStrategyEls.find((el) => el.checked)?.value || "parallel";
+  return selected.trim();
+}
+
+function updatePostCanaryControls() {
+  const strategy = selectedPostCanaryStrategy();
+  const isParallel = strategy === "parallel";
+  concurrencyLimitEl.disabled = !isParallel;
+  concurrencyLimitEl.setAttribute("aria-disabled", String(!isParallel));
+}
+
 function resolveEffectiveExecutionConfig(concurrencyLimit, strategy) {
   return {
     strategy,
@@ -1172,7 +1183,7 @@ function collectRunInput() {
   const staggerDelay = Number(staggerDelayEl.value || "1.0");
   const stopOnError = stopOnErrorEl.checked;
   const useImported = useImportedEl.checked;
-  const postCanaryStrategy = (postCanaryStrategyEl.value || "parallel").trim();
+  const postCanaryStrategy = selectedPostCanaryStrategy();
 
   if (commands.length === 0) {
     throw new Error("commands is empty");
@@ -1242,14 +1253,14 @@ function appendListItems(el, values) {
   });
 }
 
-function buildReviewModel(mode, runInput) {
+function buildReviewModel(runInput) {
   const remainingCount = Math.max(0, runInput.targetDeviceKeys.length - 1);
   const strategyText =
     runInput.postCanaryStrategy === "sequential"
       ? "Canary -> Device-1 -> Device-2 -> ..."
       : `Canary -> [Device-1, Device-2, ...] (parallel up to ${runInput.effectiveConcurrencyLimit})`;
   return {
-    modeText: mode === "sync" ? "Execution mode: Sync (/run)" : "Execution mode: Async (/run/async)",
+    modeText: "Execution mode: Async (/run/async)",
     hosts: runInput.targetDeviceKeys,
     commands: runInput.commands,
     verifyCommands: runInput.verifyCommands.length > 0 ? runInput.verifyCommands : ["(none)"],
@@ -1258,8 +1269,10 @@ function buildReviewModel(mode, runInput) {
       `Verify mode: ${runInput.verifyMode}`,
       `Stop on error: ${runInput.stopOnError}`,
       `Stagger delay: ${runInput.staggerDelay}s`,
-      `Post-canary strategy: ${runInput.postCanaryStrategy}`,
-      `Concurrency input: ${runInput.concurrencyLimit}`,
+      `Post-canary strategy: ${runInput.postCanaryStrategy === "sequential" ? "Sequential" : "Parallel"}`,
+      `Concurrency input: ${
+        runInput.postCanaryStrategy === "sequential" ? "disabled (sequential mode)" : runInput.concurrencyLimit
+      }`,
       `Effective concurrency: ${runInput.effectiveConcurrencyLimit}`,
       `Target devices: ${runInput.targetDeviceKeys.length} (remaining after canary: ${remainingCount})`,
       `Target source: ${runInput.useImported ? "imported devices" : "ad-hoc devices"}`,
@@ -1277,8 +1290,8 @@ function updateReviewHostListVisibility() {
   reviewToggleHostsBtn.textContent = reviewHostsCollapsed ? "Expand" : "Collapse";
 }
 
-function renderRunReview(mode, runInput) {
-  const review = buildReviewModel(mode, runInput);
+function renderRunReview(runInput) {
+  const review = buildReviewModel(runInput);
   reviewModeTextEl.textContent = review.modeText;
   appendListItems(reviewTargetHostsEl, review.hosts);
   appendListItems(reviewCommandsEl, review.commands);
@@ -1294,60 +1307,17 @@ function clearRunReview() {
   setRunReviewVisible(false);
 }
 
-async function executeRun(mode, runInput) {
-  if (mode === "sync") {
-    runSyncBusy = true;
-  } else {
-    runAsyncBusy = true;
-  }
+async function executeRun(runInput) {
+  runBusy = true;
   switchPage("monitor");
   updateCreateActionState();
-  setStatus(mode === "sync" ? "creating" : "creating-async");
+  setStatus("creating-async");
   try {
     const job = await client().createJob(runInput.jobName, runInput.creator, runInput.globalVars);
     selectedJobId = job.job_id;
     beginMonitor(job, runInput.targetDeviceKeys, runInput.canaryKey);
     appendLog(`job created: ${job.job_id}`);
     openJobSocket(currentApiBase(), job.job_id);
-
-    if (mode === "sync") {
-      const result = await client().runJob(
-        job.job_id,
-        runInput.commands,
-        runInput.targets.adHocDevices,
-        runInput.useImported,
-        {
-          verifyCommands: runInput.verifyCommands,
-          verifyMode: runInput.verifyMode,
-          importedDeviceKeys: runInput.targets.importedDeviceKeys,
-          canary: runInput.canary,
-          concurrencyLimit: runInput.effectiveConcurrencyLimit,
-          staggerDelay: runInput.staggerDelay,
-          stopOnError: runInput.stopOnError,
-        }
-      );
-      monitorState.result = result;
-      monitorState.job = { ...job, status: result.status };
-      monitorState.targetDeviceKeys = result.target_device_keys || monitorState.targetDeviceKeys;
-      Object.entries(result.device_results || {}).forEach(([deviceKey, value]) => {
-        ensureMonitorDevice(deviceKey);
-        monitorState.deviceStatuses[deviceKey] = value.status;
-      });
-      renderMonitorState();
-      appendLog(`run completed: ${result.status}`);
-      Object.entries(result.device_results).forEach(([key, value]) => {
-        appendLog(`${key} => status=${value.status} attempts=${value.attempts}`);
-        if (value.error_code) {
-          appendLog(`${key} error_code=${value.error_code}`);
-        }
-      });
-      setStatus(result.status);
-      const events = await client().listJobEvents(job.job_id).catch(() => []);
-      renderJobDetail({ ...job, status: result.status }, events, result);
-      await refreshJobs();
-      await refreshActive();
-      return;
-    }
 
     const started = await client().runJobAsync(
       job.job_id,
@@ -1372,19 +1342,12 @@ async function executeRun(mode, runInput) {
     setStatus("failed");
     appendLog(String(error));
   } finally {
-    if (mode === "sync") {
-      runSyncBusy = false;
-      if (activeSocket) {
-        setTimeout(() => activeSocket && activeSocket.close(), 800);
-      }
-    } else {
-      runAsyncBusy = false;
-    }
+    runBusy = false;
     updateCreateActionState();
   }
 }
 
-async function requestRun(mode) {
+async function requestRun() {
   if (activeBlockingJob) {
     appendLog(
       `Cannot create a new job while active job ${activeBlockingJob.job_id} (${activeBlockingJob.status}) is running`
@@ -1396,12 +1359,12 @@ async function requestRun(mode) {
     const runInput = collectRunInput();
     if (!enableRunConfirmationEl.checked) {
       clearRunReview();
-      await executeRun(mode, runInput);
+      await executeRun(runInput);
       return;
     }
-    pendingRunReview = { mode, runInput };
-    renderRunReview(mode, runInput);
-    appendLog(`run review opened (${mode})`);
+    pendingRunReview = { runInput };
+    renderRunReview(runInput);
+    appendLog("run review opened (async)");
     switchPage("create");
   } catch (error) {
     const message = String(error);
@@ -1410,16 +1373,7 @@ async function requestRun(mode) {
   }
 }
 
-async function runSync() {
-  await requestRun("sync");
-}
-
-async function runAsync() {
-  await requestRun("async");
-}
-
-runBtn.addEventListener("click", runSync);
-runAsyncBtn.addEventListener("click", runAsync);
+runBtn.addEventListener("click", requestRun);
 reviewExecuteBtn?.addEventListener("click", async () => {
   if (!pendingRunReview) {
     appendLog("run review is empty");
@@ -1428,7 +1382,7 @@ reviewExecuteBtn?.addEventListener("click", async () => {
   }
   const review = pendingRunReview;
   clearRunReview();
-  await executeRun(review.mode, review.runInput);
+  await executeRun(review.runInput);
 });
 reviewCancelBtn?.addEventListener("click", () => {
   appendLog("run review cancelled");
@@ -1437,6 +1391,9 @@ reviewCancelBtn?.addEventListener("click", () => {
 reviewToggleHostsBtn?.addEventListener("click", () => {
   reviewHostsCollapsed = !reviewHostsCollapsed;
   updateReviewHostListVisibility();
+});
+postCanaryStrategyEls.forEach((el) => {
+  el.addEventListener("change", updatePostCanaryControls);
 });
 
 importBtn.addEventListener("click", async () => {
@@ -1712,6 +1669,7 @@ setInterval(() => {
 presetPanelEl.classList.add("hidden");
 applyApiBaseVisibility();
 updateCreateActionState();
+updatePostCanaryControls();
 setPresetActionState();
 renderMonitorState();
 refreshProdWarningOverlay();

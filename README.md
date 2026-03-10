@@ -86,17 +86,15 @@ make check-integration
 
 - Create page now supports a final review step before execution.
 - `実行前確認を使う` toggle is enabled by default (UI-state only; resets on page reload).
-- Existing buttons are unchanged:
-  - `Create + Run` uses `/api/v2/jobs/{job_id}/run`
-  - `Create + Run Async` uses `/api/v2/jobs/{job_id}/run/async`
-- If review is enabled, both buttons open a review panel first and list:
+- The execution action is a single `Run` button and always uses `/api/v2/jobs/{job_id}/run/async`.
+- If review is enabled, `Run` opens a review panel first and lists:
   - target hosts
   - run commands
   - verify commands
   - effective run settings
-- `Canary後の実行方式` controls post-canary fanout:
-  - `Canary -> Async Parallel` uses input `concurrency_limit`
-  - `Canary -> Sequential (1台ずつ)` forces `concurrency_limit=1`
+- `Canary success after` controls post-canary fanout:
+  - `Parallel` uses input `concurrency_limit`
+  - `Sequential (1 device at a time)` forces `concurrency_limit=1` and disables the input
 - No backend API changes were added; strategy is mapped only to `concurrency_limit`.
 
 ## Documentation
