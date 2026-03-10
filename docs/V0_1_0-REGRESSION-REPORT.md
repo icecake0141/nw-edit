@@ -73,7 +73,7 @@ You may obtain a copy of the License at
 ### 3.2 ジョブ作成/実行
 
 - 解消済み
-  - UI上の Create + Run 導線で v0.1.0 相当の一括実行体験を維持。
+  - UI上の Run 導線で v0.1.0 相当の一括実行体験を維持。
   - active job 排他（作成時 `409`）を復元。
   - canary 必須・対象内整合を API/UI 両面で復元。
   - verify mode / concurrency / stagger / stop_on_error を UI から反映可能。

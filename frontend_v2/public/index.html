@@ -186,6 +186,33 @@ You may obtain a copy of the License at
       min-height: 0;
       margin: 0;
     }
+    .radio-group {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 0 0 12px;
+      padding: 0;
+      border: 0;
+    }
+    .radio-group legend {
+      width: 100%;
+      padding: 0;
+      margin-bottom: 6px;
+      font-size: 0.87rem;
+      opacity: 0.8;
+      font-weight: 500;
+    }
+    .radio-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.94rem;
+    }
+    .radio-option input {
+      width: auto;
+      min-height: 0;
+      margin: 0;
+    }
     .device-select-wrap {
       border: 1px solid var(--line);
       border-radius: 4px;
@@ -652,14 +679,19 @@ show ip interface brief</textarea>
       <input id="staggerDelay" type="number" min="0" max="60" step="0.1" value="1.0" />
       <label class="checkbox-row"><input type="checkbox" id="stopOnError" checked /> Stop on Error</label>
       <label class="checkbox-row"><input type="checkbox" id="enableRunConfirmation" checked /> 実行前確認を使う（default ON）</label>
-      <label for="postCanaryStrategy">Canary後の実行方式</label>
-      <select id="postCanaryStrategy">
-        <option value="parallel" selected>Canary → Async Parallel</option>
-        <option value="sequential">Canary → Sequential (1台ずつ)</option>
-      </select>
+      <fieldset class="radio-group">
+        <legend>Canary success after</legend>
+        <label class="radio-option">
+          <input type="radio" name="postCanaryStrategy" value="parallel" checked />
+          <span>Parallel</span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="postCanaryStrategy" value="sequential" />
+          <span>Sequential (1 device at a time)</span>
+        </label>
+      </fieldset>
       <div class="btn-row">
-        <button class="primary" id="runBtn" title="Create a job and start execution in the current page flow.">Create + Run</button>
-        <button class="primary" id="runAsyncBtn" title="Create a job and start execution asynchronously without blocking.">Create + Run Async</button>
+        <button class="primary" id="runBtn" title="Create a job and start execution asynchronously.">Run</button>
       </div>
       <div id="runReviewPanel" class="review-panel hidden">
         <div><strong>実行前最終確認</strong></div>
@@ -687,7 +719,7 @@ show ip interface brief</textarea>
           <div id="reviewFlowDiagram" class="review-flow"></div>
         </div>
         <div class="btn-row">
-          <button class="primary" id="reviewExecuteBtn" type="button" title="Approve current review and execute run.">この内容で実行</button>
+          <button class="primary" id="reviewExecuteBtn" type="button" title="Approve current review and execute run asynchronously.">この内容で実行</button>
           <button class="secondary" id="reviewCancelBtn" type="button" title="Cancel review panel and return to edit mode.">確認を閉じる</button>
         </div>
       </div>

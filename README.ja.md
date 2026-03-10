@@ -84,17 +84,15 @@ make check-integration
 
 - Create画面に、実行前の最終確認ステップを追加しています。
 - `実行前確認を使う` トグルはデフォルトONです（保持は画面内のみ。リロードで初期値に戻ります）。
-- 実行ボタンは従来どおり2つです。
-  - `Create + Run` は `/api/v2/jobs/{job_id}/run` を実行
-  - `Create + Run Async` は `/api/v2/jobs/{job_id}/run/async` を実行
-- トグルON時は、どちらのボタンでも先に確認パネルを表示し、以下を一覧表示します。
+- 実行ボタンは `Run` の1つで、常に `/api/v2/jobs/{job_id}/run/async` を実行します。
+- トグルON時は、`Run` 押下時に先に確認パネルを表示し、以下を一覧表示します。
   - 対象ホスト
   - 実行コマンド
   - 確認用コマンド
   - 実行設定（有効な同時実行数を含む）
-- `Canary後の実行方式` で canary 成功後の流し方を切り替えます。
-  - `Canary -> Async Parallel`: 入力した `concurrency_limit` を使用
-  - `Canary -> Sequential (1台ずつ)`: `concurrency_limit=1` を強制
+- `Canary success after` はラジオ選択です。
+  - `Parallel`: 入力した `concurrency_limit` を使用
+  - `Sequential (1 device at a time)`: `concurrency_limit=1` を強制し、入力欄は無効化されます
 - バックエンドAPIの変更はなく、方式の差分はフロントエンドで `concurrency_limit` に反映します。
 
 ## ドキュメント
