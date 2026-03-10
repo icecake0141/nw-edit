@@ -159,12 +159,10 @@ export class NwEditApiClient {
   /**
    * @param {string} jobId
    * @param {string[]} commands
-   * @param {DeviceTarget[]} devices
-   * @param {boolean} useImported
    * @param {{ verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
    * @returns {Promise<RunJobResponse>}
    */
-  async runJob(jobId, commands, devices, useImported, options = {}) {
+  async runJob(jobId, commands, options = {}) {
     const payload = {
       commands,
       verify_commands: options.verifyCommands,
@@ -175,13 +173,8 @@ export class NwEditApiClient {
       non_canary_retry_limit: 1,
       retry_backoff_seconds: 0,
       canary: options.canary,
+      imported_device_keys: options.importedDeviceKeys,
     };
-    if (useImported) {
-      payload.imported_device_keys = options.importedDeviceKeys;
-    } else {
-      payload.devices = devices;
-      payload.canary = options.canary || devices[0];
-    }
     return this.request(`/api/v2/jobs/${jobId}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -192,12 +185,10 @@ export class NwEditApiClient {
   /**
    * @param {string} jobId
    * @param {string[]} commands
-   * @param {DeviceTarget[]} devices
-   * @param {boolean} useImported
    * @param {{ verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
    * @returns {Promise<JobSummary>}
    */
-  async runJobAsync(jobId, commands, devices, useImported, options = {}) {
+  async runJobAsync(jobId, commands, options = {}) {
     const payload = {
       commands,
       verify_commands: options.verifyCommands,
@@ -208,13 +199,8 @@ export class NwEditApiClient {
       non_canary_retry_limit: 1,
       retry_backoff_seconds: 0,
       canary: options.canary,
+      imported_device_keys: options.importedDeviceKeys,
     };
-    if (useImported) {
-      payload.imported_device_keys = options.importedDeviceKeys;
-    } else {
-      payload.devices = devices;
-      payload.canary = options.canary || devices[0];
-    }
     return this.request(`/api/v2/jobs/${jobId}/run/async`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

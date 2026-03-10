@@ -39,6 +39,19 @@ class FailHostValidator:
         return True, None
 
 
+def import_devices_for_run(client: TestClient, rows: list[str]) -> None:
+    payload = (
+        "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+        + "\n".join(rows)
+    )
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=payload,
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+
+
 @pytest.fixture(autouse=True)
 def reset_in_memory_runtime_state():
     """Ensure each test starts with a clean in-memory runtime state."""
@@ -143,6 +156,13 @@ def test_create_job_persists_global_vars():
 
 def test_job_run_with_simulated_worker():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        [
+            "10.1.0.1,22,cisco_ios,admin,pass,edge-a,show run,",
+            "10.1.0.2,22,cisco_ios,admin,pass,edge-b,show run,",
+        ],
+    )
     create_response = client.post(
         "/api/v2/jobs",
         json={"job_name": "test rollout", "creator": "tester"},
@@ -153,10 +173,7 @@ def test_job_run_with_simulated_worker():
     run_response = client.post(
         f"/api/v2/jobs/{job_id}/run",
         json={
-            "devices": [
-                {"host": "10.1.0.1", "port": 22},
-                {"host": "10.1.0.2", "port": 22},
-            ],
+            "imported_device_keys": ["10.1.0.1:22", "10.1.0.2:22"],
             "canary": {"host": "10.1.0.1", "port": 22},
             "commands": ["show version", "show ip int br"],
             "concurrency_limit": 2,
@@ -212,6 +229,7 @@ def test_device_import_and_run_with_imported_devices():
         f"/api/v2/jobs/{job_id}/run",
         json={
             "commands": ["show version"],
+            "imported_device_keys": ["10.2.0.1:22", "10.2.0.2:22"],
             "canary": {"host": "10.2.0.1", "port": 22},
         },
     )
@@ -262,6 +280,10 @@ def test_list_devices_includes_prod_attribute():
 
 def test_run_fails_preflight_when_command_variable_is_missing():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        ["10.8.0.1,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
     create_response = client.post(
         "/api/v2/jobs",
         json={"job_name": "missing vars", "creator": "tester"},
@@ -272,7 +294,7 @@ def test_run_fails_preflight_when_command_variable_is_missing():
     run_response = client.post(
         f"/api/v2/jobs/{job_id}/run",
         json={
-            "devices": [{"host": "10.8.0.1", "port": 22}],
+            "imported_device_keys": ["10.8.0.1:22"],
             "canary": {"host": "10.8.0.1", "port": 22},
             "commands": ["hostname {{hostname}}"],
         },
@@ -308,6 +330,7 @@ def test_run_prefers_host_vars_over_global_vars():
         f"/api/v2/jobs/{job_id}/run",
         json={
             "commands": ["hostname {{hostname}}"],
+            "imported_device_keys": ["10.7.0.1:22"],
             "canary": {"host": "10.7.0.1", "port": 22},
         },
     )
@@ -318,6 +341,10 @@ def test_run_prefers_host_vars_over_global_vars():
 
 def test_run_rejects_when_canary_is_not_in_target_devices():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        ["10.3.0.1,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
     create_response = client.post(
         "/api/v2/jobs",
         json={"job_name": "mismatch canary", "creator": "tester"},
@@ -328,7 +355,7 @@ def test_run_rejects_when_canary_is_not_in_target_devices():
     run_response = client.post(
         f"/api/v2/jobs/{job_id}/run",
         json={
-            "devices": [{"host": "10.3.0.1", "port": 22}],
+            "imported_device_keys": ["10.3.0.1:22"],
             "canary": {"host": "10.3.0.99", "port": 22},
             "commands": ["show version"],
         },
@@ -339,6 +366,10 @@ def test_run_rejects_when_canary_is_not_in_target_devices():
 
 def test_list_jobs_endpoint():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        ["10.10.0.1,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
     first = client.post("/api/v2/jobs", json={"job_name": "first", "creator": "a"})
     assert first.status_code == 200
     first_id = first.json()["job_id"]
@@ -346,7 +377,7 @@ def test_list_jobs_endpoint():
     run_first = client.post(
         f"/api/v2/jobs/{first_id}/run",
         json={
-            "devices": [{"host": "10.10.0.1", "port": 22}],
+            "imported_device_keys": ["10.10.0.1:22"],
             "canary": {"host": "10.10.0.1", "port": 22},
             "commands": ["show version"],
         },
@@ -375,6 +406,10 @@ def test_create_job_returns_409_when_active_job_exists():
 
 def test_create_job_allowed_after_active_job_is_terminal():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        ["10.10.0.9,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
     first = client.post("/api/v2/jobs", json={"job_name": "first", "creator": "ops"})
     assert first.status_code == 200
     first_id = first.json()["job_id"]
@@ -382,7 +417,7 @@ def test_create_job_allowed_after_active_job_is_terminal():
     run_first = client.post(
         f"/api/v2/jobs/{first_id}/run",
         json={
-            "devices": [{"host": "10.10.0.9", "port": 22}],
+            "imported_device_keys": ["10.10.0.9:22"],
             "canary": {"host": "10.10.0.9", "port": 22},
             "commands": ["show version"],
         },
@@ -410,6 +445,10 @@ def test_active_job_endpoint():
 
 def test_run_job_async_endpoint():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        ["10.9.0.1,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
     create = client.post(
         "/api/v2/jobs", json={"job_name": "async-run", "creator": "ops"}
     )
@@ -419,7 +458,7 @@ def test_run_job_async_endpoint():
     start = client.post(
         f"/api/v2/jobs/{job_id}/run/async",
         json={
-            "devices": [{"host": "10.9.0.1", "port": 22}],
+            "imported_device_keys": ["10.9.0.1:22"],
             "canary": {"host": "10.9.0.1", "port": 22},
             "commands": ["show version"],
         },
@@ -430,6 +469,13 @@ def test_run_job_async_endpoint():
 
 def test_pause_resume_cancel_routes_exist():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        [
+            "10.9.1.1,22,cisco_ios,admin,pass,edge-a,show run,",
+            "10.9.1.2,22,cisco_ios,admin,pass,edge-b,show run,",
+        ],
+    )
     create = client.post("/api/v2/jobs", json={"job_name": "ctl-run", "creator": "ops"})
     assert create.status_code == 200
     job_id = create.json()["job_id"]
@@ -437,10 +483,7 @@ def test_pause_resume_cancel_routes_exist():
     client.post(
         f"/api/v2/jobs/{job_id}/run/async",
         json={
-            "devices": [
-                {"host": "10.9.1.1", "port": 22},
-                {"host": "10.9.1.2", "port": 22},
-            ],
+            "imported_device_keys": ["10.9.1.1:22", "10.9.1.2:22"],
             "canary": {"host": "10.9.1.1", "port": 22},
             "commands": ["show version"],
             "concurrency_limit": 1,
@@ -461,6 +504,15 @@ def test_pause_resume_cancel_routes_exist():
 def test_async_pause_resume_cancel_flow(monkeypatch):
     client = TestClient(app)
     monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+    import_devices_for_run(
+        client,
+        [
+            "10.9.2.1,22,cisco_ios,admin,pass,edge-a,show run,",
+            "10.9.2.2,22,cisco_ios,admin,pass,edge-b,show run,",
+            "10.9.2.3,22,cisco_ios,admin,pass,edge-c,show run,",
+            "10.9.2.4,22,cisco_ios,admin,pass,edge-d,show run,",
+        ],
+    )
 
     create = client.post(
         "/api/v2/jobs", json={"job_name": "async-control-flow", "creator": "ops"}
@@ -471,11 +523,11 @@ def test_async_pause_resume_cancel_flow(monkeypatch):
     start = client.post(
         f"/api/v2/jobs/{job_id}/run/async",
         json={
-            "devices": [
-                {"host": "10.9.2.1", "port": 22},
-                {"host": "10.9.2.2", "port": 22},
-                {"host": "10.9.2.3", "port": 22},
-                {"host": "10.9.2.4", "port": 22},
+            "imported_device_keys": [
+                "10.9.2.1:22",
+                "10.9.2.2:22",
+                "10.9.2.3:22",
+                "10.9.2.4:22",
             ],
             "canary": {"host": "10.9.2.1", "port": 22},
             "commands": ["show version"],
@@ -515,6 +567,13 @@ def test_async_pause_resume_cancel_flow(monkeypatch):
 def test_terminate_alias_cancels_async_run(monkeypatch):
     client = TestClient(app)
     monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+    import_devices_for_run(
+        client,
+        [
+            "10.9.2.10,22,cisco_ios,admin,pass,edge-a,show run,",
+            "10.9.2.11,22,cisco_ios,admin,pass,edge-b,show run,",
+        ],
+    )
 
     create = client.post(
         "/api/v2/jobs", json={"job_name": "async-terminate-flow", "creator": "ops"}
@@ -525,10 +584,7 @@ def test_terminate_alias_cancels_async_run(monkeypatch):
     start = client.post(
         f"/api/v2/jobs/{job_id}/run/async",
         json={
-            "devices": [
-                {"host": "10.9.2.10", "port": 22},
-                {"host": "10.9.2.11", "port": 22},
-            ],
+            "imported_device_keys": ["10.9.2.10:22", "10.9.2.11:22"],
             "canary": {"host": "10.9.2.10", "port": 22},
             "commands": ["show version"],
             "concurrency_limit": 1,
@@ -552,6 +608,13 @@ def test_terminate_alias_cancels_async_run(monkeypatch):
 def test_sync_run_rejected_while_same_job_is_running_async(monkeypatch):
     client = TestClient(app)
     monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+    import_devices_for_run(
+        client,
+        [
+            "10.9.3.1,22,cisco_ios,admin,pass,edge-a,show run,",
+            "10.9.3.2,22,cisco_ios,admin,pass,edge-b,show run,",
+        ],
+    )
 
     create = client.post(
         "/api/v2/jobs", json={"job_name": "race-sync", "creator": "ops"}
@@ -562,10 +625,7 @@ def test_sync_run_rejected_while_same_job_is_running_async(monkeypatch):
     start_async = client.post(
         f"/api/v2/jobs/{job_id}/run/async",
         json={
-            "devices": [
-                {"host": "10.9.3.1", "port": 22},
-                {"host": "10.9.3.2", "port": 22},
-            ],
+            "imported_device_keys": ["10.9.3.1:22", "10.9.3.2:22"],
             "canary": {"host": "10.9.3.1", "port": 22},
             "commands": ["show version"],
         },
@@ -575,7 +635,7 @@ def test_sync_run_rejected_while_same_job_is_running_async(monkeypatch):
     sync = client.post(
         f"/api/v2/jobs/{job_id}/run",
         json={
-            "devices": [{"host": "10.9.3.1", "port": 22}],
+            "imported_device_keys": ["10.9.3.1:22"],
             "canary": {"host": "10.9.3.1", "port": 22},
             "commands": ["show version"],
         },
@@ -587,6 +647,14 @@ def test_sync_run_rejected_while_same_job_is_running_async(monkeypatch):
 def test_duplicate_async_run_does_not_clear_pause_control(monkeypatch):
     client = TestClient(app)
     monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+    import_devices_for_run(
+        client,
+        [
+            "10.9.4.1,22,cisco_ios,admin,pass,edge-a,show run,",
+            "10.9.4.2,22,cisco_ios,admin,pass,edge-b,show run,",
+            "10.9.4.3,22,cisco_ios,admin,pass,edge-c,show run,",
+        ],
+    )
 
     create = client.post(
         "/api/v2/jobs", json={"job_name": "race-async", "creator": "ops"}
@@ -597,10 +665,10 @@ def test_duplicate_async_run_does_not_clear_pause_control(monkeypatch):
     start_async = client.post(
         f"/api/v2/jobs/{job_id}/run/async",
         json={
-            "devices": [
-                {"host": "10.9.4.1", "port": 22},
-                {"host": "10.9.4.2", "port": 22},
-                {"host": "10.9.4.3", "port": 22},
+            "imported_device_keys": [
+                "10.9.4.1:22",
+                "10.9.4.2:22",
+                "10.9.4.3:22",
             ],
             "canary": {"host": "10.9.4.1", "port": 22},
             "commands": ["show version"],
@@ -620,7 +688,7 @@ def test_duplicate_async_run_does_not_clear_pause_control(monkeypatch):
     duplicate_async = client.post(
         f"/api/v2/jobs/{job_id}/run/async",
         json={
-            "devices": [{"host": "10.9.4.1", "port": 22}],
+            "imported_device_keys": ["10.9.4.1:22"],
             "canary": {"host": "10.9.4.1", "port": 22},
             "commands": ["show version"],
         },
@@ -968,6 +1036,7 @@ def test_run_verify_mode_none_disables_verify_commands(monkeypatch):
         f"/api/v2/jobs/{job_id}/run",
         json={
             "commands": ["show version"],
+            "imported_device_keys": ["10.12.0.1:22", "10.12.0.2:22"],
             "verify_commands": ["show run"],
             "verify_mode": "none",
             "canary": {"host": "10.12.0.1", "port": 22},
@@ -981,6 +1050,10 @@ def test_run_verify_mode_none_disables_verify_commands(monkeypatch):
 
 def test_run_rejects_missing_canary():
     client = TestClient(app)
+    import_devices_for_run(
+        client,
+        ["10.16.0.1,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
     create = client.post(
         "/api/v2/jobs", json={"job_name": "missing-canary", "creator": "tester"}
     )
@@ -990,12 +1063,35 @@ def test_run_rejects_missing_canary():
     run = client.post(
         f"/api/v2/jobs/{job_id}/run",
         json={
-            "devices": [{"host": "10.16.0.1", "port": 22}],
+            "imported_device_keys": ["10.16.0.1:22"],
             "commands": ["show version"],
         },
     )
     assert run.status_code == 400
     assert run.json()["detail"] == "canary is required"
+
+
+def test_run_rejects_legacy_devices_field():
+    client = TestClient(app)
+    create = client.post(
+        "/api/v2/jobs", json={"job_name": "legacy-devices", "creator": "tester"}
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "devices": [{"host": "10.99.0.1", "port": 22}],
+            "canary": {"host": "10.99.0.1", "port": 22},
+            "commands": ["show version"],
+        },
+    )
+    assert run.status_code == 400
+    assert (
+        run.json()["detail"]
+        == "devices is no longer supported; use imported_device_keys"
+    )
 
 
 def test_run_verify_mode_canary_targets_only_canary(monkeypatch):

@@ -36,7 +36,6 @@ const importStreamLogEl = document.getElementById("importStreamLog");
 const importErrorsEl = document.getElementById("importErrors");
 const importedDeviceListEl = document.getElementById("importedDeviceList");
 const importedDeviceHintEl = document.getElementById("importedDeviceHint");
-const useImportedEl = document.getElementById("useImported");
 const enablePresetModeEl = document.getElementById("enablePresetMode");
 const presetPanelEl = document.getElementById("presetPanel");
 const osModelSelectEl = document.getElementById("osModelSelect");
@@ -262,17 +261,6 @@ function formatImportErrorDetail(detail) {
   return JSON.stringify(detail);
 }
 
-function parseDevices(text) {
-  return text
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [host, rawPort] = line.split(":");
-      return { host, port: Number(rawPort || "22") };
-    });
-}
-
 function parseCommands(text) {
   return text
     .split("\n")
@@ -351,9 +339,6 @@ function hasProdDevice(keys) {
 }
 
 function createPageTargetKeysForWarning() {
-  if (!useImportedEl.checked) {
-    return [];
-  }
   return selectedImportedDeviceKeys();
 }
 
@@ -432,39 +417,20 @@ function refreshCanaryOptions() {
     return;
   }
   const previous = canaryDeviceEl.value;
-  let candidates = [];
-  if (useImportedEl.checked) {
-    const selectedKeys = selectedImportedDeviceKeys();
-    const keys =
-      selectedKeys.length > 0
-        ? selectedKeys
-        : importedDevices.map((device) => importedDeviceKey(device));
-    const uniqueKeys = Array.from(new Set(keys));
-    candidates = uniqueKeys
-      .map((key) => {
-        const matched = importedDevices.find((device) => importedDeviceKey(device) === key);
-        const [host, rawPort] = key.split(":");
-        return {
-          key,
-          host,
-          port: Number(rawPort || "22"),
-          hostname: matched?.name || host,
-        };
-      })
-      .filter((item) => item.host && Number.isFinite(item.port));
-  } else {
-    const adHocDevices = parseDevices(document.getElementById("devices").value);
-    const unique = new Map();
-    adHocDevices.forEach((device) => {
-      unique.set(`${device.host}:${device.port}`, device);
-    });
-    candidates = Array.from(unique.values()).map((device) => ({
-      key: `${device.host}:${device.port}`,
-      host: device.host,
-      port: device.port,
-      hostname: device.host,
-    }));
-  }
+  const selectedKeys = selectedImportedDeviceKeys();
+  const uniqueKeys = Array.from(new Set(selectedKeys));
+  const candidates = uniqueKeys
+    .map((key) => {
+      const matched = importedDevices.find((device) => importedDeviceKey(device) === key);
+      const [host, rawPort] = key.split(":");
+      return {
+        key,
+        host,
+        port: Number(rawPort || "22"),
+        hostname: matched?.name || host,
+      };
+    })
+    .filter((item) => item.host && Number.isFinite(item.port));
 
   canaryDeviceEl.innerHTML = '<option value="">(select canary)</option>';
   candidates.forEach((item) => {
@@ -1118,20 +1084,15 @@ async function refreshRuntimeModes() {
   }
 }
 
-function resolveRunTargets(useImported, adHocDevices) {
-  if (!useImported) {
-    return {
-      importedDeviceKeys: [],
-      adHocDevices,
-      targetDevices: adHocDevices,
-    };
-  }
+function resolveRunTargets() {
   if (importedDevices.length === 0) {
     throw new Error("imported devices are empty");
   }
   const chosen = selectedImportedDeviceKeys();
-  const importedDeviceKeys =
-    chosen.length > 0 ? chosen : importedDevices.map((device) => importedDeviceKey(device));
+  if (chosen.length === 0) {
+    throw new Error("select at least one imported device");
+  }
+  const importedDeviceKeys = chosen;
   const targetDevices = importedDeviceKeys
     .map((key) => {
       const [host, rawPort] = key.split(":");
@@ -1140,16 +1101,8 @@ function resolveRunTargets(useImported, adHocDevices) {
     .filter((device) => device.host && Number.isFinite(device.port));
   return {
     importedDeviceKeys,
-    adHocDevices: [],
     targetDevices,
   };
-}
-
-function resolveTargetDeviceKeys(useImported, targets) {
-  if (useImported) {
-    return targets.importedDeviceKeys;
-  }
-  return targets.adHocDevices.map((device) => `${device.host}:${device.port}`);
 }
 
 function selectedPostCanaryStrategy() {
@@ -1163,7 +1116,6 @@ function updatePostCanaryControls() {
   concurrencyLimitEl.disabled = !isParallel;
   concurrencyLimitEl.setAttribute("aria-disabled", String(!isParallel));
 }
-
 function resolveEffectiveExecutionConfig(concurrencyLimit, strategy) {
   return {
     strategy,
@@ -1175,14 +1127,12 @@ function collectRunInput() {
   const jobName = document.getElementById("jobName").value.trim();
   const creator = document.getElementById("creator").value.trim();
   const globalVarsText = document.getElementById("globalVars").value;
-  const devices = parseDevices(document.getElementById("devices").value);
   const commands = parseCommands(document.getElementById("commands").value);
   const verifyCommands = parseCommands(verifyCommandsEl.value);
   const verifyMode = verifyModeEl.value;
   const concurrencyLimit = Number(concurrencyLimitEl.value || "5");
   const staggerDelay = Number(staggerDelayEl.value || "1.0");
   const stopOnError = stopOnErrorEl.checked;
-  const useImported = useImportedEl.checked;
   const postCanaryStrategy = selectedPostCanaryStrategy();
 
   if (commands.length === 0) {
@@ -1198,12 +1148,9 @@ function collectRunInput() {
     throw new Error("postCanaryStrategy must be parallel or sequential");
   }
 
-  const targets = resolveRunTargets(useImported, devices);
-  if (!useImported && targets.adHocDevices.length === 0) {
-    throw new Error("ad-hoc devices is empty");
-  }
+  const targets = resolveRunTargets();
   if (targets.targetDevices.length === 0) {
-    throw new Error("target devices is empty");
+    throw new Error("imported target devices is empty");
   }
 
   const canaryKey = canaryDeviceEl.value.trim();
@@ -1217,7 +1164,7 @@ function collectRunInput() {
   const [canaryHost, canaryRawPort] = canaryKey.split(":");
   const canary = { host: canaryHost, port: Number(canaryRawPort || "22") };
   const globalVars = parseGlobalVars(globalVarsText);
-  const targetDeviceKeys = resolveTargetDeviceKeys(useImported, targets);
+  const targetDeviceKeys = targets.importedDeviceKeys;
   const effectiveConfig = resolveEffectiveExecutionConfig(concurrencyLimit, postCanaryStrategy);
 
   return {
@@ -1230,7 +1177,6 @@ function collectRunInput() {
     concurrencyLimit,
     staggerDelay,
     stopOnError,
-    useImported,
     canary,
     canaryKey,
     targets,
@@ -1275,7 +1221,7 @@ function buildReviewModel(runInput) {
       }`,
       `Effective concurrency: ${runInput.effectiveConcurrencyLimit}`,
       `Target devices: ${runInput.targetDeviceKeys.length} (remaining after canary: ${remainingCount})`,
-      `Target source: ${runInput.useImported ? "imported devices" : "ad-hoc devices"}`,
+      "Target source: imported devices",
     ],
     flowDiagram: strategyText,
   };
@@ -1322,8 +1268,6 @@ async function executeRun(runInput) {
     const started = await client().runJobAsync(
       job.job_id,
       runInput.commands,
-      runInput.targets.adHocDevices,
-      runInput.useImported,
       {
         verifyCommands: runInput.verifyCommands,
         verifyMode: runInput.verifyMode,
@@ -1491,12 +1435,6 @@ refreshActiveBtn.addEventListener("click", () => {
   refreshActive().catch((error) => appendLog(String(error)));
 });
 
-useImportedEl.addEventListener("change", () => {
-  importedDeviceListEl.parentElement.classList.toggle("hidden", !useImportedEl.checked);
-  refreshCanaryOptions();
-  refreshProdWarningOverlay();
-});
-
 enablePresetModeEl.addEventListener("change", async () => {
   presetPanelEl.classList.toggle("hidden", !enablePresetModeEl.checked);
   if (!enablePresetModeEl.checked) {
@@ -1560,13 +1498,6 @@ clearImportedSelectionBtn.addEventListener("click", () => {
 
 importedDeviceListEl.addEventListener("change", () => {
   refreshCanaryOptions();
-  refreshProdWarningOverlay();
-});
-
-document.getElementById("devices").addEventListener("input", () => {
-  if (!useImportedEl.checked) {
-    refreshCanaryOptions();
-  }
   refreshProdWarningOverlay();
 });
 
