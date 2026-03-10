@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateJobRequest(BaseModel):
@@ -55,7 +55,6 @@ class DeviceTargetPayload(BaseModel):
 class RunJobRequest(BaseModel):
     """Payload to run a job in scaffold mode."""
 
-    devices: Optional[List[DeviceTargetPayload]] = None
     canary: Optional[DeviceTargetPayload] = None
     commands: List[str] = Field(min_length=1)
     verify_commands: Optional[List[str]] = None
@@ -66,6 +65,7 @@ class RunJobRequest(BaseModel):
     stop_on_error: bool = True
     non_canary_retry_limit: int = Field(default=1, ge=0, le=3)
     retry_backoff_seconds: float = Field(default=0.0, ge=0.0, le=60.0)
+    model_config = ConfigDict(extra="allow")
 
 
 class DeviceRunResponse(BaseModel):

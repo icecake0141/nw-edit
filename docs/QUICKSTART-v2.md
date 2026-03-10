@@ -67,7 +67,7 @@ curl -s -X POST http://127.0.0.1:8010/api/v2/jobs \
 ```bash
 curl -s -X POST http://127.0.0.1:8010/api/v2/jobs/<job_id>/run/async \
   -H "Content-Type: application/json" \
-  -d '{"commands":["show version"]}'
+  -d '{"commands":["show version"],"imported_device_keys":["10.0.0.1:22"],"canary":{"host":"10.0.0.1","port":22}}'
 ```
 
 4. Check status/result

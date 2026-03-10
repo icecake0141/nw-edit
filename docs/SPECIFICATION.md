@@ -99,9 +99,10 @@ host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 
 - `verify_commands` (optional): if provided, used for all target devices.
 - `canary` (required): explicit canary target (`host`, `port`).
-- `imported_device_keys` (optional): explicit imported-device targets (`host:port` list).
-  - cannot be used together with ad-hoc `devices`
+- `imported_device_keys` (required): explicit imported-device targets (`host:port` list).
   - empty list is rejected with `HTTP 400`
+  - unknown keys are rejected with `HTTP 400`
+  - legacy ad-hoc `devices` is rejected with `HTTP 400`
 
 ## Runtime configuration
 

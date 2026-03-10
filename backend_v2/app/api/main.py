@@ -164,37 +164,36 @@ def to_response(job: JobRecord) -> JobResponse:
 def _resolve_run_targets(
     payload: RunJobRequest,
 ) -> tuple[list[DeviceTarget], DeviceTarget]:
-    if payload.devices and payload.imported_device_keys is not None:
+    extra_fields = payload.model_extra or {}
+    if "devices" in extra_fields:
         raise HTTPException(
             status_code=400,
-            detail="devices and imported_device_keys cannot be used together",
+            detail="devices is no longer supported; use imported_device_keys",
         )
-    if payload.devices:
-        devices = [DeviceTarget(host=d.host, port=d.port) for d in payload.devices]
-    elif payload.imported_device_keys is not None:
-        if not payload.imported_device_keys:
-            raise HTTPException(
-                status_code=400,
-                detail="imported_device_keys cannot be empty",
-            )
-        imported_map = {d.key: d for d in device_store.list()}
-        missing_keys = [
-            key for key in payload.imported_device_keys if key not in imported_map
-        ]
-        if missing_keys:
-            missing = ", ".join(missing_keys)
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown imported_device_keys: {missing}",
-            )
-        devices = [
-            DeviceTarget(host=imported_map[key].host, port=imported_map[key].port)
-            for key in payload.imported_device_keys
-        ]
-    else:
-        devices = [DeviceTarget(host=d.host, port=d.port) for d in device_store.list()]
-    if not devices:
-        raise HTTPException(status_code=400, detail="No devices provided or imported")
+    if payload.imported_device_keys is None:
+        raise HTTPException(
+            status_code=400,
+            detail="imported_device_keys is required",
+        )
+    if not payload.imported_device_keys:
+        raise HTTPException(
+            status_code=400,
+            detail="imported_device_keys cannot be empty",
+        )
+    imported_map = {d.key: d for d in device_store.list()}
+    missing_keys = [
+        key for key in payload.imported_device_keys if key not in imported_map
+    ]
+    if missing_keys:
+        missing = ", ".join(missing_keys)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown imported_device_keys: {missing}",
+        )
+    devices = [
+        DeviceTarget(host=imported_map[key].host, port=imported_map[key].port)
+        for key in payload.imported_device_keys
+    ]
 
     if payload.canary is None:
         raise HTTPException(

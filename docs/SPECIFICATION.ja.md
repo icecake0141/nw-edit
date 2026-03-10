@@ -99,9 +99,10 @@ host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 
 - `verify_commands`（任意）: 指定時は全対象デバイスへ共通適用。
 - `canary`（必須）: canary対象デバイス（`host`, `port`）を明示指定。
-- `imported_device_keys`（任意）: import済みデバイスの実行対象を `host:port` で明示。
-  - ad-hoc の `devices` と同時指定不可
+- `imported_device_keys`（必須）: import済みデバイスの実行対象を `host:port` で明示。
   - 空配列は `HTTP 400`
+  - 未知キーは `HTTP 400`
+  - 旧 ad-hoc `devices` は `HTTP 400`
 
 ## 実行時設定
 

@@ -648,7 +648,6 @@ You may obtain a copy of the License at
         <span id="activeJobBannerText">A job is currently running.</span>
         <button class="secondary" id="viewActiveJobBtn" type="button" title="Jump to monitor view for the currently active job.">View Active Job</button>
       </div>
-      <label class="checkbox-row"><input type="checkbox" id="useImported" checked /> Use imported devices when running</label>
       <div class="device-select-wrap">
         <div class="btn-row">
           <button class="secondary" id="selectAllImportedBtn" type="button" title="Select all imported devices currently shown in the list.">Select All Imported</button>
@@ -657,10 +656,6 @@ You may obtain a copy of the License at
         <div class="muted" id="importedDeviceHint">Imported target candidates: 0</div>
         <div id="importedDeviceList" class="device-select-list"></div>
       </div>
-      <label for="devices">Ad-hoc Devices (host:port per line, used when imported list is disabled)</label>
-      <textarea id="devices">10.0.0.1:22
-10.0.0.2:22
-10.0.0.3:22</textarea>
       <label for="canaryDevice">Canary Device (required)</label>
       <select id="canaryDevice">
         <option value="">(select canary)</option>
