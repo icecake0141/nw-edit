@@ -480,6 +480,10 @@ function refreshCanaryOptions() {
   });
   if (previous && candidates.some((item) => item.key === previous)) {
     canaryDeviceEl.value = previous;
+    return;
+  }
+  if (candidates.length > 0) {
+    canaryDeviceEl.value = candidates[0].key;
   }
 }
 
@@ -1404,7 +1408,9 @@ async function requestRun(mode) {
     appendLog(`run review opened (${mode})`);
     switchPage("create");
   } catch (error) {
-    appendLog(String(error));
+    const message = String(error);
+    setStatus(`input-error: ${message}`);
+    appendLog(message);
   }
 }
 
