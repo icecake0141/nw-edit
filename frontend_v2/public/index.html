@@ -19,38 +19,90 @@ You may obtain a copy of the License at
   <title>nw-edit v2 operations console</title>
   <style>
     :root {
-      --bg: #f5f5f5;
-      --ink: #333333;
-      --card: #ffffff;
-      --accent: #007bff;
-      --accent-2: #6c757d;
-      --line: #dddddd;
+      --bg: #edf3f8;
+      --bg-accent: radial-gradient(circle at top left, rgba(49, 94, 166, 0.16), transparent 30%);
+      --surface: rgba(255, 255, 255, 0.76);
+      --surface-strong: #ffffff;
+      --surface-soft: #f5f8fc;
+      --surface-tint: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 252, 0.94));
+      --ink: #172033;
+      --ink-soft: #5f6b85;
+      --title: #0f1728;
+      --accent: #1f4ea3;
+      --accent-strong: #173d84;
+      --accent-soft: #e7eefc;
+      --accent-2: #5f6c84;
+      --line: rgba(126, 147, 180, 0.28);
+      --line-strong: rgba(104, 128, 166, 0.42);
+      --success-bg: #edf9f0;
+      --success-line: #7fcca0;
+      --success-ink: #1f6b41;
+      --warning-bg: #fff7e7;
+      --warning-line: #efc373;
+      --warning-ink: #8b5a12;
+      --danger-bg: #fff0f0;
+      --danger-line: #efaaaa;
+      --danger-ink: #9d2b2b;
+      --info-bg: #eef5ff;
+      --info-line: #a9c4f5;
+      --info-ink: #2856a9;
+      --shadow-sm: 0 10px 24px rgba(15, 23, 40, 0.06);
+      --shadow-md: 0 20px 48px rgba(15, 23, 40, 0.08);
+      --shadow-lg: 0 28px 72px rgba(15, 23, 40, 0.14);
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --focus: 0 0 0 4px rgba(31, 78, 163, 0.16);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       color: var(--ink);
       line-height: 1.5;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      background: var(--bg);
-      padding: 20px;
+      background:
+        linear-gradient(180deg, #f7fbff 0%, var(--bg) 42%, #e6edf5 100%);
+      background-attachment: fixed;
+      padding: 28px;
       min-height: 100vh;
+      position: relative;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        var(--bg-accent),
+        radial-gradient(circle at 85% 10%, rgba(73, 121, 199, 0.11), transparent 28%);
+      opacity: 1;
     }
     .wrap {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 30px;
+      padding: 28px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      gap: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(244, 248, 252, 0.78));
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 28px;
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(14px);
       position: relative;
       z-index: 1;
+      overflow: hidden;
+    }
+    .wrap::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
     }
     .prod-warning-overlay {
       position: fixed;
@@ -90,33 +142,57 @@ You may obtain a copy of the License at
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
-      background: var(--card);
+      gap: 18px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(240, 245, 252, 0.92));
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px 14px;
+      border-radius: calc(var(--radius-md) + 2px);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .head::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: linear-gradient(180deg, #4c79c8 0%, var(--accent) 55%, var(--accent-strong) 100%);
     }
     .head h1 {
       margin: 0;
-      font-size: clamp(1.1rem, 1.8vw, 1.65rem);
-      letter-spacing: 0.005em;
+      font-size: clamp(1.2rem, 1.9vw, 1.8rem);
+      letter-spacing: -0.02em;
+      color: var(--title);
+      font-weight: 700;
     }
     .head-meta {
       display: grid;
       justify-items: end;
-      gap: 4px;
+      gap: 6px;
       font-size: 0.88rem;
+      color: var(--ink-soft);
+      padding-left: 18px;
+      border-left: 1px solid var(--line);
     }
     .panel {
-      background: var(--card);
+      background: var(--surface-tint);
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 4px;
+      background: linear-gradient(90deg, rgba(31, 78, 163, 0.22), rgba(31, 78, 163, 0.06), transparent 70%);
     }
     .grid {
       display: grid;
-      gap: 14px;
+      gap: 16px;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: start;
     }
@@ -125,23 +201,31 @@ You may obtain a copy of the License at
     }
     .nav {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
+      padding: 14px;
+      background: rgba(239, 244, 250, 0.78);
     }
     .nav button {
-      background: #f0f0f0;
-      color: var(--ink);
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--ink-soft);
+      border: 1px solid rgba(113, 133, 165, 0.16);
+      box-shadow: none;
     }
     .nav button:hover {
-      background: #e2e6ea;
+      background: rgba(255, 255, 255, 0.94);
+      border-color: rgba(87, 118, 168, 0.26);
+      color: var(--title);
     }
     .nav button[aria-pressed="true"] {
-      background: var(--accent);
+      background: linear-gradient(180deg, #315ea6, var(--accent));
       color: #fff;
       outline: none;
+      border-color: transparent;
+      box-shadow: 0 12px 24px rgba(31, 78, 163, 0.22);
     }
     .nav button.active {
-      background: var(--accent);
+      background: linear-gradient(180deg, #315ea6, var(--accent));
       color: #fff;
     }
     .page {
@@ -154,32 +238,53 @@ You may obtain a copy of the License at
       display: block;
       font-size: 0.87rem;
       margin-bottom: 6px;
-      opacity: 0.8;
-      font-weight: 500;
+      color: var(--ink-soft);
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }
     input, textarea, select {
       width: 100%;
-      padding: 10px 12px;
-      border-radius: 4px;
-      border: 1px solid var(--line);
+      padding: 11px 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(115, 136, 167, 0.28);
       font: inherit;
       font-size: 0.94rem;
       color: inherit;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
     }
     input, select { min-height: 40px; }
-    input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
-      outline: 2px solid #007bff;
-      outline-offset: 1px;
+    input::placeholder, textarea::placeholder {
+      color: #8994aa;
     }
-    textarea { min-height: 90px; resize: vertical; }
-    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
+      outline: none;
+      border-color: rgba(31, 78, 163, 0.55);
+      box-shadow: var(--focus);
+    }
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
     .checkbox-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin: 10px 0 12px;
+      margin: 12px 0 14px;
       opacity: 1;
+      color: var(--ink);
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(247, 250, 253, 0.92);
+      border: 1px solid rgba(124, 145, 176, 0.16);
     }
     .checkbox-row input {
       width: auto;
@@ -190,23 +295,27 @@ You may obtain a copy of the License at
       display: flex;
       gap: 14px;
       flex-wrap: wrap;
-      margin: 0 0 12px;
-      padding: 0;
+      margin: 4px 0 14px;
+      padding: 14px 14px 10px;
       border: 0;
+      border-radius: 14px;
+      background: rgba(247, 250, 253, 0.9);
+      border: 1px solid rgba(124, 145, 176, 0.16);
     }
     .radio-group legend {
       width: 100%;
       padding: 0;
       margin-bottom: 6px;
       font-size: 0.87rem;
-      opacity: 0.8;
-      font-weight: 500;
+      color: var(--ink-soft);
+      font-weight: 600;
     }
     .radio-option {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-size: 0.94rem;
+      color: var(--ink);
     }
     .radio-option input {
       width: auto;
@@ -214,24 +323,30 @@ You may obtain a copy of the License at
       margin: 0;
     }
     .device-select-wrap {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 10px;
-      background: #fbfcfd;
-      margin-bottom: 12px;
+      border: 1px solid rgba(115, 136, 167, 0.22);
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(244, 248, 252, 0.92));
+      margin-bottom: 14px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
     .device-select-list {
       display: grid;
-      gap: 6px;
+      gap: 8px;
       max-height: 180px;
       overflow: auto;
-      margin-top: 8px;
+      margin-top: 12px;
+      padding-right: 4px;
     }
     .device-option {
       display: flex;
       align-items: center;
       gap: 8px;
       font-size: 0.9rem;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid rgba(125, 145, 175, 0.14);
     }
     .device-option input {
       width: auto;
@@ -244,14 +359,14 @@ You may obtain a copy of the License at
     .import-status {
       display: grid;
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 12px;
     }
     .import-loading {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-size: 0.84rem;
-      color: #374151;
+      color: var(--ink-soft);
     }
     .import-spinner {
       width: 14px;
@@ -272,10 +387,10 @@ You may obtain a copy of the License at
     }
     .import-stream-log {
       margin-top: 2px;
-      padding: 10px;
-      border-radius: 4px;
-      border: 1px solid #1f2937;
-      background: #111827;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #20314f;
+      background: linear-gradient(180deg, #122033, #0f1a2b);
       color: #e5e7eb;
       max-height: 180px;
       overflow: auto;
@@ -287,49 +402,86 @@ You may obtain a copy of the License at
     progress {
       width: 100%;
       height: 10px;
+      accent-color: var(--accent);
     }
     .error-box {
-      border: 1px solid #efc7c7;
-      background: #fff7f7;
-      color: #7f1d1d;
-      border-radius: 8px;
-      padding: 8px 10px;
+      border: 1px solid var(--danger-line);
+      background: linear-gradient(180deg, #fff8f8, var(--danger-bg));
+      color: var(--danger-ink);
+      border-radius: 12px;
+      padding: 10px 12px;
       font-size: 0.86rem;
       white-space: pre-wrap;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
     .active-job-banner {
-      border: 1px solid #f5d08b;
-      background: #fff8e8;
-      color: #7a4c00;
-      border-radius: 4px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
+      border: 1px solid var(--warning-line);
+      background: linear-gradient(180deg, #fffaf0, var(--warning-bg));
+      color: var(--warning-ink);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
     .active-job-banner.hidden {
       display: none;
     }
-    .muted { opacity: 0.72; font-size: 0.86rem; }
-    button {
-      border: none;
-      border-radius: 4px;
-      padding: 10px 18px;
-      font: inherit;
-      font-weight: 500;
-      cursor: pointer;
+    .muted {
+      color: var(--ink-soft);
+      font-size: 0.86rem;
     }
-    .primary { background: var(--accent); color: white; }
-    .secondary { background: var(--accent-2); color: white; }
-    .primary:hover { background: #0056b3; }
-    .secondary:hover { background: #5a6268; }
+    button {
+      border: 1px solid transparent;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+      min-height: 42px;
+      letter-spacing: 0.01em;
+    }
+    button:hover {
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+      box-shadow: none;
+      transform: none;
+    }
+    .primary {
+      background: linear-gradient(180deg, #315ea6, var(--accent));
+      color: white;
+      box-shadow: 0 12px 24px rgba(31, 78, 163, 0.2);
+    }
+    .secondary {
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--title);
+      border-color: rgba(102, 123, 154, 0.24);
+      box-shadow: 0 8px 18px rgba(15, 23, 40, 0.06);
+    }
+    .primary:hover {
+      background: linear-gradient(180deg, #2a579f, var(--accent-strong));
+      box-shadow: 0 14px 28px rgba(31, 78, 163, 0.24);
+    }
+    .secondary:hover {
+      background: rgba(255, 255, 255, 0.98);
+      border-color: rgba(83, 114, 166, 0.32);
+      box-shadow: 0 10px 22px rgba(15, 23, 40, 0.08);
+    }
     pre {
       margin: 0;
-      padding: 12px;
-      border-radius: 4px;
-      background: #151923;
+      padding: 14px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #141d2d, #0f1725);
       color: #e5e7eb;
       max-height: 300px;
       overflow: auto;
@@ -337,111 +489,158 @@ You may obtain a copy of the License at
       font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
       white-space: pre-wrap;
       word-break: break-word;
+      border: 1px solid rgba(33, 48, 75, 0.9);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
     .history-list {
       display: grid;
-      gap: 8px;
+      gap: 10px;
       max-height: 360px;
       overflow: auto;
     }
     .history-item {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 10px;
-      background: #fff;
+      border: 1px solid rgba(117, 137, 167, 0.2);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.84);
       cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
     }
     .history-item:hover {
-      border-color: #98b3d0;
-      background: #f8fbff;
+      border-color: rgba(87, 118, 168, 0.34);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 16px 30px rgba(15, 23, 40, 0.08);
+      transform: translateY(-1px);
     }
     .job-summary-card {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 12px;
-      background: #fbfcfd;
-      margin-bottom: 12px;
+      border: 1px solid rgba(117, 137, 167, 0.2);
+      border-radius: 16px;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 246, 252, 0.94));
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .job-summary-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 4px;
+      background: linear-gradient(90deg, #5c82c9 0%, var(--accent) 48%, rgba(31, 78, 163, 0.12) 100%);
     }
     .status-badge {
       display: inline-block;
       border-radius: 999px;
-      padding: 2px 8px;
+      padding: 4px 10px;
       font-size: 0.76rem;
       font-weight: 700;
       letter-spacing: 0.02em;
       text-transform: uppercase;
+      border: 1px solid transparent;
     }
     .status-queued {
-      background: #e5e7eb;
-      color: #374151;
+      background: #edf1f7;
+      color: #435069;
+      border-color: #d2dbe8;
     }
     .status-running {
-      background: #fef3c7;
-      color: #92400e;
+      background: #fff0cf;
+      color: #94621a;
+      border-color: #f1d08f;
     }
     .status-success, .status-completed {
-      background: #dcfce7;
-      color: #166534;
+      background: #e9f8ee;
+      color: #1f6b41;
+      border-color: #b8e0c6;
     }
     .status-failed, .status-cancelled {
-      background: #fee2e2;
-      color: #991b1b;
+      background: #ffe8e8;
+      color: #9d2b2b;
+      border-color: #f1b5b5;
     }
     .status-paused {
-      background: #dbeafe;
-      color: #1e40af;
+      background: #e7f0ff;
+      color: #2856a9;
+      border-color: #bfd2f8;
     }
     .monitor-grid {
       display: grid;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 12px;
+      margin-top: 14px;
     }
     .device-card {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 12px;
-      background: #fff;
+      border: 1px solid rgba(117, 137, 167, 0.22);
+      border-radius: 16px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(244, 248, 252, 0.94));
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .device-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 4px;
+      background: rgba(115, 136, 167, 0.18);
     }
     .device-card.status-queued {
-      border-color: #cbd5e1;
-      background: #f8fafc;
+      border-color: #ccd7e6;
+      background: linear-gradient(180deg, #fbfdff, #f3f7fb);
     }
     .device-card.status-running {
-      border-color: #fbbf24;
-      background: #fffbeb;
+      border-color: #f1d08f;
+      background: linear-gradient(180deg, #fffdf7, #fff5dd);
     }
     .device-card.status-success, .device-card.status-completed {
-      border-color: #86efac;
-      background: #f0fdf4;
+      border-color: #a5d9b7;
+      background: linear-gradient(180deg, #f7fdf9, #edf9f0);
     }
     .device-card.status-failed, .device-card.status-cancelled {
-      border-color: #fca5a5;
-      background: #fef2f2;
+      border-color: #efb0b0;
+      background: linear-gradient(180deg, #fff9f9, #fff0f0);
+    }
+    .device-card.status-queued::before {
+      background: linear-gradient(90deg, #d4dce8, #aab8cb);
+    }
+    .device-card.status-running::before {
+      background: linear-gradient(90deg, #f2cf8a, #e4aa34);
+    }
+    .device-card.status-success::before, .device-card.status-completed::before {
+      background: linear-gradient(90deg, #97d1ac, #4ba36e);
+    }
+    .device-card.status-failed::before, .device-card.status-cancelled::before {
+      background: linear-gradient(90deg, #f0b3b3, #dc6e6e);
     }
     .device-card h4 {
-      margin: 0 0 6px;
+      margin: 0 0 8px;
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+      color: var(--title);
     }
     .device-card .meta {
       font-size: 0.84rem;
-      opacity: 0.75;
-      margin-bottom: 6px;
+      color: var(--ink-soft);
+      margin-bottom: 8px;
     }
     .output-label {
-      margin: 8px 0 4px;
+      margin: 10px 0 5px;
       font-size: 0.8rem;
       font-weight: 700;
-      opacity: 0.8;
+      color: var(--ink-soft);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
     }
     .stream-output {
       margin-top: 6px;
-      padding: 10px;
-      border-radius: 4px;
-      border: 1px solid #1f2937;
-      background: #111827;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #20314f;
+      background: linear-gradient(180deg, #122033, #0f1a2b);
       color: #e5e7eb;
       white-space: pre-wrap;
       max-height: 180px;
@@ -455,10 +654,10 @@ You may obtain a copy of the License at
     }
     .diff-output {
       margin-top: 6px;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
-      background: #fafafa;
-      padding: 10px;
+      border: 1px solid rgba(117, 137, 167, 0.22);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.82);
+      padding: 12px;
       max-height: 240px;
       overflow: auto;
       font-size: 0.82rem;
@@ -467,20 +666,21 @@ You may obtain a copy of the License at
       word-break: break-word;
     }
     .diff-add {
-      color: #166534;
-      background: #dcfce7;
+      color: #1f6b41;
+      background: #def4e6;
     }
     .diff-remove {
-      color: #991b1b;
-      background: #fee2e2;
+      color: #9d2b2b;
+      background: #fde4e4;
     }
     .help-content {
       display: grid;
-      gap: 14px;
+      gap: 16px;
     }
     .help-content h3 {
       margin: 0;
       font-size: 1rem;
+      color: var(--title);
     }
     .help-content p {
       margin: 0;
@@ -489,28 +689,31 @@ You may obtain a copy of the License at
       max-height: none;
     }
     .review-panel {
-      border: 1px solid #98b3d0;
-      background: #f8fbff;
-      border-radius: 6px;
-      padding: 12px;
+      border: 1px solid rgba(120, 147, 190, 0.26);
+      background: linear-gradient(180deg, rgba(245, 249, 255, 0.96), rgba(237, 244, 253, 0.92));
+      border-radius: 16px;
+      padding: 16px;
       display: grid;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 12px;
+      margin-top: 14px;
+      box-shadow: var(--shadow-sm);
     }
     .review-grid {
       display: grid;
-      gap: 10px;
+      gap: 12px;
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .review-block {
-      border: 1px solid #c9d8ea;
-      background: #fff;
-      border-radius: 4px;
-      padding: 10px;
+      border: 1px solid rgba(124, 145, 176, 0.22);
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
     .review-block h4 {
-      margin: 0 0 6px;
+      margin: 0 0 8px;
       font-size: 0.9rem;
+      color: var(--title);
     }
     .review-list {
       margin: 0;
@@ -522,11 +725,11 @@ You may obtain a copy of the License at
       word-break: break-word;
     }
     .review-flow {
-      border: 1px dashed #90a9c7;
-      border-radius: 4px;
-      padding: 10px;
+      border: 1px dashed rgba(104, 128, 166, 0.5);
+      border-radius: 12px;
+      padding: 12px;
       font-size: 0.85rem;
-      background: #f4f8fd;
+      background: rgba(243, 247, 253, 0.95);
       overflow: auto;
       white-space: pre;
       font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
@@ -539,12 +742,55 @@ You may obtain a copy of the License at
     @media (max-width: 980px) {
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .field-wide { grid-column: span 2; }
+      .wrap {
+        padding: 22px;
+      }
+      .head {
+        padding: 16px 18px;
+      }
     }
     @media (max-width: 700px) {
+      body {
+        padding: 16px;
+      }
+      .wrap {
+        padding: 16px;
+        border-radius: 20px;
+      }
       .grid { grid-template-columns: 1fr; }
       .field-wide { grid-column: span 1; }
-      .panel { padding: 14px; }
-      .head { align-items: flex-start; flex-direction: column; }
+      .panel {
+        padding: 16px;
+        border-radius: 14px;
+      }
+      .head {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 16px;
+      }
+      .head-meta {
+        justify-items: start;
+        padding-left: 0;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+        width: 100%;
+      }
+      .nav {
+        gap: 8px;
+        padding: 10px;
+      }
+      .nav button {
+        flex: 1 1 calc(50% - 8px);
+      }
+      .btn-row button {
+        flex: 1 1 auto;
+      }
+      .checkbox-row,
+      .radio-group,
+      .device-select-wrap {
+        padding: 12px;
+      }
     }
   </style>
 </head>
