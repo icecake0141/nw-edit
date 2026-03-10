@@ -355,11 +355,7 @@ function createPageTargetKeysForWarning() {
   if (!useImportedEl.checked) {
     return [];
   }
-  const selectedKeys = selectedImportedDeviceKeys();
-  if (selectedKeys.length > 0) {
-    return selectedKeys;
-  }
-  return importedDevices.map((device) => importedDeviceKey(device));
+  return selectedImportedDeviceKeys();
 }
 
 function refreshProdWarningOverlay() {
