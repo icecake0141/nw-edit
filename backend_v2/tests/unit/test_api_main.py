@@ -17,6 +17,7 @@
 # Review required for correctness, security, and licensing.
 """API-level tests for v2 scaffold."""
 
+import importlib
 import json
 import os
 import time
@@ -133,6 +134,40 @@ def test_cors_allows_local_frontend_origin():
     )
     assert preflight.status_code == 200
     assert preflight.headers["access-control-allow-origin"] == "http://127.0.0.1:3010"
+
+
+def test_cors_rejects_localhost_origin_by_default():
+    client = TestClient(app)
+    preflight = client.options(
+        "/api/v2/devices/import",
+        headers={
+            "Origin": "http://localhost:3010",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert preflight.status_code == 400
+    assert "access-control-allow-origin" not in preflight.headers
+
+
+def test_cors_env_override_allows_custom_origin(monkeypatch):
+    monkeypatch.setenv("NW_EDIT_V2_CORS_ORIGINS", "http://localhost:3010")
+    reloaded = importlib.reload(api_main)
+    try:
+        client = TestClient(reloaded.app)
+        preflight = client.options(
+            "/api/v2/devices/import",
+            headers={
+                "Origin": "http://localhost:3010",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        assert preflight.status_code == 200
+        assert (
+            preflight.headers["access-control-allow-origin"] == "http://localhost:3010"
+        )
+    finally:
+        monkeypatch.delenv("NW_EDIT_V2_CORS_ORIGINS", raising=False)
+        importlib.reload(api_main)
 
 
 def test_create_job_persists_global_vars():

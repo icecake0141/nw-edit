@@ -87,8 +87,7 @@ Modes:
 Run minimal frontend locally:
 
 ```bash
-cd frontend_v2/public
-python3 -m http.server 3010
+python3 -m backend_v2.app.frontend_server
 ```
 
 Sample flow:

@@ -44,6 +44,8 @@ python3 -m pip install -r backend_v2/requirements-dev.txt
 
 - Backend: `http://127.0.0.1:8010`
 - Frontend: `http://127.0.0.1:3010`
+- Frontend は `python -m http.server` ではなく、リポジトリ内の hardened static server で配信されます。
+- Directory Listing は設計上無効で、未知のパスは `404` を返します。
 
 ### 検証
 

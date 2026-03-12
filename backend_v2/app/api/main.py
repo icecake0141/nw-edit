@@ -93,13 +93,13 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Allow local v2 frontend (python http.server on 3010) to call API on 8010.
+# Allow the local v2 frontend on 127.0.0.1:3010 to call API on 8010.
 # Comma-separated override is available for deployment-specific origins.
 cors_origins = [
     origin.strip()
     for origin in os.getenv(
         "NW_EDIT_V2_CORS_ORIGINS",
-        "http://127.0.0.1:3010,http://localhost:3010",
+        "http://127.0.0.1:3010",
     ).split(",")
     if origin.strip()
 ]
