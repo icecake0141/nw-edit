@@ -46,6 +46,8 @@ python3 -m pip install -r backend_v2/requirements-dev.txt
 
 - Backend: `http://127.0.0.1:8010`
 - Frontend: `http://127.0.0.1:3010`
+- Frontend is served by the repo-managed hardened static server, not `python -m http.server`.
+- Directory listing is disabled by design; unknown paths return `404`.
 
 ### Validation
 

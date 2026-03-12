@@ -38,11 +38,14 @@ export NW_EDIT_V2_SIMULATED_DELAY_MS=200   # optional (slow down simulated worke
 ## 2. Start frontend v2
 
 ```bash
-cd frontend_v2/public
-python3 -m http.server 3010
+python3 -m backend_v2.app.frontend_server
 ```
 
 Open `http://127.0.0.1:3010`.
+
+Notes:
+- The frontend binds to `127.0.0.1` by default.
+- Directory listing is disabled; requests to unknown paths return `404`.
 
 ## 3. Basic API flow
 

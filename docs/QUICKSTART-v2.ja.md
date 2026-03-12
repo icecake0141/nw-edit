@@ -30,11 +30,14 @@ export NW_EDIT_V2_SIMULATED_DELAY_MS=200   # 任意（simulated worker の遅延
 ## 2. frontend v2 を起動
 
 ```bash
-cd frontend_v2/public
-python3 -m http.server 3010
+python3 -m backend_v2.app.frontend_server
 ```
 
 `http://127.0.0.1:3010` を開いてください。
+
+補足:
+- Frontend はデフォルトで `127.0.0.1` にのみ bind します。
+- Directory Listing は無効で、存在しないパスは `404` を返します。
 
 ## 3. 基本的な API フロー
 
