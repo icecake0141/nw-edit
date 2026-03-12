@@ -41,6 +41,8 @@ A minimal web application for applying multi-line configuration commands to mult
 
 ```bash
 python3 -m pip install -r backend_v2/requirements-dev.txt
+export NW_EDIT_V2_WORKER_MODE=netmiko
+export NW_EDIT_V2_VALIDATOR_MODE=netmiko
 ./start_v2.sh
 ```
 
@@ -48,6 +50,19 @@ python3 -m pip install -r backend_v2/requirements-dev.txt
 - Frontend: `http://127.0.0.1:3010`
 - Frontend is served by the repo-managed hardened static server, not `python -m http.server`.
 - Directory listing is disabled by design; unknown paths return `404`.
+- `./start_v2.sh` now requires `NW_EDIT_V2_WORKER_MODE` and `NW_EDIT_V2_VALIDATOR_MODE` to be explicitly exported before startup.
+- Startup prints required/optional environment variables before launching services.
+- Environment variable names containing `PASS`, `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, or `AUTH` are shown as `***MASKED***`.
+
+### Startup environment variables
+
+- Required:
+  - `NW_EDIT_V2_WORKER_MODE`: backend worker mode (`netmiko` or `simulated`)
+  - `NW_EDIT_V2_VALIDATOR_MODE`: import-time validator mode (`netmiko` or `simulated`)
+- Optional:
+  - `NW_EDIT_V2_SIMULATED_DELAY_MS`: simulated worker delay in milliseconds (default: `0`)
+  - `NW_EDIT_V2_PRESET_FILE`: preset JSON storage path (default: `backend_v2/data/run_presets.json`)
+  - `NW_EDIT_V2_CORS_ORIGINS`: comma-separated frontend origins (default: `http://127.0.0.1:3010,http://localhost:3010`)
 
 ### Validation
 

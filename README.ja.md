@@ -39,6 +39,8 @@ limitations under the License.
 
 ```bash
 python3 -m pip install -r backend_v2/requirements-dev.txt
+export NW_EDIT_V2_WORKER_MODE=netmiko
+export NW_EDIT_V2_VALIDATOR_MODE=netmiko
 ./start_v2.sh
 ```
 
@@ -46,6 +48,19 @@ python3 -m pip install -r backend_v2/requirements-dev.txt
 - Frontend: `http://127.0.0.1:3010`
 - Frontend は `python -m http.server` ではなく、リポジトリ内の hardened static server で配信されます。
 - Directory Listing は設計上無効で、未知のパスは `404` を返します。
+- `./start_v2.sh` は起動前に `NW_EDIT_V2_WORKER_MODE` と `NW_EDIT_V2_VALIDATOR_MODE` の明示設定を要求します。
+- 起動時に required/optional の環境変数一覧を表示してからサービスを起動します。
+- 環境変数名に `PASS`、`PASSWORD`、`SECRET`、`TOKEN`、`KEY`、`CREDENTIAL`、`AUTH` を含む値は `***MASKED***` と表示します。
+
+### 起動時の環境変数
+
+- Required:
+  - `NW_EDIT_V2_WORKER_MODE`: backend worker モード（`netmiko` または `simulated`）
+  - `NW_EDIT_V2_VALIDATOR_MODE`: import 時 validator モード（`netmiko` または `simulated`）
+- Optional:
+  - `NW_EDIT_V2_SIMULATED_DELAY_MS`: simulated worker の遅延ミリ秒（既定: `0`）
+  - `NW_EDIT_V2_PRESET_FILE`: プリセット JSON の保存先（既定: `backend_v2/data/run_presets.json`）
+  - `NW_EDIT_V2_CORS_ORIGINS`: カンマ区切りの frontend origin 一覧（既定: `http://127.0.0.1:3010,http://localhost:3010`）
 
 ### 検証
 
