@@ -13,21 +13,46 @@ You may obtain a copy of the License at
 -->
 # QUICKSTART v2（日本語）
 
-## 1. backend v2 を起動
+## 1. 起動用の環境変数を export
+
+`./start_v2.sh` は、起動前に 2 つのランタイムモード変数を明示設定する必要があります。
+
+```bash
+export NW_EDIT_V2_WORKER_MODE=netmiko
+export NW_EDIT_V2_VALIDATOR_MODE=netmiko
+```
+
+任意の変数:
+
+```bash
+export NW_EDIT_V2_SIMULATED_DELAY_MS=200
+export NW_EDIT_V2_PRESET_FILE=backend_v2/data/run_presets.json
+export NW_EDIT_V2_CORS_ORIGINS=http://127.0.0.1:3010,http://localhost:3010
+```
+
+`./start_v2.sh` は backend/frontend の起動前に required/optional の環境変数一覧を表示します。変数名に `PASS`、`PASSWORD`、`SECRET`、`TOKEN`、`KEY`、`CREDENTIAL`、`AUTH` を含む場合、値は `***MASKED***` で表示されます。
+
+## 2. backend と frontend v2 を起動
+
+```bash
+./start_v2.sh
+```
+
+`http://127.0.0.1:3010` を開いてください。
+
+## 3. backend v2 を個別起動（任意）
 
 ```bash
 uvicorn backend_v2.app.api.main:app --reload --port 8010
 ```
 
-モード設定:
+個別起動時の設定:
 
 ```bash
-export NW_EDIT_V2_WORKER_MODE=netmiko      # 既定値は netmiko（ローカル検証のみ simulated を指定）
-export NW_EDIT_V2_VALIDATOR_MODE=netmiko   # 既定値は netmiko（ローカル検証のみ simulated を指定）
 export NW_EDIT_V2_SIMULATED_DELAY_MS=200   # 任意（simulated worker の遅延）
 ```
 
-## 2. frontend v2 を起動
+## 4. frontend v2 を個別起動（任意）
 
 ```bash
 python3 -m backend_v2.app.frontend_server
@@ -39,7 +64,7 @@ python3 -m backend_v2.app.frontend_server
 - Frontend はデフォルトで `127.0.0.1` にのみ bind します。
 - Directory Listing は無効で、存在しないパスは `404` を返します。
 
-## 3. 基本的な API フロー
+## 5. 基本的な API フロー
 
 1. デバイスをインポート
 
@@ -101,14 +126,14 @@ curl -s "http://127.0.0.1:8010/api/v2/presets?os_model=cisco_ios"
 - `Save New Preset` で同一 `name + os_model` が存在する場合は `HTTP 409`。
 - Run成功時の自動保存は行われません。
 
-## 4. ローカル検証ショートカット
+## 6. ローカル検証ショートカット
 
 ```bash
 make check
 make check-integration
 ```
 
-## 5. 監視とトラブルシュート
+## 7. 監視とトラブルシュート
 
 - 実行中ジョブの確認:
 
@@ -136,7 +161,7 @@ make check-integration
 docker compose --profile test down
 ```
 
-## 6. 既知制約と非目標
+## 8. 既知制約と非目標
 
 - 実行時データはインメモリのみ（永続DBなし）。
 - 認証情報はプロセスメモリ上で平文扱い。

@@ -21,21 +21,46 @@ You may obtain a copy of the License at
 python3 -m pip install -r backend_v2/requirements-dev.txt
 ```
 
-## 1. Start backend v2
+## 1. Export startup environment variables
+
+`./start_v2.sh` requires the two runtime mode variables to be set explicitly before launch.
+
+```bash
+export NW_EDIT_V2_WORKER_MODE=netmiko
+export NW_EDIT_V2_VALIDATOR_MODE=netmiko
+```
+
+Optional variables:
+
+```bash
+export NW_EDIT_V2_SIMULATED_DELAY_MS=200
+export NW_EDIT_V2_PRESET_FILE=backend_v2/data/run_presets.json
+export NW_EDIT_V2_CORS_ORIGINS=http://127.0.0.1:3010,http://localhost:3010
+```
+
+At startup, `./start_v2.sh` prints required and optional environment variables before launching the backend and frontend. Variable names containing `PASS`, `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, or `AUTH` are displayed as `***MASKED***`.
+
+## 2. Start backend and frontend v2
+
+```bash
+./start_v2.sh
+```
+
+Open `http://127.0.0.1:3010`.
+
+## 3. Start backend v2 manually (optional)
 
 ```bash
 uvicorn backend_v2.app.api.main:app --reload --port 8010
 ```
 
-Modes:
+Manual mode settings:
 
 ```bash
-export NW_EDIT_V2_WORKER_MODE=netmiko     # default is netmiko (set simulated for local dry runs)
-export NW_EDIT_V2_VALIDATOR_MODE=netmiko   # default is netmiko (set simulated for local dry runs)
 export NW_EDIT_V2_SIMULATED_DELAY_MS=200   # optional (slow down simulated worker)
 ```
 
-## 2. Start frontend v2
+## 4. Start frontend v2 manually (optional)
 
 ```bash
 python3 -m backend_v2.app.frontend_server
@@ -47,7 +72,7 @@ Notes:
 - The frontend binds to `127.0.0.1` by default.
 - Directory listing is disabled; requests to unknown paths return `404`.
 
-## 3. Basic API flow
+## 5. Basic API flow
 
 1. Import devices
 
@@ -109,14 +134,14 @@ curl -s "http://127.0.0.1:8010/api/v2/presets?os_model=cisco_ios"
 - Duplicate `name + os_model` on `Save New Preset` returns `HTTP 409`.
 - Presets are not auto-saved when a run succeeds.
 
-## 4. Local validation shortcuts
+## 6. Local validation shortcuts
 
 ```bash
 make check
 make check-integration
 ```
 
-## 5. Monitoring and troubleshooting
+## 7. Monitoring and troubleshooting
 
 - Check active run:
 
@@ -144,7 +169,7 @@ make check-integration
 docker compose --profile test down
 ```
 
-## 6. Known limitations and non-goals
+## 8. Known limitations and non-goals
 
 - In-memory runtime only (no persistent DB/state).
 - Credentials are handled in plaintext in process memory.
