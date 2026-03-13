@@ -78,16 +78,11 @@ def reset_in_memory_runtime_state():
             for job_id, thread in api_main.run_coordinator._threads.items()
             if thread.is_alive()
         }
-    with api_main.store._lock:
-        api_main.store._jobs.clear()
-    with api_main.device_store._lock:
-        api_main.device_store._devices.clear()
-    with api_main.event_store._lock:
-        api_main.event_store._events_by_job.clear()
-    with api_main.run_store._lock:
-        api_main.run_store._latest_by_job.clear()
-    with api_main.control_store._lock:
-        api_main.control_store._controls.clear()
+    api_main.store.clear()
+    api_main.device_store.clear()
+    api_main.event_store.clear()
+    api_main.run_store.clear()
+    api_main.control_store.clear()
     api_main.engine.worker = api_main.SimulatedDeviceWorker()
     api_main.device_import_service.validator = api_main.SimulatedConnectionValidator()
     yield
@@ -781,6 +776,106 @@ def test_presets_crud_and_duplicate_conflict():
     models = client.get("/api/v2/presets/os-models")
     assert models.status_code == 200
     assert "cisco_ios" in models.json()
+
+
+def test_app_reset_clears_volatile_state_but_keeps_presets():
+    client = TestClient(app)
+    preset_name = f"reset-keep-{time.time_ns()}"
+    preset = client.post(
+        "/api/v2/presets",
+        json={
+            "name": preset_name,
+            "os_model": "cisco_ios",
+            "commands": ["show clock"],
+            "verify_commands": [],
+        },
+    )
+    assert preset.status_code == 200
+
+    import_devices_for_run(
+        client,
+        ["10.20.0.1,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
+    create = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "reset-me", "creator": "tester"},
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "commands": ["show version"],
+            "imported_device_keys": ["10.20.0.1:22"],
+            "canary": {"host": "10.20.0.1", "port": 22},
+        },
+    )
+    assert run.status_code == 200
+
+    reset = client.post("/api/v2/app/reset")
+    assert reset.status_code == 200
+    assert reset.json()["reset"] is True
+    assert reset.json()["cleared"]["devices"] == 1
+    assert reset.json()["cleared"]["jobs"] == 1
+    assert reset.json()["cleared"]["events"] > 0
+    assert reset.json()["cleared"]["run_results"] == 1
+    assert reset.json()["cleared"]["controls"] == 1
+
+    listed_devices = client.get("/api/v2/devices")
+    assert listed_devices.status_code == 200
+    assert listed_devices.json() == []
+
+    listed_jobs = client.get("/api/v2/jobs")
+    assert listed_jobs.status_code == 200
+    assert listed_jobs.json() == []
+
+    active = client.get("/api/v2/jobs/active")
+    assert active.status_code == 200
+    assert active.json() == {"active": False, "job": None}
+
+    events = client.get(f"/api/v2/jobs/{job_id}/events")
+    assert events.status_code == 404
+
+    result = client.get(f"/api/v2/jobs/{job_id}/result")
+    assert result.status_code == 404
+
+    listed_presets = client.get("/api/v2/presets?os_model=cisco_ios")
+    assert listed_presets.status_code == 200
+    assert any(item["name"] == preset_name for item in listed_presets.json())
+
+
+def test_app_reset_returns_409_when_active_job_exists(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setenv("NW_EDIT_V2_SIMULATED_DELAY_MS", "700")
+    import_devices_for_run(
+        client,
+        [
+            "10.20.1.1,22,cisco_ios,admin,pass,edge-a,show run,",
+            "10.20.1.2,22,cisco_ios,admin,pass,edge-b,show run,",
+        ],
+    )
+    create = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "reset-blocked", "creator": "tester"},
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    started = client.post(
+        f"/api/v2/jobs/{job_id}/run/async",
+        json={
+            "commands": ["show version"],
+            "imported_device_keys": ["10.20.1.1:22", "10.20.1.2:22"],
+            "canary": {"host": "10.20.1.1", "port": 22},
+            "concurrency_limit": 1,
+        },
+    )
+    assert started.status_code == 200
+
+    reset = client.post("/api/v2/app/reset")
+    assert reset.status_code == 409
+    assert "Cannot reset app state" in reset.json()["detail"]
 
 
 def test_run_with_imported_device_keys_limits_targets():

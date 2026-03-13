@@ -42,3 +42,9 @@ class InMemoryJobStore:
     def list(self) -> list[JobRecord]:
         with self._lock:
             return list(self._jobs.values())
+
+    def clear(self) -> int:
+        with self._lock:
+            cleared = len(self._jobs)
+            self._jobs = {}
+            return cleared

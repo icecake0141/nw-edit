@@ -26,6 +26,7 @@
  * @typedef {{ active: boolean, job?: JobSummary }} ActiveJobResponse
  * @typedef {{ worker_mode: string, validator_mode: string }} RuntimeModesResponse
  * @typedef {{ preset_id: string, name: string, os_model: string, commands: string[], verify_commands: string[], created_at: string, updated_at: string }} Preset
+ * @typedef {{ reset: boolean, cleared: { devices: number, jobs: number, events: number, run_results: number, controls: number } }} AppResetResponse
  */
 
 /**
@@ -131,6 +132,13 @@ export class NwEditApiClient {
   /** @returns {Promise<DeviceProfile[]>} */
   async listDevices() {
     return this.request("/api/v2/devices");
+  }
+
+  /** @returns {Promise<AppResetResponse>} */
+  async resetAppState() {
+    return this.request("/api/v2/app/reset", {
+      method: "POST",
+    });
   }
 
   /** @param {string} csvText @returns {Promise<ImportDevicesResponse>} */
