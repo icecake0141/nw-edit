@@ -97,6 +97,18 @@ make check-integration
   - `Sequential (1 device at a time)`: `concurrency_limit=1` を強制し、入力欄は無効化されます
 - バックエンドAPIの変更はなく、方式の差分はフロントエンドで `concurrency_limit` に反映します。
 
+## アプリ状態初期化（v2）
+
+- Import画面の `Reset App State` で、プロセス再起動なしに揮発状態を初期化できます。
+- 初期化対象:
+  - import済みデバイス
+  - ジョブ履歴
+  - バッファ済みイベントと実行結果
+  - 画面上の一時入力/選択状態
+- 保存済み実行プリセットは `NW_EDIT_V2_PRESET_FILE` に残ります。
+- バックエンドAPI: `POST /api/v2/app/reset`
+- `queued` / `running` / `paused` のジョブがある場合は `HTTP 409` で拒否されます。
+
 ## ドキュメント
 
 - ドキュメント一覧（英日）: [docs/INDEX.ja.md](docs/INDEX.ja.md)
