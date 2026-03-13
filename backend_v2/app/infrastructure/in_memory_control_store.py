@@ -40,3 +40,9 @@ class InMemoryControlStore:
     def get(self, job_id: str) -> ExecutionControl | None:
         with self._lock:
             return self._controls.get(job_id)
+
+    def clear(self) -> int:
+        with self._lock:
+            cleared = len(self._controls)
+            self._controls = {}
+            return cleared

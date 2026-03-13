@@ -49,6 +49,7 @@ const resumeBtn = document.getElementById("resumeBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const clearBtn = document.getElementById("clearBtn");
 const importBtn = document.getElementById("importBtn");
+const resetAppStateBtn = document.getElementById("resetAppStateBtn");
 const refreshDevicesBtn = document.getElementById("refreshDevicesBtn");
 const listJobsBtn = document.getElementById("listJobsBtn");
 const refreshActiveBtn = document.getElementById("refreshActiveBtn");
@@ -98,6 +99,7 @@ let detailTargetDeviceKeys = [];
 let monitorResultLoading = false;
 let runBusy = false;
 let presetActionBusy = false;
+let resetAppStateBusy = false;
 /** @type {import("./api-client.js").JobDetail|null} */
 let activeBlockingJob = null;
 let reviewHostsCollapsed = false;
@@ -188,6 +190,14 @@ function resetImportStreamLog() {
   importStreamLogEl.textContent = "";
 }
 
+function closeActiveSocket() {
+  if (!activeSocket) {
+    return;
+  }
+  activeSocket.close();
+  activeSocket = null;
+}
+
 function setImportStreamVisible(visible) {
   if (!importLoadingEl || !importStreamLogEl) {
     return;
@@ -203,6 +213,9 @@ function isActiveRunBlocking(status) {
 function updateCreateActionState() {
   const blocked = Boolean(activeBlockingJob);
   runBtn.disabled = blocked || runBusy;
+  if (resetAppStateBtn) {
+    resetAppStateBtn.disabled = Boolean(runBusy || resetAppStateBusy);
+  }
   setPresetActionState();
   if (!activeJobBannerEl || !activeJobBannerTextEl) {
     return;
@@ -219,6 +232,9 @@ function updateCreateActionState() {
 
 function setImportInProgress(inProgress) {
   importBtn.disabled = inProgress;
+  if (resetAppStateBtn) {
+    resetAppStateBtn.disabled = Boolean(inProgress || runBusy || resetAppStateBusy);
+  }
   setImportStreamVisible(inProgress);
   if (inProgress) {
     importProgressEl.classList.remove("hidden");
@@ -680,6 +696,103 @@ function resetMonitorState() {
   monitorState.eventCount = 0;
 }
 
+function resetDetailState() {
+  detailTargetDeviceKeys = [];
+  detailMetaEl.textContent = "No job selected";
+  detailSummaryEl.textContent = "Select a job from history";
+  detailDevicesEl.innerHTML = "";
+  detailDataEl.textContent = "";
+}
+
+function resetHistoryState() {
+  historyEl.replaceChildren();
+  const div = document.createElement("div");
+  div.className = "history-item";
+  div.textContent = "no jobs yet";
+  historyEl.append(div);
+}
+
+function resetStatusCommandState() {
+  if (statusDeviceSelectEl) {
+    statusDeviceSelectEl.innerHTML = '<option value="">(select device)</option>';
+  }
+  if (statusCommandsEl) {
+    statusCommandsEl.value = statusCommandsEl.defaultValue;
+  }
+  if (statusOutputEl) {
+    statusOutputEl.textContent = statusOutputEl.defaultValue || "No output yet";
+  }
+}
+
+function resetCreateFormState() {
+  const jobNameEl = document.getElementById("jobName");
+  const creatorEl = document.getElementById("creator");
+  const globalVarsEl = document.getElementById("globalVars");
+  const commandsEl = document.getElementById("commands");
+  jobNameEl.value = jobNameEl.defaultValue;
+  creatorEl.value = creatorEl.defaultValue;
+  globalVarsEl.value = globalVarsEl.defaultValue;
+  commandsEl.value = commandsEl.defaultValue;
+  verifyCommandsEl.value = verifyCommandsEl.defaultValue;
+  verifyModeEl.value = verifyModeEl.defaultValue;
+  concurrencyLimitEl.value = concurrencyLimitEl.defaultValue;
+  staggerDelayEl.value = staggerDelayEl.defaultValue;
+  stopOnErrorEl.checked = stopOnErrorEl.defaultChecked;
+  enableRunConfirmationEl.checked = enableRunConfirmationEl.defaultChecked;
+  enablePresetModeEl.checked = enablePresetModeEl.defaultChecked;
+  presetPanelEl.classList.toggle("hidden", !enablePresetModeEl.checked);
+  osModelSelectEl.innerHTML = '<option value="">(not selected)</option>';
+  presetSelectEl.innerHTML = '<option value="">(not selected)</option>';
+  presetNameEl.value = presetNameEl.defaultValue;
+  canaryDeviceEl.innerHTML = '<option value="">(select canary)</option>';
+  postCanaryStrategyEls.forEach((el) => {
+    el.checked = el.defaultChecked;
+  });
+  reviewHostsCollapsed = false;
+  clearRunReview();
+  updateReviewHostListVisibility();
+  updatePostCanaryControls();
+  setPresetActionState();
+}
+
+function resetImportSectionState() {
+  const csvInputEl = document.getElementById("csvInput");
+  csvInputEl.value = csvInputEl.defaultValue;
+  clearImportError();
+  resetImportStreamLog();
+  setImportInProgress(false);
+  deviceCountEl.textContent = "imported devices: 0";
+}
+
+function resetFrontendAppState() {
+  closeActiveSocket();
+  importedDevices = [];
+  currentPresets = [];
+  prodDeviceKeys = new Set();
+  selectedJobId = null;
+  activeBlockingJob = null;
+  pendingRunReview = null;
+  resetMonitorState();
+  resetDetailState();
+  resetHistoryState();
+  resetStatusCommandState();
+  resetImportSectionState();
+  resetCreateFormState();
+  logEl.textContent = "";
+  activeSummaryEl.textContent = "active job: none";
+  monitorSummaryEl.textContent = "No active run selected";
+  monitorDevicesEl.innerHTML = "";
+  pauseBtn.disabled = true;
+  resumeBtn.disabled = true;
+  cancelBtn.disabled = true;
+  setStatus("ready");
+  renderImportedDeviceList();
+  populateStatusDeviceSelect();
+  refreshCanaryOptions();
+  refreshProdWarningOverlay();
+  updateCreateActionState();
+}
+
 function beginMonitor(job, targetDeviceKeys, canaryKey) {
   resetMonitorState();
   monitorState.job = { ...job };
@@ -977,7 +1090,8 @@ function switchPage(pageName) {
   refreshProdWarningOverlay();
 }
 
-async function refreshImportedDevices() {
+async function refreshImportedDevices(options = {}) {
+  const { log = true } = options;
   importedDevices = await client().listDevices();
   prodDeviceKeys = new Set(
     importedDevices
@@ -995,7 +1109,9 @@ async function refreshImportedDevices() {
   populateStatusDeviceSelect();
   refreshCanaryOptions();
   await refreshPresetOptions().catch((error) => appendLog(String(error)));
-  appendLog(`loaded imported devices: ${importedDevices.length}`);
+  if (log) {
+    appendLog(`loaded imported devices: ${importedDevices.length}`);
+  }
   refreshProdWarningOverlay();
 }
 
@@ -1425,6 +1541,31 @@ importBtn.addEventListener("click", async () => {
 
 refreshDevicesBtn.addEventListener("click", () => {
   refreshImportedDevices().catch((error) => appendLog(String(error)));
+});
+
+resetAppStateBtn?.addEventListener("click", async () => {
+  const confirmed = window.confirm(
+    "Reset app state?\n\nImported devices, input values, job history, run results, and temporary UI state will be cleared. Saved presets will be kept."
+  );
+  if (!confirmed) {
+    return;
+  }
+  resetAppStateBusy = true;
+  updateCreateActionState();
+  try {
+    await client().resetAppState();
+    resetFrontendAppState();
+    switchPage("import");
+    await refreshImportedDevices({ log: false });
+    await refreshJobs();
+    await refreshActive();
+    await refreshRuntimeModes();
+  } catch (error) {
+    appendLog(String(error));
+  } finally {
+    resetAppStateBusy = false;
+    updateCreateActionState();
+  }
 });
 
 listJobsBtn.addEventListener("click", () => {

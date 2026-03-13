@@ -30,6 +30,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from backend_v2.app.api.schemas import (
+    AppResetCountsResponse,
+    AppResetResponse,
     ActiveJobResponse,
     CreateJobRequest,
     DeviceImportResponse,
@@ -508,6 +510,31 @@ def list_devices() -> list[DeviceProfileResponse]:
     ]
 
 
+@app.post("/api/v2/app/reset", response_model=AppResetResponse)
+def reset_app_state() -> AppResetResponse:
+    """Clear volatile in-memory application state."""
+    jobs = store.list()
+    active_jobs = [
+        job
+        for job in jobs
+        if job.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}
+    ]
+    if active_jobs:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot reset app state while a job is queued, running, or paused",
+        )
+
+    cleared = AppResetCountsResponse(
+        devices=device_store.clear(),
+        jobs=store.clear(),
+        events=event_store.clear(),
+        run_results=run_store.clear(),
+        controls=control_store.clear(),
+    )
+    return AppResetResponse(reset=True, cleared=cleared)
+
+
 @app.post("/api/v2/commands/exec", response_model=StatusCommandResponse)
 def execute_status_command(payload: StatusCommandRequest) -> StatusCommandResponse:
     """Execute read-only status commands on an imported device."""
@@ -640,6 +667,9 @@ def get_job(job_id: str) -> JobResponse:
 @app.get("/api/v2/jobs/{job_id}/events", response_model=list[ExecutionEventResponse])
 def list_job_events(job_id: str) -> list[ExecutionEventResponse]:
     """List buffered execution events for a job."""
+    job = store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
     events = event_store.list_events(job_id=job_id)
     return [
         ExecutionEventResponse(

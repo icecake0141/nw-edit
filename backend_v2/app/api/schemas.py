@@ -194,3 +194,20 @@ class RuntimeModesResponse(BaseModel):
 
     worker_mode: str
     validator_mode: str
+
+
+class AppResetCountsResponse(BaseModel):
+    """Counts of cleared in-memory app state."""
+
+    devices: int
+    jobs: int
+    events: int
+    run_results: int
+    controls: int
+
+
+class AppResetResponse(BaseModel):
+    """App reset response payload."""
+
+    reset: bool
+    cleared: AppResetCountsResponse
