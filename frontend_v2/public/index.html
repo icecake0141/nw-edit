@@ -322,6 +322,32 @@ You may obtain a copy of the License at
       min-height: 0;
       margin: 0;
     }
+    .verify-mode-group {
+      display: grid;
+      gap: 10px;
+    }
+    .verify-mode-option {
+      display: grid;
+      gap: 4px;
+      min-width: 240px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(124, 145, 176, 0.2);
+      background: rgba(255, 255, 255, 0.78);
+    }
+    .verify-mode-option strong {
+      font-size: 0.95rem;
+    }
+    .verify-mode-option span {
+      color: var(--ink-soft);
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+    .form-note {
+      margin: -6px 0 14px;
+      color: var(--ink-soft);
+      font-size: 0.86rem;
+    }
     .device-select-wrap {
       border: 1px solid rgba(115, 136, 167, 0.22);
       border-radius: 14px;
@@ -928,12 +954,25 @@ You may obtain a copy of the License at
 show ip interface brief</textarea>
       <label for="verifyCommands">Verify Commands (one line each)</label>
       <textarea id="verifyCommands"></textarea>
-      <label for="verifyMode">Verify Mode</label>
-      <select id="verifyMode">
-        <option value="canary">Canary only</option>
-        <option value="all">All devices</option>
-        <option value="none">None</option>
-      </select>
+      <fieldset class="radio-group verify-mode-group" id="verifyModeGroup">
+        <legend>Verify commands apply to</legend>
+        <label class="radio-option verify-mode-option">
+          <input type="radio" name="verifyMode" value="all" checked />
+          <strong>Canary first, then all devices</strong>
+          <span>Run verify commands on the canary device first, then continue on all target devices.</span>
+        </label>
+        <label class="radio-option verify-mode-option">
+          <input type="radio" name="verifyMode" value="canary" />
+          <strong>Canary device only</strong>
+          <span>Run verify commands on the canary device only, then finish.</span>
+        </label>
+        <label class="radio-option verify-mode-option">
+          <input type="radio" name="verifyMode" value="none" />
+          <strong>Skip verify commands</strong>
+          <span>Do not run verify commands on any device.</span>
+        </label>
+      </fieldset>
+      <div class="form-note" id="verifyModeHint">Choose where verify commands run after the canary step.</div>
       <label for="concurrencyLimit">Concurrency Limit</label>
       <input id="concurrencyLimit" type="number" min="1" max="100" value="5" />
       <label for="staggerDelay">Stagger Delay (seconds)</label>

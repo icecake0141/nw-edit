@@ -55,7 +55,10 @@ const refreshActiveBtn = document.getElementById("refreshActiveBtn");
 const selectAllImportedBtn = document.getElementById("selectAllImportedBtn");
 const clearImportedSelectionBtn = document.getElementById("clearImportedSelectionBtn");
 const verifyCommandsEl = document.getElementById("verifyCommands");
-const verifyModeEl = document.getElementById("verifyMode");
+const verifyModeHintEl = document.getElementById("verifyModeHint");
+const verifyModeEls = Array.from(
+  document.querySelectorAll('input[name="verifyMode"]')
+);
 const canaryDeviceEl = document.getElementById("canaryDevice");
 const concurrencyLimitEl = document.getElementById("concurrencyLimit");
 const staggerDelayEl = document.getElementById("staggerDelay");
@@ -215,6 +218,42 @@ function updateCreateActionState() {
     `Active job ${activeBlockingJob.job_id} (${activeBlockingJob.status}) is running. ` +
     "New job creation is disabled.";
   activeJobBannerEl.classList.remove("hidden");
+}
+
+function selectedVerifyMode() {
+  const selected = verifyModeEls.find((el) => el.checked);
+  return selected ? selected.value : "all";
+}
+
+function describeVerifyMode(mode) {
+  switch (mode) {
+    case "canary":
+      return "Canary device only";
+    case "none":
+      return "Skip verify commands";
+    case "all":
+    default:
+      return "Canary first, then all devices";
+  }
+}
+
+function describeVerifyPlan(verifyMode, verifyCommands) {
+  if (!verifyCommands || verifyCommands.length === 0) {
+    return "Skip verify commands";
+  }
+  return describeVerifyMode(verifyMode);
+}
+
+function updateVerifyModeControls() {
+  const hasVerifyCommands = parseCommands(verifyCommandsEl.value).length > 0;
+  verifyModeEls.forEach((el) => {
+    el.disabled = !hasVerifyCommands;
+  });
+  if (verifyModeHintEl) {
+    verifyModeHintEl.textContent = hasVerifyCommands
+      ? "Choose where verify commands run after the canary step."
+      : "No verify commands configured. This setting will be ignored.";
+  }
 }
 
 function setImportInProgress(inProgress) {
@@ -1129,7 +1168,7 @@ function collectRunInput() {
   const globalVarsText = document.getElementById("globalVars").value;
   const commands = parseCommands(document.getElementById("commands").value);
   const verifyCommands = parseCommands(verifyCommandsEl.value);
-  const verifyMode = verifyModeEl.value;
+  const verifyMode = selectedVerifyMode();
   const concurrencyLimit = Number(concurrencyLimitEl.value || "5");
   const staggerDelay = Number(staggerDelayEl.value || "1.0");
   const stopOnError = stopOnErrorEl.checked;
@@ -1212,7 +1251,7 @@ function buildReviewModel(runInput) {
     verifyCommands: runInput.verifyCommands.length > 0 ? runInput.verifyCommands : ["(none)"],
     settings: [
       `Canary: ${runInput.canaryKey}`,
-      `Verify mode: ${runInput.verifyMode}`,
+      `Verify: ${describeVerifyPlan(runInput.verifyMode, runInput.verifyCommands)}`,
       `Stop on error: ${runInput.stopOnError}`,
       `Stagger delay: ${runInput.staggerDelay}s`,
       `Post-canary strategy: ${runInput.postCanaryStrategy === "sequential" ? "Sequential" : "Parallel"}`,
@@ -1335,6 +1374,9 @@ reviewCancelBtn?.addEventListener("click", () => {
 reviewToggleHostsBtn?.addEventListener("click", () => {
   reviewHostsCollapsed = !reviewHostsCollapsed;
   updateReviewHostListVisibility();
+});
+verifyModeEls.forEach((el) => {
+  el.addEventListener("change", updateVerifyModeControls);
 });
 postCanaryStrategyEls.forEach((el) => {
   el.addEventListener("change", updatePostCanaryControls);
@@ -1472,6 +1514,7 @@ presetSelectEl.addEventListener("change", () => {
   presetNameEl.value = selected.name;
   document.getElementById("commands").value = selected.commands.join("\n");
   verifyCommandsEl.value = selected.verify_commands.join("\n");
+  updateVerifyModeControls();
   setPresetActionState();
   appendLog(`preset applied: ${selected.name} (${selected.os_model})`);
 });
@@ -1500,6 +1543,8 @@ importedDeviceListEl.addEventListener("change", () => {
   refreshCanaryOptions();
   refreshProdWarningOverlay();
 });
+
+verifyCommandsEl.addEventListener("input", updateVerifyModeControls);
 
 statusRunBtn.addEventListener("click", async () => {
   const selected = statusDeviceSelectEl.value.trim();
@@ -1600,6 +1645,7 @@ setInterval(() => {
 presetPanelEl.classList.add("hidden");
 applyApiBaseVisibility();
 updateCreateActionState();
+updateVerifyModeControls();
 updatePostCanaryControls();
 setPresetActionState();
 renderMonitorState();
