@@ -822,43 +822,18 @@ You may obtain a copy of the License at
 </head>
 <body>
   <div id="prodWarningOverlay" class="prod-warning-overlay" aria-hidden="true">
-    <div class="prod-warning-labels">
-      <span style="top: 2%; left: 3%;">本番環境 / Production Environment</span>
-      <span style="top: 5%; left: 38%;">生产环境 / Production Environment</span>
-      <span style="top: 8%; left: 68%;">Environnement de Production</span>
-      <span style="top: 12%; left: 14%;">Produktionsumgebung</span>
-      <span style="top: 15%; left: 49%;">Среда Продакшн</span>
-      <span style="top: 18%; left: 76%;">Entorno de Produccion</span>
-      <span style="top: 22%; left: 6%;">Ambiente de Producao</span>
-      <span style="top: 25%; left: 33%;">بيئة الإنتاج</span>
-      <span style="top: 28%; left: 61%;">สภาพแวดล้อมการผลิต</span>
-      <span style="top: 31%; left: 83%;">Ambiente di Produzione</span>
-      <span style="top: 35%; left: 4%;">本番環境 / Production Environment</span>
-      <span style="top: 38%; left: 42%;">生产环境 / Production Environment</span>
-      <span style="top: 41%; left: 71%;">Environnement de Production</span>
-      <span style="top: 45%; left: 18%;">Produktionsumgebung</span>
-      <span style="top: 48%; left: 51%;">Среда Продакшн</span>
-      <span style="top: 51%; left: 79%;">Entorno de Produccion</span>
-      <span style="top: 55%; left: 9%;">Ambiente de Producao</span>
-      <span style="top: 58%; left: 36%;">بيئة الإنتاج</span>
-      <span style="top: 61%; left: 63%;">สภาพแวดล้อมการผลิต</span>
-      <span style="top: 64%; left: 84%;">Ambiente di Produzione</span>
-      <span style="top: 68%; left: 5%;">本番環境 / Production Environment</span>
-      <span style="top: 71%; left: 39%;">生产环境 / Production Environment</span>
-      <span style="top: 74%; left: 69%;">Environnement de Production</span>
-      <span style="top: 78%; left: 13%;">Produktionsumgebung</span>
-      <span style="top: 81%; left: 47%;">Среда Продакшн</span>
-      <span style="top: 84%; left: 75%;">Entorno de Produccion</span>
-      <span style="top: 88%; left: 7%;">Ambiente de Producao</span>
-      <span style="top: 91%; left: 34%;">بيئة الإنتاج</span>
-      <span style="top: 94%; left: 59%;">สภาพแวดล้อมการผลิต</span>
-      <span style="top: 97%; left: 80%;">Ambiente di Produzione</span>
-    </div>
+    <div id="prodWarningLabels" class="prod-warning-labels"></div>
   </div>
   <div class="wrap">
     <div class="head">
-      <h1>nw-edit v2 operations console</h1>
+      <h1 data-i18n-text="head.title">nw-edit v2 operations console</h1>
       <div class="head-meta">
+        <div>
+          <label for="localeSelect" data-i18n-text="locale.label">Language</label>
+          <select id="localeSelect" data-i18n-aria-label="locale.label">
+            <option value="en" data-i18n-text="locale.option.en">English</option>
+          </select>
+        </div>
         <div id="status">idle</div>
         <div id="modeStatus" class="muted">mode: worker=- / validator=-</div>
       </div>
@@ -866,31 +841,31 @@ You may obtain a copy of the License at
 
     <section class="panel grid">
       <div id="apiBaseField">
-        <label for="apiBase">API Base</label>
+        <label for="apiBase" data-i18n-text="form.apiBase">API Base</label>
         <input id="apiBase" value="http://127.0.0.1:8010" />
       </div>
       <div>
-        <label for="creator">Creator</label>
+        <label for="creator" data-i18n-text="form.creator">Creator</label>
         <input id="creator" value="local" />
       </div>
       <div>
-        <label for="jobName">Job Name</label>
+        <label for="jobName" data-i18n-text="form.jobName">Job Name</label>
         <input id="jobName" value="v2 demo rollout" />
       </div>
       <div class="field-wide">
-        <label for="globalVars">Global Vars (JSON)</label>
+        <label for="globalVars" data-i18n-text="form.globalVars">Global Vars (JSON)</label>
         <textarea id="globalVars">{"timezone":"Asia/Tokyo"}</textarea>
       </div>
     </section>
 
-    <section class="panel nav" aria-label="v2 pages">
-      <button class="secondary nav-btn" data-page="import" aria-pressed="true" title="Open the import page to register devices from CSV.">Import</button>
-      <button class="secondary nav-btn" data-page="create" aria-pressed="false" title="Open the create page to define commands and start a job.">Create</button>
-      <button class="secondary nav-btn" data-page="monitor" aria-pressed="false" title="Open the monitor page to control and inspect the active job.">Monitor</button>
-      <button class="secondary nav-btn" data-page="history" aria-pressed="false" title="Open the history page to browse previously created jobs.">History</button>
-      <button class="secondary nav-btn" data-page="status-command" aria-pressed="false" title="Open the status command page for read-only checks on imported devices.">Status Command</button>
-      <button class="secondary nav-btn" data-page="detail" aria-pressed="false" title="Open the detail page to inspect one selected job result.">Detail</button>
-      <button class="secondary nav-btn" data-page="help" aria-pressed="false" title="Open command variable usage examples for global and host vars.">Help</button>
+    <section class="panel nav" aria-label="v2 pages" data-i18n-aria-label="nav.ariaLabel">
+      <button class="secondary nav-btn" data-page="import" aria-pressed="true" title="Open the import page to register devices from CSV." data-i18n-text="nav.import" data-i18n-title="nav.title.import">Import</button>
+      <button class="secondary nav-btn" data-page="create" aria-pressed="false" title="Open the create page to define commands and start a job." data-i18n-text="nav.create" data-i18n-title="nav.title.create">Create</button>
+      <button class="secondary nav-btn" data-page="monitor" aria-pressed="false" title="Open the monitor page to control and inspect the active job." data-i18n-text="nav.monitor" data-i18n-title="nav.title.monitor">Monitor</button>
+      <button class="secondary nav-btn" data-page="history" aria-pressed="false" title="Open the history page to browse previously created jobs." data-i18n-text="nav.history" data-i18n-title="nav.title.history">History</button>
+      <button class="secondary nav-btn" data-page="status-command" aria-pressed="false" title="Open the status command page for read-only checks on imported devices." data-i18n-text="nav.statusCommand" data-i18n-title="nav.title.statusCommand">Status Command</button>
+      <button class="secondary nav-btn" data-page="detail" aria-pressed="false" title="Open the detail page to inspect one selected job result." data-i18n-text="nav.detail" data-i18n-title="nav.title.detail">Detail</button>
+      <button class="secondary nav-btn" data-page="help" aria-pressed="false" title="Open command variable usage examples for global and host vars." data-i18n-text="nav.help" data-i18n-title="nav.title.help">Help</button>
     </section>
 
     <section class="panel page active" data-page="import">
@@ -1075,93 +1050,7 @@ show ip interface brief</textarea>
     </section>
 
     <section class="panel page" data-page="help">
-      <div class="help-content">
-        <h3>Command Variables Help</h3>
-        <p>
-          Variables let you reuse command templates across devices.
-          Use placeholders like <code>{{hostname}}</code> in command lines,
-          then provide values from <code>global_vars</code> or CSV <code>host_vars</code>.
-        </p>
-
-        <h3>1) Placeholder Format</h3>
-        <p>Use double braces in commands:</p>
-        <pre>configure terminal
-hostname {{hostname}}
-clock timezone JST {{tz_offset}}</pre>
-
-        <h3>2) Global Vars (job-level JSON)</h3>
-        <p>Set in the top input field: <strong>Global Vars (JSON)</strong>.</p>
-        <pre>{
-  "hostname_prefix": "edge",
-  "tz_offset": "9"
-}</pre>
-        <p>Equivalent API payload:</p>
-        <pre>{
-  "job_name": "nightly rollout",
-  "creator": "local",
-  "global_vars": {
-    "hostname_prefix": "edge",
-    "tz_offset": "9"
-  }
-}</pre>
-
-        <h3>3) Host Vars (per-device CSV)</h3>
-        <p>Use CSV column <code>host_vars</code> as a JSON object string:</p>
-        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
-10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1"",""tz_offset"":""9""}",true
-10.0.0.2,22,cisco_ios,admin,pass,edge-2,show run,"{""hostname"":""edge-2""}",false</pre>
-
-        <h3>4) Resolution Priority</h3>
-        <p>
-          If the same key exists in both places, device-level CSV value wins:
-          <code>host_vars &gt; global_vars</code>.
-        </p>
-
-        <h3>5) Missing Variable Behavior</h3>
-        <p>
-          If any placeholder has no value, preflight fails with <code>HTTP 400</code>.
-          Device commands are not executed.
-        </p>
-
-        <h3>6) Common Mistakes and Fixes</h3>
-        <pre>- Invalid JSON in Global Vars:
-  wrong: {"timezone":"Asia/Tokyo",}
-  fix:   {"timezone":"Asia/Tokyo"}
-
-- Global Vars must be an object:
-  wrong: ["x", "y"]
-  fix:   {"x":"1","y":"2"}
-
-- CSV host_vars quoting:
-  wrong: {"hostname":"edge-1"}   (not CSV-escaped)
-  fix:   "{""hostname"":""edge-1""}"</pre>
-
-        <h3>7) End-to-End Mini Example</h3>
-        <p>Inputs:</p>
-        <pre>global_vars:
-{"tz_offset":"9","ntp_server":"192.0.2.10"}
-
-command:
-clock timezone JST {{tz_offset}}
-ntp server {{ntp_server}}
-hostname {{hostname}}
-
-host_vars for 10.0.0.1:
-{"hostname":"edge-1","ntp_server":"192.0.2.20"}</pre>
-        <p>Resolved commands for 10.0.0.1:</p>
-        <pre>clock timezone JST 9
-ntp server 192.0.2.20
-hostname edge-1</pre>
-
-        <h3>8) Production Host Flag</h3>
-        <p>
-          Optional CSV column <code>prod</code> marks production hosts.
-          <code>true</code> enables production warning UI in Create/Monitor/Detail pages when selected targets include that host.
-        </p>
-        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
-10.0.0.10,22,cisco_ios,admin,pass,core-prod,show run,"{""hostname"":""core-prod""}",true
-10.0.0.20,22,cisco_ios,admin,pass,edge-dev,show run,"{""hostname"":""edge-dev""}",false</pre>
-      </div>
+      <div id="helpContent" class="help-content"></div>
     </section>
   </div>
 

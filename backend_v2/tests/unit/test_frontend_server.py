@@ -73,6 +73,15 @@ def test_static_asset_preserves_javascript_content_type(tmp_path: Path):
             assert response.headers["Content-Type"].startswith("application/javascript")
 
 
+def test_repo_frontend_index_includes_locale_selector():
+    repo_root = Path(__file__).resolve().parents[3]
+    index_path = repo_root / "frontend_v2" / "public" / "index.html"
+    body = index_path.read_text(encoding="utf-8")
+
+    assert 'id="localeSelect"' in body
+    assert 'data-i18n-text="locale.label"' in body
+
+
 def test_unknown_paths_return_404(tmp_path: Path):
     (tmp_path / "index.html").write_text("ok", encoding="utf-8")
 

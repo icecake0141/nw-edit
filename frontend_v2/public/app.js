@@ -17,6 +17,7 @@
 import { NwEditApiClient } from "./api-client.js";
 
 const statusEl = document.getElementById("status");
+const localeSelectEl = document.getElementById("localeSelect");
 const apiBaseFieldEl = document.getElementById("apiBaseField");
 const modeStatusEl = document.getElementById("modeStatus");
 const logEl = document.getElementById("log");
@@ -75,6 +76,7 @@ const activeJobBannerEl = document.getElementById("activeJobBanner");
 const activeJobBannerTextEl = document.getElementById("activeJobBannerText");
 const viewActiveJobBtn = document.getElementById("viewActiveJobBtn");
 const prodWarningOverlayEl = document.getElementById("prodWarningOverlay");
+const prodWarningLabelsEl = document.getElementById("prodWarningLabels");
 const runReviewPanelEl = document.getElementById("runReviewPanel");
 const reviewModeTextEl = document.getElementById("reviewModeText");
 const reviewTargetHostsEl = document.getElementById("reviewTargetHosts");
@@ -85,6 +87,220 @@ const reviewFlowDiagramEl = document.getElementById("reviewFlowDiagram");
 const reviewExecuteBtn = document.getElementById("reviewExecuteBtn");
 const reviewCancelBtn = document.getElementById("reviewCancelBtn");
 const reviewToggleHostsBtn = document.getElementById("reviewToggleHostsBtn");
+const helpContentEl = document.getElementById("helpContent");
+
+const DEFAULT_LOCALE = "en";
+const LOCALE_STORAGE_KEY = "nw-edit.locale";
+const SUPPORTED_LOCALES = ["en"];
+let currentLocale = resolveInitialLocale();
+
+const translations = {
+  en: {
+    head: {
+      title: "nw-edit v2 operations console",
+    },
+    locale: {
+      label: "Language",
+      option: {
+        en: "English",
+      },
+    },
+    form: {
+      apiBase: "API Base",
+      creator: "Creator",
+      jobName: "Job Name",
+      globalVars: "Global Vars (JSON)",
+    },
+    nav: {
+      ariaLabel: "v2 pages",
+      import: "Import",
+      create: "Create",
+      monitor: "Monitor",
+      history: "History",
+      statusCommand: "Status Command",
+      detail: "Detail",
+      help: "Help",
+      title: {
+        import: "Open the import page to register devices from CSV.",
+        create: "Open the create page to define commands and start a job.",
+        monitor: "Open the monitor page to control and inspect the active job.",
+        history: "Open the history page to browse previously created jobs.",
+        statusCommand: "Open the status command page for read-only checks on imported devices.",
+        detail: "Open the detail page to inspect one selected job result.",
+        help: "Open command variable usage examples for global and host vars.",
+      },
+    },
+    labels: {
+      prodWarning: "Production Environment",
+      importedDevices: "imported devices: {count}",
+      importedTargetCandidates: "Imported target candidates: {count}",
+      selectDevice: "(select device)",
+      selectCanary: "(select canary)",
+      notSelected: "(not selected)",
+      noJobsYet: "no jobs yet",
+      noTargetDevicesYet: "No target devices yet",
+      noActiveJobSelected: "No active job selected.",
+      noActiveRunSelected: "No active run selected",
+      noJobSelected: "No job selected",
+      selectJobFromHistory: "Select a job from history",
+      noOutputYet: "No output yet",
+      emptyOutput: "(empty output)",
+      none: "(none)",
+    },
+    status: {
+      idle: "idle",
+      creatingAsync: "creating-async",
+      running: "running",
+      paused: "paused",
+      cancelled: "cancelled",
+      failed: "failed",
+      inputError: "input-error: {message}",
+      active: "active:{status}",
+      mode: "mode: worker={worker} / validator={validator}",
+      modeUnknown: "mode: worker=- / validator=-",
+      runningLabel: "Running",
+      pausedLabel: "Paused",
+      failedLabel: "Failed",
+      cancelledLabel: "Cancelled",
+      completedLabel: "Complete",
+      queuedLabel: "Queue",
+      activeNone: "active job: none",
+      activeJob: "active job: {jobId} ({status})",
+      selectedJob: "selected: {jobId} ({status}) events={events}",
+    },
+    messages: {
+      verifyChoose: "Choose where verify commands run after the canary step.",
+      verifyIgnored: "No verify commands configured. This setting will be ignored.",
+      validatingDevices: "Validating devices... {processed}/{total}",
+      csvImportFailed: "CSV import failed",
+      globalVarsParseError: "global vars JSON parse error: {error}",
+      globalVarsObject: "global vars must be a JSON object",
+      presetModeDisabled: "Preset Mode is disabled",
+      osModelRequired: "os_model is required",
+      presetNameRequired: "preset name is required",
+      commandsEmpty: "commands is empty",
+      presetSaved: "preset saved: {name} ({osModel})",
+      presetUpdated: "preset updated: {name} ({osModel})",
+      presetSelectionRequired: "preset selection is required for update",
+      websocketError: "websocket error",
+      websocketClosed: "websocket closed for {jobId}",
+      failedFetchResult: "failed to fetch result for {jobId}: {error}",
+      loadedImportedDevices: "loaded imported devices: {count}",
+      loadedJobs: "loaded jobs: {count}",
+      historySelected: "history selected: {jobId}",
+      importedDevicesEmpty: "imported devices are empty",
+      selectAtLeastOneImportedDevice: "select at least one imported device",
+      importedTargetDevicesEmpty: "imported target devices is empty",
+      concurrencyLimitInvalid: "concurrency_limit must be >= 1",
+      staggerDelayInvalid: "stagger_delay must be >= 0",
+      postCanaryStrategyInvalid: "postCanaryStrategy must be parallel or sequential",
+      canaryRequired: "canary device is required",
+      canaryIncluded: "canary device must be included in target devices",
+      executionModeAsync: "Execution mode: Async (/run/async)",
+      canaryFlowSequential: "Canary -> Device-1 -> Device-2 -> ...",
+      canaryFlowParallel: "Canary -> [Device-1, Device-2, ...] (parallel up to {limit})",
+      settingCanary: "Canary: {value}",
+      settingVerify: "Verify: {value}",
+      settingStopOnError: "Stop on error: {value}",
+      settingStaggerDelay: "Stagger delay: {value}s",
+      settingPostCanary: "Post-canary strategy: {value}",
+      settingConcurrencyInput: "Concurrency input: {value}",
+      settingConcurrencyDisabled: "disabled (sequential mode)",
+      settingEffectiveConcurrency: "Effective concurrency: {value}",
+      settingTargetDevices: "Target devices: {count} (remaining after canary: {remaining})",
+      settingTargetSource: "Target source: imported devices",
+      runReviewOpened: "run review opened (async)",
+      runReviewEmpty: "run review is empty",
+      runReviewCancelled: "run review cancelled",
+      cannotCreateWhileActive: "Cannot create a new job while active job {jobId} ({status}) is running",
+      importStarted: "Import started",
+      validationStarted: "Validation started (total={total})",
+      progressOk: "{host}:{port} OK ({processed}/{total})",
+      progressNg: "{host}:{port} NG ({processed}/{total})",
+      importCompleted: "Import completed (valid={valid}, total={total})",
+      importError: "Import error: {message}",
+      importFailed: "Import failed: {message}",
+      importSuccess: "import success: valid={count}",
+      presetApplied: "preset applied: {name} ({osModel})",
+      selectTargetDevice: "Please select a target device.",
+      enterCommand: "Please enter at least one command.",
+      runningEllipsis: "Running...",
+      errorPrefix: "Error: {error}",
+      statusCommandSucceeded: "status command succeeded for {host}:{port}",
+      pausedJob: "paused {jobId}",
+      resumedJob: "resumed {jobId}",
+      cancelledJob: "cancelled {jobId}",
+      selectedJobEvents: "selected job events: {count}",
+      noActiveJob: "No active job",
+      jobCreated: "job created: {jobId}",
+      runAsyncStarted: "run async started: {status}",
+      helpHtml: `<h3>Command Variables Help</h3>
+        <p>Variables let you reuse command templates across devices. Use placeholders like <code>{{hostname}}</code> in command lines, then provide values from <code>global_vars</code> or CSV <code>host_vars</code>.</p>
+        <h3>1) Placeholder Format</h3>
+        <p>Use double braces in commands:</p>
+        <pre>configure terminal
+hostname {{hostname}}
+clock timezone JST {{tz_offset}}</pre>
+        <h3>2) Global Vars (job-level JSON)</h3>
+        <p>Set in the top input field: <strong>Global Vars (JSON)</strong>.</p>
+        <pre>{
+  "hostname_prefix": "edge",
+  "tz_offset": "9"
+}</pre>
+        <p>Equivalent API payload:</p>
+        <pre>{
+  "job_name": "nightly rollout",
+  "creator": "local",
+  "global_vars": {
+    "hostname_prefix": "edge",
+    "tz_offset": "9"
+  }
+}</pre>
+        <h3>3) Host Vars (per-device CSV)</h3>
+        <p>Use CSV column <code>host_vars</code> as a JSON object string:</p>
+        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1"",""tz_offset"":""9""}",true
+10.0.0.2,22,cisco_ios,admin,pass,edge-2,show run,"{""hostname"":""edge-2""}",false</pre>
+        <h3>4) Resolution Priority</h3>
+        <p>If the same key exists in both places, device-level CSV value wins: <code>host_vars &gt; global_vars</code>.</p>
+        <h3>5) Missing Variable Behavior</h3>
+        <p>If any placeholder has no value, preflight fails with <code>HTTP 400</code>. Device commands are not executed.</p>
+        <h3>6) Common Mistakes and Fixes</h3>
+        <pre>- Invalid JSON in Global Vars:
+  wrong: {"timezone":"Asia/Tokyo",}
+  fix:   {"timezone":"Asia/Tokyo"}
+
+- Global Vars must be an object:
+  wrong: ["x", "y"]
+  fix:   {"x":"1","y":"2"}
+
+- CSV host_vars quoting:
+  wrong: {"hostname":"edge-1"}   (not CSV-escaped)
+  fix:   "{""hostname"":""edge-1""}"</pre>
+        <h3>7) End-to-End Mini Example</h3>
+        <p>Inputs:</p>
+        <pre>global_vars:
+{"tz_offset":"9","ntp_server":"192.0.2.10"}
+
+command:
+clock timezone JST {{tz_offset}}
+ntp server {{ntp_server}}
+hostname {{hostname}}
+
+host_vars for 10.0.0.1:
+{"hostname":"edge-1","ntp_server":"192.0.2.20"}</pre>
+        <p>Resolved commands for 10.0.0.1:</p>
+        <pre>clock timezone JST 9
+ntp server 192.0.2.20
+hostname edge-1</pre>
+        <h3>8) Production Host Flag</h3>
+        <p>Optional CSV column <code>prod</code> marks production hosts. <code>true</code> enables production warning UI in Create/Monitor/Detail pages when selected targets include that host.</p>
+        <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
+10.0.0.10,22,cisco_ios,admin,pass,core-prod,show run,"{""hostname"":""core-prod""}",true
+10.0.0.20,22,cisco_ios,admin,pass,edge-dev,show run,"{""hostname"":""edge-dev""}",false</pre>`,
+    },
+  },
+};
 
 /** @type {WebSocket|null} */
 let activeSocket = null;
@@ -106,6 +322,8 @@ let activeBlockingJob = null;
 let reviewHostsCollapsed = false;
 /** @type {{runInput: any}|null} */
 let pendingRunReview = null;
+/** @type {import("./api-client.js").JobSummary[]} */
+let historyJobs = [];
 const monitorState = {
   job: null,
   targetDeviceKeys: [],
@@ -119,6 +337,99 @@ const monitorState = {
 pauseBtn.disabled = true;
 resumeBtn.disabled = true;
 cancelBtn.disabled = true;
+
+function resolveInitialLocale() {
+  const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+  return SUPPORTED_LOCALES.includes(stored || "") ? stored : DEFAULT_LOCALE;
+}
+
+function translationValue(locale, key) {
+  return key.split(".").reduce((value, part) => value?.[part], translations[locale]);
+}
+
+function interpolate(template, params = {}) {
+  return String(template).replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? `{${key}}`));
+}
+
+function t(key, params) {
+  const template =
+    translationValue(currentLocale, key) ??
+    translationValue(DEFAULT_LOCALE, key) ??
+    key;
+  return typeof template === "string" ? interpolate(template, params) : String(template);
+}
+
+function applyTranslations() {
+  document.documentElement.lang = currentLocale;
+  document.querySelectorAll("[data-i18n-text]").forEach((el) => {
+    el.textContent = t(el.getAttribute("data-i18n-text") || "");
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    el.setAttribute("title", t(el.getAttribute("data-i18n-title") || ""));
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.setAttribute("placeholder", t(el.getAttribute("data-i18n-placeholder") || ""));
+  });
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria-label") || ""));
+  });
+  document.title = t("head.title");
+  if (localeSelectEl) {
+    localeSelectEl.value = currentLocale;
+  }
+  renderHelpContent();
+  renderProdWarningLabels();
+}
+
+function setLocale(locale) {
+  currentLocale = SUPPORTED_LOCALES.includes(locale) ? locale : DEFAULT_LOCALE;
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, currentLocale);
+  applyTranslations();
+  rerenderLocalizedState();
+}
+
+function renderProdWarningLabels() {
+  if (!prodWarningLabelsEl) {
+    return;
+  }
+  const positions = [
+    ["2%", "3%"], ["5%", "38%"], ["8%", "68%"], ["12%", "14%"], ["15%", "49%"],
+    ["18%", "76%"], ["22%", "6%"], ["25%", "33%"], ["28%", "61%"], ["31%", "83%"],
+    ["35%", "4%"], ["38%", "42%"], ["41%", "71%"], ["45%", "18%"], ["48%", "51%"],
+    ["51%", "79%"], ["55%", "9%"], ["58%", "36%"], ["61%", "63%"], ["64%", "84%"],
+    ["68%", "5%"], ["71%", "39%"], ["74%", "69%"], ["78%", "13%"], ["81%", "47%"],
+    ["84%", "75%"], ["88%", "7%"], ["91%", "34%"], ["94%", "59%"], ["97%", "80%"],
+  ];
+  prodWarningLabelsEl.replaceChildren();
+  positions.forEach(([top, left]) => {
+    const span = document.createElement("span");
+    span.style.top = top;
+    span.style.left = left;
+    span.textContent = t("labels.prodWarning");
+    prodWarningLabelsEl.append(span);
+  });
+}
+
+function renderHelpContent() {
+  if (helpContentEl) {
+    helpContentEl.innerHTML = t("messages.helpHtml");
+  }
+}
+
+function rerenderLocalizedState() {
+  setStatus(statusEl.dataset.statusKey || "idle", statusEl.dataset.statusParams ? JSON.parse(statusEl.dataset.statusParams) : undefined);
+  if (modeStatusEl?.dataset.statusKey) {
+    setModeStatus(modeStatusEl.dataset.statusKey, modeStatusEl.dataset.statusParams ? JSON.parse(modeStatusEl.dataset.statusParams) : undefined);
+  }
+  updateVerifyModeControls();
+  renderImportedDeviceList();
+  populateStatusDeviceSelect();
+  refreshCanaryOptions();
+  renderJobsList();
+  renderMonitorState();
+  renderReviewPanelIfVisible();
+  refreshActiveSummaryTexts();
+}
 
 function currentApiBase() {
   return document.getElementById("apiBase").value.trim();
@@ -159,18 +470,24 @@ function toWsBase(apiBase) {
   return apiBase.replace("http://", "ws://").replace("https://", "wss://");
 }
 
-function setStatus(text) {
-  statusEl.textContent = text;
+function setStatus(keyOrText, params) {
+  const translated = keyOrText.includes(".") ? t(keyOrText, params) : keyOrText;
+  statusEl.textContent = translated;
+  statusEl.dataset.statusKey = keyOrText;
+  statusEl.dataset.statusParams = params ? JSON.stringify(params) : "";
 }
 
-function setModeStatus(text) {
+function setModeStatus(keyOrText, params) {
   if (modeStatusEl) {
-    modeStatusEl.textContent = text;
+    const translated = keyOrText.includes(".") ? t(keyOrText, params) : keyOrText;
+    modeStatusEl.textContent = translated;
+    modeStatusEl.dataset.statusKey = keyOrText;
+    modeStatusEl.dataset.statusParams = params ? JSON.stringify(params) : "";
   }
 }
 
 function appendLog(message) {
-  const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+  const line = `[${new Date().toLocaleTimeString(currentLocale)}] ${message}`;
   logEl.textContent += `${line}\n`;
   logEl.scrollTop = logEl.scrollHeight;
 }
@@ -179,7 +496,7 @@ function appendImportStreamLog(message) {
   if (!importStreamLogEl) {
     return;
   }
-  const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+  const line = `[${new Date().toLocaleTimeString(currentLocale)}] ${message}`;
   importStreamLogEl.textContent += `${line}\n`;
   importStreamLogEl.scrollTop = importStreamLogEl.scrollHeight;
 }
@@ -251,8 +568,8 @@ function updateVerifyModeControls() {
   });
   if (verifyModeHintEl) {
     verifyModeHintEl.textContent = hasVerifyCommands
-      ? "Choose where verify commands run after the canary step."
-      : "No verify commands configured. This setting will be ignored.";
+      ? t("messages.verifyChoose")
+      : t("messages.verifyIgnored");
   }
 }
 
@@ -262,7 +579,7 @@ function setImportInProgress(inProgress) {
   if (inProgress) {
     importProgressEl.classList.remove("hidden");
     importProgressTextEl.classList.remove("hidden");
-    importProgressTextEl.textContent = "Validating devices... 0/0";
+    importProgressTextEl.textContent = t("messages.validatingDevices", { processed: 0, total: 0 });
   }
   if (inProgress) {
     importProgressEl.removeAttribute("value");
@@ -286,7 +603,7 @@ function clearImportError() {
 
 function formatImportErrorDetail(detail) {
   if (!detail) {
-    return "CSV import failed";
+    return t("messages.csvImportFailed");
   }
   if (typeof detail === "string") {
     return detail;
@@ -295,7 +612,7 @@ function formatImportErrorDetail(detail) {
     const lines = detail.failed_rows.map(
       (item) => `- row ${item.row_number || "?"}: ${item.error}`
     );
-    return `${detail.message || "CSV import failed"} (${detail.failed_rows.length} rows)\n${lines.join("\n")}`;
+    return `${detail.message || t("messages.csvImportFailed")} (${detail.failed_rows.length} rows)\n${lines.join("\n")}`;
   }
   return JSON.stringify(detail);
 }
@@ -316,10 +633,10 @@ function parseGlobalVars(text) {
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`global vars JSON parse error: ${String(error)}`);
+    throw new Error(t("messages.globalVarsParseError", { error: String(error) }));
   }
   if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error("global vars must be a JSON object");
+    throw new Error(t("messages.globalVarsObject"));
   }
   return Object.fromEntries(
     Object.entries(parsed).map(([key, value]) => [String(key), String(value)])
@@ -422,7 +739,7 @@ function renderImportedDeviceList() {
     label.append(input, text);
     importedDeviceListEl.append(label);
   });
-  importedDeviceHintEl.textContent = `Imported target candidates: ${candidates.length}`;
+  importedDeviceHintEl.textContent = t("labels.importedTargetCandidates", { count: candidates.length });
   refreshProdWarningOverlay();
 }
 
@@ -430,7 +747,7 @@ function populateStatusDeviceSelect() {
   if (!statusDeviceSelectEl) {
     return;
   }
-  statusDeviceSelectEl.innerHTML = '<option value="">(select device)</option>';
+  statusDeviceSelectEl.innerHTML = `<option value="">${t("labels.selectDevice")}</option>`;
   importedDevices.forEach((device) => {
     const option = document.createElement("option");
     option.value = importedDeviceKey(device);
@@ -471,7 +788,7 @@ function refreshCanaryOptions() {
     })
     .filter((item) => item.host && Number.isFinite(item.port));
 
-  canaryDeviceEl.innerHTML = '<option value="">(select canary)</option>';
+  canaryDeviceEl.innerHTML = `<option value="">${t("labels.selectCanary")}</option>`;
   candidates.forEach((item) => {
     const option = document.createElement("option");
     option.value = item.key;
@@ -489,7 +806,7 @@ function refreshCanaryOptions() {
 
 function populateOsModelSelect(models) {
   const previous = selectedOsModel();
-  osModelSelectEl.innerHTML = '<option value="">(not selected)</option>';
+  osModelSelectEl.innerHTML = `<option value="">${t("labels.notSelected")}</option>`;
   models.forEach((model) => {
     const option = document.createElement("option");
     option.value = model;
@@ -505,12 +822,12 @@ async function refreshPresetOptions() {
   const preferredPresetId = presetSelectEl.value;
   if (!enablePresetModeEl.checked) {
     currentPresets = [];
-    presetSelectEl.innerHTML = '<option value="">(not selected)</option>';
+    presetSelectEl.innerHTML = `<option value="">${t("labels.notSelected")}</option>`;
     setPresetActionState();
     return;
   }
   const model = selectedOsModel();
-  presetSelectEl.innerHTML = '<option value="">(not selected)</option>';
+  presetSelectEl.innerHTML = `<option value="">${t("labels.notSelected")}</option>`;
   if (!model) {
     currentPresets = [];
     setPresetActionState();
@@ -544,18 +861,18 @@ function setPresetActionState() {
 function buildPresetPayloadFromForm() {
   const osModel = selectedOsModel();
   if (!enablePresetModeEl.checked) {
-    throw new Error("Preset Mode is disabled");
+    throw new Error(t("messages.presetModeDisabled"));
   }
   if (!osModel) {
-    throw new Error("os_model is required");
+    throw new Error(t("messages.osModelRequired"));
   }
   const name = presetNameEl.value.trim();
   if (!name) {
-    throw new Error("preset name is required");
+    throw new Error(t("messages.presetNameRequired"));
   }
   const commands = parseCommands(document.getElementById("commands").value);
   if (commands.length === 0) {
-    throw new Error("commands is empty");
+    throw new Error(t("messages.commandsEmpty"));
   }
   const verifyCommands = parseCommands(verifyCommandsEl.value);
   return {
@@ -584,7 +901,7 @@ async function savePresetNew() {
       presetSelectEl.value = created.preset_id;
     }
     setPresetActionState();
-    appendLog(`preset saved: ${created.name} (${created.os_model})`);
+    appendLog(t("messages.presetSaved", { name: created.name, osModel: created.os_model }));
   } catch (error) {
     appendLog(String(error));
   } finally {
@@ -596,7 +913,7 @@ async function savePresetNew() {
 async function updateSelectedPreset() {
   const presetId = presetSelectEl.value.trim();
   if (!presetId) {
-    appendLog("preset selection is required for update");
+    appendLog(t("messages.presetSelectionRequired"));
     return;
   }
 
@@ -617,7 +934,7 @@ async function updateSelectedPreset() {
       presetSelectEl.value = updated.preset_id;
     }
     setPresetActionState();
-    appendLog(`preset updated: ${updated.name} (${updated.os_model})`);
+    appendLog(t("messages.presetUpdated", { name: updated.name, osModel: updated.os_model }));
   } catch (error) {
     appendLog(String(error));
   } finally {
@@ -636,8 +953,8 @@ function openJobSocket(apiBase, jobId) {
     const data = JSON.parse(event.data);
     handleJobSocketMessage(data).catch((error) => appendLog(String(error)));
   };
-  activeSocket.onerror = () => appendLog("websocket error");
-  activeSocket.onclose = () => appendLog(`websocket closed for ${jobId}`);
+  activeSocket.onerror = () => appendLog(t("messages.websocketError"));
+  activeSocket.onclose = () => appendLog(t("messages.websocketClosed", { jobId }));
 }
 
 function formatTimestamp(value) {
@@ -648,7 +965,7 @@ function formatTimestamp(value) {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return date.toLocaleString();
+  return date.toLocaleString(currentLocale);
 }
 
 function escapeHtml(text) {
@@ -678,17 +995,17 @@ function normalizedStatus(status) {
 function statusLabel(status) {
   switch (normalizedStatus(status)) {
     case "running":
-      return "Running";
+      return t("status.runningLabel");
     case "paused":
-      return "Paused";
+      return t("status.pausedLabel");
     case "failed":
-      return "Failed";
+      return t("status.failedLabel");
     case "cancelled":
-      return "Cancelled";
+      return t("status.cancelledLabel");
     case "completed":
-      return "Complete";
+      return t("status.completedLabel");
     default:
-      return "Queue";
+      return t("status.queuedLabel");
   }
 }
 
@@ -800,7 +1117,7 @@ function buildExecutionSummaryHtml(source, eventCount) {
 function buildDeviceCardsHtml(source, deviceNameMap = {}) {
   const keys = combineDeviceKeys(source);
   if (keys.length === 0) {
-    return '<div class="muted">No target devices yet</div>';
+    return `<div class="muted">${escapeHtml(t("labels.noTargetDevicesYet"))}</div>`;
   }
   return keys
     .map((key) => {
@@ -838,6 +1155,11 @@ function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0, devi
 }
 
 function renderMonitorState() {
+  if (!monitorState.job) {
+    monitorSummaryEl.textContent = t("labels.noActiveRunSelected");
+    monitorDevicesEl.innerHTML = "";
+    return;
+  }
   renderExecutionPanel(
     monitorSummaryEl,
     monitorDevicesEl,
@@ -896,7 +1218,7 @@ async function fetchRunResultForMonitor(jobId) {
     });
     renderMonitorState();
   } catch (error) {
-    appendLog(`failed to fetch result for ${jobId}: ${String(error)}`);
+    appendLog(t("messages.failedFetchResult", { jobId, error: String(error) }));
   } finally {
     monitorResultLoading = false;
   }
@@ -959,7 +1281,11 @@ function formatJobDetailText(job, events, result) {
 
 function renderJobDetail(job, events, result) {
   detailTargetDeviceKeys = result?.target_device_keys || Object.keys(result?.device_results || {});
-  detailMetaEl.textContent = `selected: ${job.job_id} (${job.status}) events=${events.length}`;
+  detailMetaEl.textContent = t("status.selectedJob", {
+    jobId: job.job_id,
+    status: job.status,
+    events: events.length,
+  });
   detailDataEl.textContent = formatJobDetailText(job, events, result);
   const detailSource = {
     job,
@@ -1023,7 +1349,7 @@ async function refreshImportedDevices() {
       .filter((device) => Boolean(device.prod))
       .map((device) => importedDeviceKey(device))
   );
-  deviceCountEl.textContent = `imported devices: ${importedDevices.length}`;
+  deviceCountEl.textContent = t("labels.importedDevices", { count: importedDevices.length });
   const importedModels = Array.from(
     new Set(importedDevices.map((device) => device.device_type))
   ).sort();
@@ -1034,23 +1360,22 @@ async function refreshImportedDevices() {
   populateStatusDeviceSelect();
   refreshCanaryOptions();
   await refreshPresetOptions().catch((error) => appendLog(String(error)));
-  appendLog(`loaded imported devices: ${importedDevices.length}`);
+  appendLog(t("messages.loadedImportedDevices", { count: importedDevices.length }));
   refreshProdWarningOverlay();
 }
 
-async function refreshJobs() {
-  const jobs = await client().listJobs();
+function renderJobsList() {
   historyEl.replaceChildren();
 
-  if (jobs.length === 0) {
+  if (historyJobs.length === 0) {
     const div = document.createElement("div");
     div.className = "history-item";
-    div.textContent = "no jobs yet";
+    div.textContent = t("labels.noJobsYet");
     historyEl.append(div);
     return;
   }
 
-  jobs.forEach((job) => {
+  historyJobs.forEach((job) => {
     const div = document.createElement("div");
     div.className = "history-item";
     const titleWrap = document.createElement("div");
@@ -1073,12 +1398,31 @@ async function refreshJobs() {
     div.addEventListener("click", async () => {
       selectedJobId = job.job_id;
       await loadAndRenderJob(job.job_id, "detail");
-      appendLog(`history selected: ${job.job_id}`);
+      appendLog(t("messages.historySelected", { jobId: job.job_id }));
     });
     historyEl.append(div);
   });
+}
 
-  appendLog(`loaded jobs: ${jobs.length}`);
+async function refreshJobs() {
+  historyJobs = await client().listJobs();
+  renderJobsList();
+  appendLog(t("messages.loadedJobs", { count: historyJobs.length }));
+}
+
+function refreshActiveSummaryTexts() {
+  if (!monitorState.job && !activeBlockingJob) {
+    activeSummaryEl.textContent = t("status.activeNone");
+    if (!monitorDevicesEl.innerHTML) {
+      monitorSummaryEl.textContent = t("labels.noActiveJobSelected");
+    }
+  }
+  if (!selectedJobId && detailMetaEl) {
+    detailMetaEl.textContent = t("labels.noJobSelected");
+    if (!detailDevicesEl.innerHTML) {
+      detailSummaryEl.textContent = t("labels.selectJobFromHistory");
+    }
+  }
 }
 
 async function refreshActive() {
@@ -1086,8 +1430,8 @@ async function refreshActive() {
   if (!active.active || !active.job) {
     activeBlockingJob = null;
     updateCreateActionState();
-    activeSummaryEl.textContent = "active job: none";
-    monitorSummaryEl.textContent = "No active job selected.";
+    activeSummaryEl.textContent = t("status.activeNone");
+    monitorSummaryEl.textContent = t("labels.noActiveJobSelected");
     monitorDevicesEl.innerHTML = "";
     pauseBtn.disabled = true;
     resumeBtn.disabled = true;
@@ -1099,8 +1443,8 @@ async function refreshActive() {
     return;
   }
 
-  activeSummaryEl.textContent = `active job: ${active.job.job_id} (${active.job.status})`;
-  setStatus(`active:${active.job.status}`);
+  activeSummaryEl.textContent = t("status.activeJob", { jobId: active.job.job_id, status: active.job.status });
+  setStatus("status.active", { status: active.job.status });
   activeBlockingJob = isActiveRunBlocking(active.job.status) ? active.job : null;
   updateCreateActionState();
   pauseBtn.disabled = active.job.status !== "running";
@@ -1116,20 +1460,20 @@ async function refreshActive() {
 async function refreshRuntimeModes() {
   try {
     const modes = await client().getRuntimeModes();
-    setModeStatus(`mode: worker=${modes.worker_mode} / validator=${modes.validator_mode}`);
+    setModeStatus("status.mode", { worker: modes.worker_mode, validator: modes.validator_mode });
   } catch (error) {
-    setModeStatus("mode: worker=- / validator=-");
+    setModeStatus("status.modeUnknown");
     appendLog(`failed to load runtime modes: ${String(error)}`);
   }
 }
 
 function resolveRunTargets() {
   if (importedDevices.length === 0) {
-    throw new Error("imported devices are empty");
+    throw new Error(t("messages.importedDevicesEmpty"));
   }
   const chosen = selectedImportedDeviceKeys();
   if (chosen.length === 0) {
-    throw new Error("select at least one imported device");
+    throw new Error(t("messages.selectAtLeastOneImportedDevice"));
   }
   const importedDeviceKeys = chosen;
   const targetDevices = importedDeviceKeys
@@ -1175,29 +1519,29 @@ function collectRunInput() {
   const postCanaryStrategy = selectedPostCanaryStrategy();
 
   if (commands.length === 0) {
-    throw new Error("commands is empty");
+    throw new Error(t("messages.commandsEmpty"));
   }
   if (!Number.isFinite(concurrencyLimit) || concurrencyLimit < 1) {
-    throw new Error("concurrency_limit must be >= 1");
+    throw new Error(t("messages.concurrencyLimitInvalid"));
   }
   if (!Number.isFinite(staggerDelay) || staggerDelay < 0) {
-    throw new Error("stagger_delay must be >= 0");
+    throw new Error(t("messages.staggerDelayInvalid"));
   }
   if (!["parallel", "sequential"].includes(postCanaryStrategy)) {
-    throw new Error("postCanaryStrategy must be parallel or sequential");
+    throw new Error(t("messages.postCanaryStrategyInvalid"));
   }
 
   const targets = resolveRunTargets();
   if (targets.targetDevices.length === 0) {
-    throw new Error("imported target devices is empty");
+    throw new Error(t("messages.importedTargetDevicesEmpty"));
   }
 
   const canaryKey = canaryDeviceEl.value.trim();
   if (!canaryKey) {
-    throw new Error("canary device is required");
+    throw new Error(t("messages.canaryRequired"));
   }
   if (!targets.targetDevices.some((device) => `${device.host}:${device.port}` === canaryKey)) {
-    throw new Error("canary device must be included in target devices");
+    throw new Error(t("messages.canaryIncluded"));
   }
 
   const [canaryHost, canaryRawPort] = canaryKey.split(":");
@@ -1242,25 +1586,27 @@ function buildReviewModel(runInput) {
   const remainingCount = Math.max(0, runInput.targetDeviceKeys.length - 1);
   const strategyText =
     runInput.postCanaryStrategy === "sequential"
-      ? "Canary -> Device-1 -> Device-2 -> ..."
-      : `Canary -> [Device-1, Device-2, ...] (parallel up to ${runInput.effectiveConcurrencyLimit})`;
+      ? t("messages.canaryFlowSequential")
+      : t("messages.canaryFlowParallel", { limit: runInput.effectiveConcurrencyLimit });
   return {
-    modeText: "Execution mode: Async (/run/async)",
+    modeText: t("messages.executionModeAsync"),
     hosts: runInput.targetDeviceKeys,
     commands: runInput.commands,
-    verifyCommands: runInput.verifyCommands.length > 0 ? runInput.verifyCommands : ["(none)"],
+    verifyCommands: runInput.verifyCommands.length > 0 ? runInput.verifyCommands : [t("labels.none")],
     settings: [
-      `Canary: ${runInput.canaryKey}`,
-      `Verify: ${describeVerifyPlan(runInput.verifyMode, runInput.verifyCommands)}`,
-      `Stop on error: ${runInput.stopOnError}`,
-      `Stagger delay: ${runInput.staggerDelay}s`,
-      `Post-canary strategy: ${runInput.postCanaryStrategy === "sequential" ? "Sequential" : "Parallel"}`,
-      `Concurrency input: ${
-        runInput.postCanaryStrategy === "sequential" ? "disabled (sequential mode)" : runInput.concurrencyLimit
-      }`,
-      `Effective concurrency: ${runInput.effectiveConcurrencyLimit}`,
-      `Target devices: ${runInput.targetDeviceKeys.length} (remaining after canary: ${remainingCount})`,
-      "Target source: imported devices",
+      t("messages.settingCanary", { value: runInput.canaryKey }),
+      t("messages.settingVerify", { value: describeVerifyPlan(runInput.verifyMode, runInput.verifyCommands) }),
+      t("messages.settingStopOnError", { value: runInput.stopOnError }),
+      t("messages.settingStaggerDelay", { value: runInput.staggerDelay }),
+      t("messages.settingPostCanary", { value: runInput.postCanaryStrategy === "sequential" ? "Sequential" : "Parallel" }),
+      t("messages.settingConcurrencyInput", {
+        value: runInput.postCanaryStrategy === "sequential"
+          ? t("messages.settingConcurrencyDisabled")
+          : runInput.concurrencyLimit,
+      }),
+      t("messages.settingEffectiveConcurrency", { value: runInput.effectiveConcurrencyLimit }),
+      t("messages.settingTargetDevices", { count: runInput.targetDeviceKeys.length, remaining: remainingCount }),
+      t("messages.settingTargetSource"),
     ],
     flowDiagram: strategyText,
   };
@@ -1292,16 +1638,22 @@ function clearRunReview() {
   setRunReviewVisible(false);
 }
 
+function renderReviewPanelIfVisible() {
+  if (pendingRunReview) {
+    renderRunReview(pendingRunReview.runInput);
+  }
+}
+
 async function executeRun(runInput) {
   runBusy = true;
   switchPage("monitor");
   updateCreateActionState();
-  setStatus("creating-async");
+  setStatus("status.creatingAsync");
   try {
     const job = await client().createJob(runInput.jobName, runInput.creator, runInput.globalVars);
     selectedJobId = job.job_id;
     beginMonitor(job, runInput.targetDeviceKeys, runInput.canaryKey);
-    appendLog(`job created: ${job.job_id}`);
+    appendLog(t("messages.jobCreated", { jobId: job.job_id }));
     openJobSocket(currentApiBase(), job.job_id);
 
     const started = await client().runJobAsync(
@@ -1317,12 +1669,12 @@ async function executeRun(runInput) {
         stopOnError: runInput.stopOnError,
       }
     );
-    appendLog(`run async started: ${started.status}`);
-    setStatus("running");
+    appendLog(t("messages.runAsyncStarted", { status: started.status }));
+    setStatus("status.running");
     await refreshJobs();
     await refreshActive();
   } catch (error) {
-    setStatus("failed");
+    setStatus("status.failed");
     appendLog(String(error));
   } finally {
     runBusy = false;
@@ -1333,7 +1685,10 @@ async function executeRun(runInput) {
 async function requestRun() {
   if (activeBlockingJob) {
     appendLog(
-      `Cannot create a new job while active job ${activeBlockingJob.job_id} (${activeBlockingJob.status}) is running`
+      t("messages.cannotCreateWhileActive", {
+        jobId: activeBlockingJob.job_id,
+        status: activeBlockingJob.status,
+      })
     );
     switchPage("monitor");
     return;
@@ -1347,11 +1702,11 @@ async function requestRun() {
     }
     pendingRunReview = { runInput };
     renderRunReview(runInput);
-    appendLog("run review opened (async)");
+    appendLog(t("messages.runReviewOpened"));
     switchPage("create");
   } catch (error) {
     const message = String(error);
-    setStatus(`input-error: ${message}`);
+    setStatus("status.inputError", { message });
     appendLog(message);
   }
 }
@@ -1359,7 +1714,7 @@ async function requestRun() {
 runBtn.addEventListener("click", requestRun);
 reviewExecuteBtn?.addEventListener("click", async () => {
   if (!pendingRunReview) {
-    appendLog("run review is empty");
+    appendLog(t("messages.runReviewEmpty"));
     clearRunReview();
     return;
   }
@@ -1368,7 +1723,7 @@ reviewExecuteBtn?.addEventListener("click", async () => {
   await executeRun(review.runInput);
 });
 reviewCancelBtn?.addEventListener("click", () => {
-  appendLog("run review cancelled");
+  appendLog(t("messages.runReviewCancelled"));
   clearRunReview();
 });
 reviewToggleHostsBtn?.addEventListener("click", () => {
@@ -1388,7 +1743,7 @@ importBtn.addEventListener("click", async () => {
   clearImportError();
   resetImportStreamLog();
   setImportInProgress(true);
-  appendImportStreamLog("Import started");
+  appendImportStreamLog(t("messages.importStarted"));
   try {
     const response = await fetch(`${currentApiBase()}/api/v2/devices/import/progress`, {
       method: "POST",
@@ -1420,8 +1775,8 @@ importBtn.addEventListener("click", async () => {
           const total = Number(event.total || 0);
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = 0;
-          importProgressTextEl.textContent = `Validating devices... 0/${total}`;
-          appendImportStreamLog(`Validation started (total=${total})`);
+          importProgressTextEl.textContent = t("messages.validatingDevices", { processed: 0, total });
+          appendImportStreamLog(t("messages.validationStarted", { total }));
         } else if (event.type === "progress") {
           const processed = Number(event.processed || 0);
           const total = Number(event.total || 0);
@@ -1430,35 +1785,42 @@ importBtn.addEventListener("click", async () => {
           const result = event.connection_ok === true ? "OK" : "NG";
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = processed;
-          importProgressTextEl.textContent = `Validating devices... ${processed}/${total}`;
-          appendImportStreamLog(`${host}:${port || "?"} ${result} (${processed}/${total})`);
+          importProgressTextEl.textContent = t("messages.validatingDevices", { processed, total });
+          appendImportStreamLog(
+            t(event.connection_ok === true ? "messages.progressOk" : "messages.progressNg", {
+              host,
+              port: port || "?",
+              processed,
+              total,
+            })
+          );
           if (event.connection_ok === true) {
             successfulProgressCount += 1;
           }
           importedCount = successfulProgressCount;
-          deviceCountEl.textContent = `imported devices: ${importedCount}`;
+          deviceCountEl.textContent = t("labels.importedDevices", { count: importedCount });
         } else if (event.type === "complete") {
           importedCount = (event.devices || []).length;
           const total = Number(event.total || importedCount);
           importProgressEl.max = total > 0 ? total : 1;
           importProgressEl.value = total;
-          importProgressTextEl.textContent = `Validating devices... ${total}/${total}`;
-          deviceCountEl.textContent = `imported devices: ${importedCount}`;
-          appendImportStreamLog(`Import completed (valid=${importedCount}, total=${total})`);
+          importProgressTextEl.textContent = t("messages.validatingDevices", { processed: total, total });
+          deviceCountEl.textContent = t("labels.importedDevices", { count: importedCount });
+          appendImportStreamLog(t("messages.importCompleted", { valid: importedCount, total }));
         } else if (event.type === "error") {
           const message = formatImportErrorDetail(event.detail);
-          appendImportStreamLog(`Import error: ${message}`);
+          appendImportStreamLog(t("messages.importError", { message }));
           throw new Error(message);
         }
       }
     }
-    appendLog(`import success: valid=${importedCount}`);
+    appendLog(t("messages.importSuccess", { count: importedCount }));
     await refreshImportedDevices();
   } catch (error) {
     const message = String(error);
-    deviceCountEl.textContent = `imported devices: ${importedCountBeforeImport}`;
+    deviceCountEl.textContent = t("labels.importedDevices", { count: importedCountBeforeImport });
     showImportError(message);
-    appendImportStreamLog(`Import failed: ${message}`);
+    appendImportStreamLog(t("messages.importFailed", { message }));
     appendLog(message);
   } finally {
     setImportInProgress(false);
@@ -1516,7 +1878,7 @@ presetSelectEl.addEventListener("change", () => {
   verifyCommandsEl.value = selected.verify_commands.join("\n");
   updateVerifyModeControls();
   setPresetActionState();
-  appendLog(`preset applied: ${selected.name} (${selected.os_model})`);
+  appendLog(t("messages.presetApplied", { name: selected.name, osModel: selected.os_model }));
 });
 
 presetSaveNewBtn?.addEventListener("click", () => {
@@ -1550,24 +1912,24 @@ statusRunBtn.addEventListener("click", async () => {
   const selected = statusDeviceSelectEl.value.trim();
   const commands = statusCommandsEl.value.trim();
   if (!selected) {
-    statusOutputEl.textContent = "Please select a target device.";
+    statusOutputEl.textContent = t("messages.selectTargetDevice");
     return;
   }
   if (!commands) {
-    statusOutputEl.textContent = "Please enter at least one command.";
+    statusOutputEl.textContent = t("messages.enterCommand");
     return;
   }
   const [host, rawPort] = selected.split(":");
   const port = Number(rawPort || "22");
   statusRunBtn.disabled = true;
-  statusOutputEl.textContent = "Running...";
+  statusOutputEl.textContent = t("messages.runningEllipsis");
   try {
     const result = await client().execStatusCommands(host, port, commands);
-    statusOutputEl.textContent = result.output || "(empty output)";
-    appendLog(`status command succeeded for ${host}:${port}`);
+    statusOutputEl.textContent = result.output || t("labels.emptyOutput");
+    appendLog(t("messages.statusCommandSucceeded", { host, port }));
   } catch (error) {
     const text = String(error);
-    statusOutputEl.textContent = `Error: ${text}`;
+    statusOutputEl.textContent = t("messages.errorPrefix", { error: text });
     appendLog(text);
   } finally {
     statusRunBtn.disabled = false;
@@ -1582,8 +1944,8 @@ viewActiveJobBtn?.addEventListener("click", async () => {
 pauseBtn.addEventListener("click", async () => {
   try {
     const result = await client().controlActiveJob("pause");
-    appendLog(`paused ${result.job_id}`);
-    setStatus("paused");
+    appendLog(t("messages.pausedJob", { jobId: result.job_id }));
+    setStatus("status.paused");
     await refreshActive();
   } catch (error) {
     appendLog(String(error));
@@ -1593,8 +1955,8 @@ pauseBtn.addEventListener("click", async () => {
 resumeBtn.addEventListener("click", async () => {
   try {
     const result = await client().controlActiveJob("resume");
-    appendLog(`resumed ${result.job_id}`);
-    setStatus("running");
+    appendLog(t("messages.resumedJob", { jobId: result.job_id }));
+    setStatus("status.running");
     await refreshActive();
   } catch (error) {
     appendLog(String(error));
@@ -1604,12 +1966,12 @@ resumeBtn.addEventListener("click", async () => {
 cancelBtn.addEventListener("click", async () => {
   try {
     const result = await client().controlActiveJob("cancel");
-    appendLog(`cancelled ${result.job_id}`);
-    setStatus("cancelled");
+    appendLog(t("messages.cancelledJob", { jobId: result.job_id }));
+    setStatus("status.cancelled");
     await refreshActive();
     if (selectedJobId) {
       const events = await client().listJobEvents(selectedJobId);
-      appendLog(`selected job events: ${events.length}`);
+      appendLog(t("messages.selectedJobEvents", { count: events.length }));
     }
   } catch (error) {
     appendLog(String(error));
@@ -1618,6 +1980,10 @@ cancelBtn.addEventListener("click", async () => {
 
 clearBtn.addEventListener("click", () => {
   logEl.textContent = "";
+});
+
+localeSelectEl?.addEventListener("change", () => {
+  setLocale(localeSelectEl.value);
 });
 
 document.querySelectorAll(".nav-btn").forEach((btn) => {
@@ -1643,11 +2009,21 @@ setInterval(() => {
 }, 4000);
 
 presetPanelEl.classList.add("hidden");
+applyTranslations();
 applyApiBaseVisibility();
+setStatus("status.idle");
+setModeStatus("status.modeUnknown");
 updateCreateActionState();
 updateVerifyModeControls();
 updatePostCanaryControls();
 setPresetActionState();
+detailMetaEl.textContent = t("labels.noJobSelected");
+detailSummaryEl.textContent = t("labels.selectJobFromHistory");
+statusOutputEl.textContent = t("labels.noOutputYet");
+deviceCountEl.textContent = t("labels.importedDevices", { count: 0 });
+importedDeviceHintEl.textContent = t("labels.importedTargetCandidates", { count: 0 });
+monitorSummaryEl.textContent = t("labels.noActiveRunSelected");
+activeSummaryEl.textContent = t("status.activeNone");
 renderMonitorState();
 refreshProdWarningOverlay();
 refreshImportedDevices().catch(() => {});
