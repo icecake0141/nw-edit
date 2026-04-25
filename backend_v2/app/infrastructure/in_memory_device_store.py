@@ -45,3 +45,9 @@ class InMemoryDeviceStore:
                 if device.key == key:
                     return device
         return None
+
+    def clear(self) -> int:
+        with self._lock:
+            cleared = len(self._devices)
+            self._devices = []
+            return cleared

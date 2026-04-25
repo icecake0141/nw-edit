@@ -114,10 +114,10 @@ You may obtain a copy of the License at
       background:
         repeating-linear-gradient(
           135deg,
-          rgba(255, 176, 64, 0.14) 0px,
-          rgba(255, 176, 64, 0.14) 20px,
-          rgba(20, 20, 20, 0.05) 20px,
-          rgba(20, 20, 20, 0.05) 38px
+          rgba(255, 176, 64, 0.22) 0px,
+          rgba(255, 176, 64, 0.22) 20px,
+          rgba(20, 20, 20, 0.08) 20px,
+          rgba(20, 20, 20, 0.08) 38px
         );
     }
     .prod-warning-overlay.active {
@@ -127,7 +127,7 @@ You may obtain a copy of the License at
       position: absolute;
       inset: 0;
       font-weight: 700;
-      color: rgba(110, 54, 0, 0.3);
+      color: rgba(110, 54, 0, 0.42);
       letter-spacing: 0.04em;
       font-size: clamp(11px, 1.1vw, 16px);
       text-transform: uppercase;
@@ -325,6 +325,13 @@ You may obtain a copy of the License at
     .verify-mode-group {
       display: grid;
       gap: 10px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+    .verify-mode-group legend {
+      margin-bottom: 2px;
     }
     .verify-mode-option {
       display: grid;
@@ -333,7 +340,7 @@ You may obtain a copy of the License at
       padding: 12px 14px;
       border-radius: 12px;
       border: 1px solid rgba(124, 145, 176, 0.2);
-      background: rgba(255, 255, 255, 0.78);
+      background: rgba(255, 255, 255, 0.82);
     }
     .verify-mode-option strong {
       font-size: 0.95rem;
@@ -344,7 +351,7 @@ You may obtain a copy of the License at
       line-height: 1.45;
     }
     .form-note {
-      margin: -6px 0 14px;
+      margin: 0;
       color: var(--ink-soft);
       font-size: 0.86rem;
     }
@@ -355,6 +362,91 @@ You may obtain a copy of the License at
       background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(244, 248, 252, 0.92));
       margin-bottom: 14px;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    .command-card-group {
+      display: grid;
+      gap: 14px;
+      margin: 16px 0 18px;
+    }
+    .command-card {
+      border: 1px solid rgba(117, 137, 167, 0.22);
+      border-radius: 16px;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 252, 0.94));
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      gap: 10px;
+    }
+    .command-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 4px;
+      background: linear-gradient(90deg, rgba(117, 137, 167, 0.18), rgba(117, 137, 167, 0.04));
+    }
+    .command-card.apply-card::before {
+      background: linear-gradient(90deg, #5c82c9 0%, var(--accent) 48%, rgba(31, 78, 163, 0.12) 100%);
+    }
+    .command-card.verify-card {
+      border-color: rgba(136, 170, 220, 0.34);
+      background: linear-gradient(180deg, rgba(243, 248, 255, 0.98), rgba(235, 243, 253, 0.95));
+    }
+    .command-card.verify-card::before {
+      background: linear-gradient(90deg, rgba(88, 131, 205, 0.72), rgba(88, 131, 205, 0.16));
+    }
+    .command-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .command-card-title {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--title);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .command-card-copy {
+      margin: 4px 0 0;
+      color: var(--ink-soft);
+      font-size: 0.87rem;
+    }
+    .command-card label {
+      margin-bottom: 4px;
+    }
+    .command-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+    }
+    .apply-card .command-badge {
+      background: rgba(31, 78, 163, 0.1);
+      color: var(--accent-strong);
+      border-color: rgba(31, 78, 163, 0.18);
+    }
+    .verify-card .command-badge {
+      background: rgba(74, 122, 205, 0.12);
+      color: var(--info-ink);
+      border-color: rgba(74, 122, 205, 0.2);
+    }
+    .command-card textarea {
+      min-height: 120px;
+    }
+    .verify-controls {
+      display: grid;
+      gap: 12px;
     }
     .device-select-list {
       display: grid;
@@ -814,7 +906,8 @@ You may obtain a copy of the License at
       }
       .checkbox-row,
       .radio-group,
-      .device-select-wrap {
+      .device-select-wrap,
+      .command-card {
         padding: 12px;
       }
     }
@@ -876,6 +969,7 @@ You may obtain a copy of the License at
       <div class="btn-row">
         <button class="secondary" id="importBtn" title="Import devices from the CSV text above and validate each row.">Import CSV</button>
         <button class="secondary" id="refreshDevicesBtn" title="Refresh the currently stored imported device list from backend memory.">Refresh Devices</button>
+        <button class="secondary" id="resetAppStateBtn" title="Clear imported devices, jobs, results, and current input state while keeping saved presets.">Reset App State</button>
       </div>
       <div class="import-status">
         <div id="importLoading" class="import-loading hidden" aria-live="polite">
@@ -924,30 +1018,62 @@ You may obtain a copy of the License at
           <button class="secondary" id="presetUpdateBtn" type="button" title="Update currently selected preset with current commands/verify commands." disabled>Update Selected Preset</button>
         </div>
       </div>
-      <label for="commands">Commands (one line each)</label>
-      <textarea id="commands">show version
+      <div class="command-card-group">
+        <section class="command-card apply-card" aria-labelledby="applyCommandsTitle">
+          <div class="command-card-head">
+            <div>
+              <h3 id="applyCommandsTitle" class="command-card-title">
+                <span class="command-badge">Apply</span>
+                <span>実機へ投入するコマンド</span>
+              </h3>
+              <p class="command-card-copy">対象機器の設定変更に使うコマンドです。1行ごとに順番に投入されます。</p>
+            </div>
+          </div>
+          <div>
+            <label for="commands">Commands (one line each)</label>
+            <textarea id="commands" placeholder="snmp-server location DC1&#10;snmp-server contact NOC">show version
 show ip interface brief</textarea>
-      <label for="verifyCommands">Verify Commands (one line each)</label>
-      <textarea id="verifyCommands"></textarea>
-      <fieldset class="radio-group verify-mode-group" id="verifyModeGroup">
-        <legend>Verify commands apply to</legend>
-        <label class="radio-option verify-mode-option">
-          <input type="radio" name="verifyMode" value="all" checked />
-          <strong>Canary first, then all devices</strong>
-          <span>Run verify commands on the canary device first, then continue on all target devices.</span>
-        </label>
-        <label class="radio-option verify-mode-option">
-          <input type="radio" name="verifyMode" value="canary" />
-          <strong>Canary device only</strong>
-          <span>Run verify commands on the canary device only, then finish.</span>
-        </label>
-        <label class="radio-option verify-mode-option">
-          <input type="radio" name="verifyMode" value="none" />
-          <strong>Skip verify commands</strong>
-          <span>Do not run verify commands on any device.</span>
-        </label>
-      </fieldset>
-      <div class="form-note" id="verifyModeHint">Choose where verify commands run after the canary step.</div>
+          </div>
+        </section>
+        <section class="command-card verify-card" aria-labelledby="verifyCommandsTitle">
+          <div class="command-card-head">
+            <div>
+              <h3 id="verifyCommandsTitle" class="command-card-title">
+                <span class="command-badge">Verify</span>
+                <span>確認用コマンド</span>
+              </h3>
+              <p class="command-card-copy">投入前後の状態確認に使います。空欄でも実行できます。</p>
+            </div>
+          </div>
+          <div class="verify-controls">
+            <div>
+              <label for="verifyCommands">Verify Commands (one line each)</label>
+              <textarea id="verifyCommands" placeholder="show run | section snmp&#10;show ip interface brief"></textarea>
+            </div>
+            <div>
+              <fieldset class="radio-group verify-mode-group" id="verifyModeGroup">
+                <legend>Verify commands apply to</legend>
+                <label class="radio-option verify-mode-option">
+                  <input type="radio" name="verifyMode" value="all" checked />
+                  <strong>Canary first, then all devices</strong>
+                  <span>Run verify commands on the canary device first, then continue on all target devices.</span>
+                </label>
+                <label class="radio-option verify-mode-option">
+                  <input type="radio" name="verifyMode" value="canary" />
+                  <strong>Canary device only</strong>
+                  <span>Run verify commands on the canary device only, then finish.</span>
+                </label>
+                <label class="radio-option verify-mode-option">
+                  <input type="radio" name="verifyMode" value="none" />
+                  <strong>Skip verify commands</strong>
+                  <span>Do not run verify commands on any device.</span>
+                </label>
+              </fieldset>
+              <p class="form-note" id="verifyModeHint">Choose where verify commands run after the canary step.</p>
+            </div>
+          </div>
+        </section>
+      </div>
       <label for="concurrencyLimit">Concurrency Limit</label>
       <input id="concurrencyLimit" type="number" min="1" max="100" value="5" />
       <label for="staggerDelay">Stagger Delay (seconds)</label>

@@ -114,6 +114,18 @@ make check-integration
   - `Sequential (1 device at a time)` forces `concurrency_limit=1` and disables the input
 - No backend API changes were added; strategy is mapped only to `concurrency_limit`.
 
+## App state reset (v2)
+
+- Import page provides `Reset App State` to clear volatile runtime state without restarting the process.
+- Reset removes:
+  - imported devices
+  - job history
+  - buffered events and run results
+  - temporary UI input and selection state
+- Reset keeps saved execution presets in `NW_EDIT_V2_PRESET_FILE`.
+- Backend API: `POST /api/v2/app/reset`
+- If any job is `queued`, `running`, or `paused`, reset is rejected with `HTTP 409`.
+
 ## Documentation
 
 - Full index (EN/JA): [docs/INDEX.md](docs/INDEX.md)

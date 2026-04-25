@@ -41,3 +41,9 @@ class InMemoryEventStore(EventPublisher):
     def event_count(self, job_id: str) -> int:
         with self._lock:
             return len(self._events_by_job.get(job_id, []))
+
+    def clear(self) -> int:
+        with self._lock:
+            cleared = sum(len(events) for events in self._events_by_job.values())
+            self._events_by_job = {}
+            return cleared
