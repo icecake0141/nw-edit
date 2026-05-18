@@ -60,7 +60,18 @@ def test_import_csv_parses_and_stores_valid_devices():
     device = result.devices[0]
     assert device.host == "10.0.0.1"
     assert device.verify_cmds == ["show run", "show ip int br"]
-    assert device.host_vars == {"hostname": "edge-1", "site": "100"}
+    assert device.host_vars == {
+        "host": "10.0.0.1",
+        "ip": "10.0.0.1",
+        "port": "22",
+        "device_type": "cisco_ios",
+        "username": "admin",
+        "name": "edge-1",
+        "hostname": "edge-1",
+        "prod": "true",
+        "site": "100",
+    }
+    assert "password" not in device.host_vars
     assert device.prod is True
     assert device.connection_ok is True
     assert result.failed_rows == []
@@ -94,6 +105,48 @@ def test_import_csv_normalizes_generic_linux_device_type():
 
     assert len(result.devices) == 1
     assert result.devices[0].device_type == "linux"
+    assert result.devices[0].host_vars["device_type"] == "linux"
+
+
+def test_import_csv_adds_default_host_vars_from_csv_columns():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password,name,site,bad-key\n"
+        "10.0.8.1,2222,cisco_ios,admin,secret,edge-8,tokyo,ignored\n"
+    )
+
+    assert len(result.devices) == 1
+    assert result.devices[0].host_vars == {
+        "host": "10.0.8.1",
+        "ip": "10.0.8.1",
+        "port": "2222",
+        "device_type": "cisco_ios",
+        "username": "admin",
+        "name": "edge-8",
+        "hostname": "edge-8",
+        "prod": "false",
+        "site": "tokyo",
+    }
+
+
+def test_import_csv_explicit_host_vars_override_default_host_vars():
+    service = DeviceImportService(
+        store=InMemoryDeviceStore(),
+        validator=SimulatedConnectionValidator(),
+    )
+    result = service.import_csv(
+        "host,port,device_type,username,password,name,host_vars\n"
+        "10.0.8.2,22,cisco_ios,admin,pass,display-name,"
+        '"{""hostname"":""edge-8-2"",""ip"":""192.0.2.8""}"\n'
+    )
+
+    assert len(result.devices) == 1
+    assert result.devices[0].host_vars["hostname"] == "edge-8-2"
+    assert result.devices[0].host_vars["ip"] == "192.0.2.8"
+    assert result.devices[0].host_vars["host"] == "10.0.8.2"
 
 
 def test_import_csv_collects_failed_rows():
