@@ -260,12 +260,12 @@ function describeVerifyPlan(verifyMode, verifyCommands) {
 function updateVerifyModeControls() {
   const hasVerifyCommands = parseCommands(verifyCommandsEl.value).length > 0;
   verifyModeEls.forEach((el) => {
-    el.disabled = !hasVerifyCommands;
+    el.disabled = false;
   });
   if (verifyModeHintEl) {
     verifyModeHintEl.textContent = hasVerifyCommands
       ? "Choose where verify commands run after the canary step."
-      : "No verify commands configured. This setting will be ignored.";
+      : "No verify commands configured. You can still choose the canary rollout scope.";
   }
 }
 
