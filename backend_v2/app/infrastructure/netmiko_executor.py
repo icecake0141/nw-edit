@@ -155,7 +155,7 @@ def run_status_commands(device_params: dict[str, Any], commands: str) -> str:
         )
         outputs = []
         for cmd in command_list:
-            output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
+            output = str(connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT))
             error_message = _check_for_errors(output)
             if error_message:
                 raise RuntimeError(error_message)
@@ -319,7 +319,7 @@ def execute_device_commands(
                     connection.disconnect()
                     return result
                 add_log(f"  > {cmd}")
-                output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
+                output = str(connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT))
                 pre_outputs.append(output)
                 error_message = _check_for_errors(output)
                 if error_message:
@@ -345,8 +345,8 @@ def execute_device_commands(
         if has_timed_out(stage="configuration apply"):
             connection.disconnect()
             return result
-        apply_output = connection.send_config_set(
-            commands, read_timeout=COMMAND_TIMEOUT
+        apply_output = str(
+            connection.send_config_set(commands, read_timeout=COMMAND_TIMEOUT)
         )
         result["apply_output"] = apply_output
         add_log("Configuration applied")
@@ -371,7 +371,7 @@ def execute_device_commands(
                     connection.disconnect()
                     return result
                 add_log(f"  > {cmd}")
-                output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
+                output = str(connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT))
                 post_outputs.append(output)
                 error_message = _check_for_errors(output)
                 if error_message:
