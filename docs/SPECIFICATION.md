@@ -63,6 +63,10 @@ host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 - Command placeholders use `{{var}}` syntax.
 - Global variables are provided at job creation (`POST /api/v2/jobs` with `global_vars`).
 - Host variables are provided per imported device via CSV `host_vars`.
+- Imported CSV columns are also available as default host variables when their column
+  names are valid variable identifiers. Built-ins include `host`, `ip`, `hostname`,
+  `port`, `device_type`, `name`, `username`, and `prod`; `password`, `host_vars`,
+  and `verify_cmds` are excluded.
 - Merge precedence is `host_vars > global_vars`.
 - If any placeholder is unresolved, run preflight fails with `HTTP 400` before device execution.
 

@@ -66,6 +66,7 @@ class DeviceImportService:
         "generic_linux": "linux",
         "generic-linux": "linux",
     }
+    _EXCLUDED_DEFAULT_VAR_COLUMNS = {"password", "host_vars", "verify_cmds"}
 
     def __init__(
         self, store: InMemoryDeviceStore, validator: DeviceConnectionValidator
@@ -84,6 +85,29 @@ class DeviceImportService:
     @staticmethod
     def _normalize_header_name(name: str) -> str:
         return name.strip().lower()
+
+    def _default_host_vars(
+        self,
+        normalized: dict[str, str],
+        port: int,
+        device_type: str,
+        prod: bool,
+    ) -> dict[str, str]:
+        defaults = {
+            key: value
+            for key, value in normalized.items()
+            if (
+                key not in self._EXCLUDED_DEFAULT_VAR_COLUMNS
+                and self._var_name_pattern.match(key)
+            )
+        }
+        defaults["host"] = normalized["host"]
+        defaults["ip"] = normalized["host"]
+        defaults["port"] = str(port)
+        defaults["device_type"] = device_type
+        defaults["hostname"] = normalized.get("name") or normalized["host"]
+        defaults["prod"] = "true" if prod else "false"
+        return {key: str(value) for key, value in defaults.items()}
 
     def import_csv(
         self,
@@ -176,8 +200,15 @@ class DeviceImportService:
                 for cmd in (normalized.get("verify_cmds") or "").split(";")
                 if cmd.strip()
             ]
+            prod = (normalized.get("prod") or "").strip().lower() == "true"
+            device_type = self._normalize_device_type(normalized["device_type"])
+            host_vars = self._default_host_vars(
+                normalized=normalized,
+                port=port,
+                device_type=device_type,
+                prod=prod,
+            )
             host_vars_raw = normalized.get("host_vars") or ""
-            host_vars: dict[str, str] = {}
             if host_vars_raw:
                 try:
                     loaded = json.loads(host_vars_raw)
@@ -216,8 +247,9 @@ class DeviceImportService:
                         )
                     )
                     continue
-                host_vars = {str(key): str(value) for key, value in loaded.items()}
-            prod = (normalized.get("prod") or "").strip().lower() == "true"
+                host_vars.update(
+                    {str(key): str(value) for key, value in loaded.items()}
+                )
             parsed_entries.append(
                 (
                     row_number,
@@ -225,9 +257,7 @@ class DeviceImportService:
                     DeviceProfile(
                         host=normalized["host"],
                         port=port,
-                        device_type=self._normalize_device_type(
-                            normalized["device_type"]
-                        ),
+                        device_type=device_type,
                         username=normalized["username"],
                         password=normalized["password"],
                         name=normalized.get("name") or None,
