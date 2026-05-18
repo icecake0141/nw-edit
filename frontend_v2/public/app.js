@@ -171,7 +171,7 @@ const translations = {
     },
     messages: {
       verifyChoose: "Choose where verify commands run after the canary step.",
-      verifyIgnored: "No verify commands configured. This setting will be ignored.",
+      verifyIgnored: "No verify commands configured. You can still choose the canary rollout scope.",
       validatingDevices: "Validating devices... {processed}/{total}",
       csvImportFailed: "CSV import failed",
       globalVarsParseError: "global vars JSON parse error: {error}",
@@ -577,7 +577,7 @@ function describeVerifyPlan(verifyMode, verifyCommands) {
 function updateVerifyModeControls() {
   const hasVerifyCommands = parseCommands(verifyCommandsEl.value).length > 0;
   verifyModeEls.forEach((el) => {
-    el.disabled = !hasVerifyCommands;
+    el.disabled = false;
   });
   if (verifyModeHintEl) {
     verifyModeHintEl.textContent = hasVerifyCommands
