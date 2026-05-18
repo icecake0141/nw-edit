@@ -326,11 +326,12 @@ def test_run_fails_preflight_when_command_variable_is_missing():
         json={
             "imported_device_keys": ["10.8.0.1:22"],
             "canary": {"host": "10.8.0.1", "port": 22},
-            "commands": ["hostname {{hostname}}"],
+            "commands": ["hostname {{missing_hostname}}"],
         },
     )
     assert run_response.status_code == 400
     assert "Missing command variables" in run_response.json()["detail"]
+    assert "missing_hostname" in run_response.json()["detail"]
 
 
 def test_run_prefers_host_vars_over_global_vars():

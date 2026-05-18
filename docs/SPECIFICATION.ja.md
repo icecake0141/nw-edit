@@ -63,6 +63,9 @@ host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 - コマンドのプレースホルダ記法は `{{var}}`。
 - グローバル変数はジョブ作成時（`POST /api/v2/jobs` の `global_vars`）に指定。
 - ホスト毎変数は CSV の `host_vars` 列で指定。
+- インポートされた CSV 列も、列名が有効な変数名であればデフォルトのホスト毎変数として利用可能。
+  組み込み変数は `host`, `ip`, `hostname`, `port`, `device_type`, `name`,
+  `username`, `prod`。`password`, `host_vars`, `verify_cmds` は対象外。
 - マージ優先順位は `host_vars > global_vars`。
 - 未解決プレースホルダが1つでもある場合、デバイス実行前に preflight で `HTTP 400` を返す。
 
