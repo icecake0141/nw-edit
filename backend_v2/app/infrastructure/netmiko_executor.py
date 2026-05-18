@@ -37,6 +37,7 @@ ERROR_PATTERNS = [
     "Error:",
     "Ambiguous command",
     "Incomplete command",
+    "Unknown action",
 ]
 
 MAX_LOG_SIZE = 1024 * 1024
@@ -154,13 +155,18 @@ def run_status_commands(device_params: dict[str, Any], commands: str) -> str:
         )
         outputs = []
         for cmd in command_list:
-            output = connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
+            output = str(connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT))
+            error_message = _check_for_errors(output)
+            if error_message:
+                raise RuntimeError(error_message)
             outputs.append(f"$ {cmd}\n{output}")
         return "\n\n".join(outputs)
     except NetmikoAuthenticationException as exc:
         raise RuntimeError(f"Authentication failed: {str(exc)}") from exc
     except NetmikoTimeoutException as exc:
         raise RuntimeError(f"Command execution timeout: {str(exc)}") from exc
+    except RuntimeError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"SSH execution error: {str(exc)}") from exc
     finally:
@@ -313,9 +319,16 @@ def execute_device_commands(
                     connection.disconnect()
                     return result
                 add_log(f"  > {cmd}")
-                pre_outputs.append(
-                    connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
-                )
+                output = str(connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT))
+                pre_outputs.append(output)
+                error_message = _check_for_errors(output)
+                if error_message:
+                    connection.disconnect()
+                    return handle_failure(
+                        error_code="command_error",
+                        error_message=error_message,
+                        log_message=f"ERROR: {error_message}",
+                    )
             result["pre_output"] = "\n".join(pre_outputs)
             add_log("Pre-verification complete")
 
@@ -332,8 +345,8 @@ def execute_device_commands(
         if has_timed_out(stage="configuration apply"):
             connection.disconnect()
             return result
-        apply_output = connection.send_config_set(
-            commands, read_timeout=COMMAND_TIMEOUT
+        apply_output = str(
+            connection.send_config_set(commands, read_timeout=COMMAND_TIMEOUT)
         )
         result["apply_output"] = apply_output
         add_log("Configuration applied")
@@ -358,9 +371,16 @@ def execute_device_commands(
                     connection.disconnect()
                     return result
                 add_log(f"  > {cmd}")
-                post_outputs.append(
-                    connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT)
-                )
+                output = str(connection.send_command(cmd, read_timeout=COMMAND_TIMEOUT))
+                post_outputs.append(output)
+                error_message = _check_for_errors(output)
+                if error_message:
+                    connection.disconnect()
+                    return handle_failure(
+                        error_code="command_error",
+                        error_message=error_message,
+                        log_message=f"ERROR: {error_message}",
+                    )
             result["post_output"] = "\n".join(post_outputs)
             add_log("Post-verification complete")
 

@@ -134,6 +134,46 @@ def test_execute_device_commands_detects_command_error(monkeypatch):
     assert "Command error detected" in str(result["error"])
 
 
+def test_execute_device_commands_detects_fortios_unknown_action(monkeypatch):
+    fake = _FakeConnection()
+
+    def send_config_set_error(commands: list[str], read_timeout: int) -> str:
+        del commands, read_timeout
+        return (
+            'FORTIOS # next\nUnknown action 0\n \nFORTIOS # edit "1"\nUnknown action 0'
+        )
+
+    fake.send_config_set = send_config_set_error  # type: ignore[method-assign]
+    monkeypatch.setattr(executor, "ConnectHandler", lambda **kwargs: fake)
+
+    result = executor.execute_device_commands(
+        device_params=_device_params(),
+        commands=["bad fortios command"],
+        verify_cmds=[],
+        is_canary=True,
+    )
+
+    assert result["status"] == "failed"
+    assert result["error_code"] == "command_error"
+    assert "Unknown action" in str(result["error"])
+
+
+def test_run_status_commands_detects_fortios_unknown_action(monkeypatch):
+    fake = _FakeConnection(
+        pre_output='FORTIOS # next\nUnknown action 0\n \nFORTIOS # edit "1"\nUnknown action 0'
+    )
+    monkeypatch.setattr(executor, "ConnectHandler", lambda **kwargs: fake)
+
+    try:
+        executor.run_status_commands(_device_params(), "bad fortios command")
+    except RuntimeError as exc:
+        assert "Unknown action" in str(exc)
+    else:
+        raise AssertionError("FortiOS Unknown action output should fail")
+
+    assert fake.disconnected is True
+
+
 def test_execute_device_commands_cancelled_before_connect(monkeypatch):
     cancel_event = threading.Event()
     cancel_event.set()
