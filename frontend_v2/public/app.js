@@ -1250,7 +1250,7 @@ function buildDeviceCardsHtml(source, deviceNameMap = {}) {
           <h4>${escapeHtml(`${key} (${hostname})`)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
           <div class="meta">Attempts: ${attempts || "-"} ${error ? `/ Error: ${escapeHtml(error)}` : ""}</div>
           <div class="output-label">Command Stream</div>
-          <pre class="stream-output">${escapeHtml(streamText)}</pre>
+          <pre class="stream-output" data-device-key="${escapeHtml(key)}">${escapeHtml(streamText)}</pre>
           ${result?.pre_output ? `<div class="output-label">Verify Pre</div><pre class="verify-output">${escapeHtml(result.pre_output)}</pre>` : ""}
           ${result?.apply_output ? `<div class="output-label">Apply Output</div><pre class="verify-output">${escapeHtml(result.apply_output)}</pre>` : ""}
           ${result?.post_output ? `<div class="output-label">Verify Post</div><pre class="verify-output">${escapeHtml(result.post_output)}</pre>` : ""}
@@ -1262,9 +1262,38 @@ function buildDeviceCardsHtml(source, deviceNameMap = {}) {
     .join("");
 }
 
+function snapshotStreamScrollState(devicesEl) {
+  const scrollState = {};
+  devicesEl.querySelectorAll(".stream-output[data-device-key]").forEach((el) => {
+    const deviceKey = el.getAttribute("data-device-key");
+    if (!deviceKey) {
+      return;
+    }
+    scrollState[deviceKey] = {
+      scrollTop: el.scrollTop,
+      pinnedToBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 4,
+    };
+  });
+  return scrollState;
+}
+
+function restoreStreamScrollState(devicesEl, scrollState) {
+  devicesEl.querySelectorAll(".stream-output[data-device-key]").forEach((el) => {
+    const deviceKey = el.getAttribute("data-device-key");
+    const state = deviceKey ? scrollState[deviceKey] : null;
+    if (!state) {
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    el.scrollTop = state.pinnedToBottom ? el.scrollHeight : state.scrollTop;
+  });
+}
+
 function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0, deviceNameMap = {}) {
+  const streamScrollState = snapshotStreamScrollState(devicesEl);
   summaryEl.innerHTML = buildExecutionSummaryHtml(source, eventCount);
   devicesEl.innerHTML = buildDeviceCardsHtml(source, deviceNameMap);
+  restoreStreamScrollState(devicesEl, streamScrollState);
 }
 
 function renderMonitorState() {
