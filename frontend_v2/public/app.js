@@ -236,7 +236,7 @@ const translations = {
       jobCreated: "job created: {jobId}",
       runAsyncStarted: "run async started: {status}",
       helpHtml: `<h3>Command Variables Help</h3>
-        <p>Variables let you reuse command templates across devices. Use placeholders like <code>{{hostname}}</code> in command lines, then provide values from <code>global_vars</code> or CSV <code>host_vars</code>.</p>
+        <p>Variables let you reuse command templates across devices. Use placeholders like <code>{{hostname}}</code> in command lines, then provide values from <code>global_vars</code>, imported CSV columns, or CSV <code>host_vars</code>.</p>
         <h3>1) Placeholder Format</h3>
         <p>Use double braces in commands:</p>
         <pre>configure terminal
@@ -257,16 +257,36 @@ clock timezone JST {{tz_offset}}</pre>
     "tz_offset": "9"
   }
 }</pre>
-        <h3>3) Host Vars (per-device CSV)</h3>
+        <h3>3) Default Host Vars from CSV Columns</h3>
+        <p>Imported CSV columns are available automatically as per-host variables. You do not need to duplicate common fields in <code>host_vars</code>.</p>
+        <p>Built-in defaults:</p>
+        <pre>{{host}}        CSV host value
+{{ip}}          same value as host
+{{hostname}}    CSV name value, or host when name is empty
+{{port}}        resolved SSH port
+{{device_type}} normalized device type
+{{name}}        CSV name value
+{{username}}    CSV username value
+{{prod}}        true or false</pre>
+        <p>Additional CSV columns with valid variable names are also available. <code>password</code>, <code>host_vars</code>, and <code>verify_cmds</code> are excluded.</p>
+        <pre>host,port,device_type,username,password,name,site,prod
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,tokyo,true
+
+commands:
+hostname {{hostname}}
+snmp-server location {{site}}
+logging host {{ip}}</pre>
+        <h3>4) Explicit Host Vars (per-device CSV)</h3>
         <p>Use CSV column <code>host_vars</code> as a JSON object string:</p>
         <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1"",""tz_offset"":""9""}",true
 10.0.0.2,22,cisco_ios,admin,pass,edge-2,show run,"{""hostname"":""edge-2""}",false</pre>
-        <h3>4) Resolution Priority</h3>
-        <p>If the same key exists in both places, device-level CSV value wins: <code>host_vars &gt; global_vars</code>.</p>
-        <h3>5) Missing Variable Behavior</h3>
+        <p>Use explicit <code>host_vars</code> when you need to add values that are not CSV columns, or override default host variables.</p>
+        <h3>5) Resolution Priority</h3>
+        <p>If the same key exists in multiple places, explicit device-level values win: <code>host_vars &gt; default CSV host vars &gt; global_vars</code>.</p>
+        <h3>6) Missing Variable Behavior</h3>
         <p>If any placeholder has no value, preflight fails with <code>HTTP 400</code>. Device commands are not executed.</p>
-        <h3>6) Common Mistakes and Fixes</h3>
+        <h3>7) Common Mistakes and Fixes</h3>
         <pre>- Invalid JSON in Global Vars:
   wrong: {"timezone":"Asia/Tokyo",}
   fix:   {"timezone":"Asia/Tokyo"}
@@ -278,23 +298,29 @@ clock timezone JST {{tz_offset}}</pre>
 - CSV host_vars quoting:
   wrong: {"hostname":"edge-1"}   (not CSV-escaped)
   fix:   "{""hostname"":""edge-1""}"</pre>
-        <h3>7) End-to-End Mini Example</h3>
+        <h3>8) End-to-End Mini Example</h3>
         <p>Inputs:</p>
         <pre>global_vars:
 {"tz_offset":"9","ntp_server":"192.0.2.10"}
+
+CSV row:
+host,port,device_type,username,password,name,site
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,tokyo
 
 command:
 clock timezone JST {{tz_offset}}
 ntp server {{ntp_server}}
 hostname {{hostname}}
+snmp-server location {{site}}
 
-host_vars for 10.0.0.1:
-{"hostname":"edge-1","ntp_server":"192.0.2.20"}</pre>
+explicit host_vars for 10.0.0.1:
+{"ntp_server":"192.0.2.20"}</pre>
         <p>Resolved commands for 10.0.0.1:</p>
         <pre>clock timezone JST 9
 ntp server 192.0.2.20
-hostname edge-1</pre>
-        <h3>8) Production Host Flag</h3>
+hostname edge-1
+snmp-server location tokyo</pre>
+        <h3>9) Production Host Flag</h3>
         <p>Optional CSV column <code>prod</code> marks production hosts. <code>true</code> enables production warning UI in Create/Monitor/Detail pages when selected targets include that host.</p>
         <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 10.0.0.10,22,cisco_ios,admin,pass,core-prod,show run,"{""hostname"":""core-prod""}",true
