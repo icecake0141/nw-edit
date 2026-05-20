@@ -46,6 +46,7 @@ CSP_POLICY: Final[str] = (
     "frame-ancestors 'none'; "
     "form-action 'self'"
 )
+INDEX_CACHE_CONTROL: Final[str] = "no-cache"
 
 mimetypes.add_type("application/javascript", ".js")
 
@@ -100,6 +101,8 @@ class HardenedStaticHandler(SimpleHTTPRequestHandler):
 
     def end_headers(self) -> None:
         self.send_header("Content-Security-Policy", CSP_POLICY)
+        if unquote(urlsplit(self.path).path) in {"", "/", "/index.html"}:
+            self.send_header("Cache-Control", INDEX_CACHE_CONTROL)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "DENY")

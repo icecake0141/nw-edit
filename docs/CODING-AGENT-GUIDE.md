@@ -154,6 +154,10 @@ Start with:
 - `frontend_v2/public/api-client.js`: API contracts consumed by the UI
 - `backend_v2/app/frontend_server.py`: hardened static serving behavior
 
+When changing `frontend_v2/public/app.js`, also bump the `?v=` query version on the
+`./app.js` script tag in `frontend_v2/public/index.html`. The frontend has no build
+step, so this explicit version is the cache-busting mechanism for browser clients.
+
 Update tests in:
 
 - `backend_v2/tests/unit/test_frontend_server.py` for static server changes

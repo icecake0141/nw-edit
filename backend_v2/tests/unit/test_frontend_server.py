@@ -58,6 +58,7 @@ def test_root_path_serves_index_with_security_headers(tmp_path: Path):
                 "default-src 'self'"
             )
             assert response.headers["X-Content-Type-Options"] == "nosniff"
+            assert response.headers["Cache-Control"] == "no-cache"
             assert response.headers["Referrer-Policy"] == "no-referrer"
             assert response.headers["X-Frame-Options"] == "DENY"
             assert response.headers["Cross-Origin-Opener-Policy"] == "same-origin"
@@ -80,6 +81,15 @@ def test_repo_frontend_index_includes_locale_selector():
 
     assert 'id="localeSelect"' in body
     assert 'data-i18n-text="locale.label"' in body
+
+
+def test_repo_frontend_index_versions_app_script():
+    repo_root = Path(__file__).resolve().parents[3]
+    index_path = repo_root / "frontend_v2" / "public" / "index.html"
+    body = index_path.read_text(encoding="utf-8")
+
+    assert 'src="./app.js?v=' in body
+    assert "Bump this query version whenever app.js changes" in body
 
 
 def test_unknown_paths_return_404(tmp_path: Path):
