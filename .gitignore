@@ -27,6 +27,7 @@ htmlcov/
 .tox/
 .hypothesis/
 venv/
+.venv/
 env/
 ENV/
 
