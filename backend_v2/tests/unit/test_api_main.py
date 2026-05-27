@@ -913,6 +913,80 @@ def test_run_with_imported_device_keys_limits_targets():
     assert list(payload["device_results"].keys()) == ["10.5.0.2:22"]
 
 
+def test_run_command_scope_canary_targets_only_canary(monkeypatch):
+    client = TestClient(app)
+    imported = client.post(
+        "/api/v2/devices/import",
+        content=(
+            "host,port,device_type,username,password,name,verify_cmds,host_vars\n"
+            "10.15.0.1,22,cisco_ios,admin,pass,edge-a,show run,\n"
+            "10.15.0.2,22,cisco_ios,admin,pass,edge-b,show run,\n"
+        ),
+        headers={"Content-Type": "text/plain"},
+    )
+    assert imported.status_code == 200
+    created = client.post(
+        "/api/v2/jobs",
+        json={"job_name": "command-scope-canary", "creator": "tester"},
+    )
+    assert created.status_code == 200
+    job_id = created.json()["job_id"]
+    captured: dict[str, object] = {}
+
+    def fake_run_job(**kwargs):
+        captured.update(kwargs)
+        return JobRunSummary(
+            job_id=job_id,
+            status=JobStatus.COMPLETED,
+            commands=["show version"],
+            verify_commands=[],
+            target_device_keys=[device.key for device in kwargs["devices"]],
+            device_results={
+                "10.15.0.2:22": DeviceExecutionResult(status="success"),
+            },
+        )
+
+    monkeypatch.setattr(api_main.engine, "run_job", fake_run_job)
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "commands": ["show version"],
+            "command_scope": "canary",
+            "imported_device_keys": ["10.15.0.1:22", "10.15.0.2:22"],
+            "canary": {"host": "10.15.0.2", "port": 22},
+        },
+    )
+    assert run.status_code == 200
+    assert [device.key for device in captured["devices"]] == ["10.15.0.2:22"]
+    assert list(captured["commands_by_device"].keys()) == ["10.15.0.2:22"]
+    assert run.json()["target_device_keys"] == ["10.15.0.2:22"]
+
+
+def test_run_rejects_invalid_command_scope():
+    client = TestClient(app)
+    import_devices_for_run(
+        client,
+        ["10.17.0.1,22,cisco_ios,admin,pass,edge-a,show run,"],
+    )
+    create = client.post(
+        "/api/v2/jobs", json={"job_name": "invalid-command-scope", "creator": "tester"}
+    )
+    assert create.status_code == 200
+    job_id = create.json()["job_id"]
+
+    run = client.post(
+        f"/api/v2/jobs/{job_id}/run",
+        json={
+            "commands": ["show version"],
+            "command_scope": "none",
+            "imported_device_keys": ["10.17.0.1:22"],
+            "canary": {"host": "10.17.0.1", "port": 22},
+        },
+    )
+    assert run.status_code == 400
+    assert run.json()["detail"] == "command_scope must be one of: all, canary"
+
+
 def test_run_rejects_empty_imported_device_keys():
     client = TestClient(app)
     create = client.post(

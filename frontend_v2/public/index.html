@@ -1034,6 +1034,19 @@ You may obtain a copy of the License at
             <textarea id="commands" placeholder="snmp-server location DC1&#10;snmp-server contact NOC">show version
 show ip interface brief</textarea>
           </div>
+          <fieldset class="radio-group command-scope-group" id="commandScopeGroup">
+            <legend>Execution commands apply to</legend>
+            <label class="radio-option">
+              <input type="radio" name="commandScope" value="all" checked />
+              <strong>Canary first, then all devices</strong>
+              <span>Run execution commands on the canary device first, then continue on remaining target devices.</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="commandScope" value="canary" />
+              <strong>Canary device only</strong>
+              <span>Run execution commands only on the canary device.</span>
+            </label>
+          </fieldset>
         </section>
         <section class="command-card verify-card" aria-labelledby="verifyCommandsTitle">
           <div class="command-card-head">
@@ -1055,13 +1068,13 @@ show ip interface brief</textarea>
                 <legend>Verify commands apply to</legend>
                 <label class="radio-option verify-mode-option">
                   <input type="radio" name="verifyMode" value="all" checked />
-                  <strong>Canary first, then all devices</strong>
-                  <span>Run verify commands on the canary device first, then continue on all target devices.</span>
+                  <strong>All executed devices</strong>
+                  <span>Run verify commands on every device that receives execution commands.</span>
                 </label>
                 <label class="radio-option verify-mode-option">
                   <input type="radio" name="verifyMode" value="canary" />
                   <strong>Canary device only</strong>
-                  <span>Run verify commands on the canary device only, then finish.</span>
+                  <span>Run verify commands only on the canary device.</span>
                 </label>
                 <label class="radio-option verify-mode-option">
                   <input type="radio" name="verifyMode" value="none" />
@@ -1069,7 +1082,7 @@ show ip interface brief</textarea>
                   <span>Do not run verify commands on any device.</span>
                 </label>
               </fieldset>
-              <p class="form-note" id="verifyModeHint">Choose where verify commands run after the canary step.</p>
+              <p class="form-note" id="verifyModeHint">Choose where configured verify commands run.</p>
             </div>
           </div>
         </section>

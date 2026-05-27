@@ -112,10 +112,12 @@ make check-integration
   - run commands
   - verify commands
   - effective run settings
+- `Execution commands apply to` controls whether execution commands run on all selected targets
+  after the canary succeeds or only on the canary device.
 - `Canary success after` controls post-canary fanout:
   - `Parallel` uses input `concurrency_limit`
   - `Sequential (1 device at a time)` forces `concurrency_limit=1` and disables the input
-- No backend API changes were added; strategy is mapped only to `concurrency_limit`.
+- Post-canary strategy is ignored when execution scope is `Canary device only`.
 
 ## App state reset (v2)
 

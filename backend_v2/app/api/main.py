@@ -251,6 +251,15 @@ def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
         raise HTTPException(status_code=404, detail="Job not found")
 
     devices, canary = _resolve_run_targets(payload)
+    command_scope = (payload.command_scope or "all").strip().lower()
+    if command_scope not in {"all", "canary"}:
+        raise HTTPException(
+            status_code=400,
+            detail="command_scope must be one of: all, canary",
+        )
+    if command_scope == "canary":
+        devices = [device for device in devices if device.key == canary.key]
+
     verify_mode = (payload.verify_mode or "all").strip().lower()
     if verify_mode not in {"all", "canary", "none"}:
         raise HTTPException(
