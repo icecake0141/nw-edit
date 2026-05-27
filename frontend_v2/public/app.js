@@ -58,6 +58,9 @@ const selectAllImportedBtn = document.getElementById("selectAllImportedBtn");
 const clearImportedSelectionBtn = document.getElementById("clearImportedSelectionBtn");
 const verifyCommandsEl = document.getElementById("verifyCommands");
 const verifyModeHintEl = document.getElementById("verifyModeHint");
+const commandScopeEls = Array.from(
+  document.querySelectorAll('input[name="commandScope"]')
+);
 const verifyModeEls = Array.from(
   document.querySelectorAll('input[name="verifyMode"]')
 );
@@ -170,8 +173,8 @@ const translations = {
       selectedJob: "selected: {jobId} ({status}) events={events}",
     },
     messages: {
-      verifyChoose: "Choose where verify commands run after the canary step.",
-      verifyIgnored: "No verify commands configured. You can still choose the canary rollout scope.",
+      verifyChoose: "Choose where configured verify commands run.",
+      verifyIgnored: "No verify commands configured. Execution command scope still applies.",
       validatingDevices: "Validating devices... {processed}/{total}",
       csvImportFailed: "CSV import failed",
       globalVarsParseError: "global vars JSON parse error: {error}",
@@ -195,16 +198,20 @@ const translations = {
       concurrencyLimitInvalid: "concurrency_limit must be >= 1",
       staggerDelayInvalid: "stagger_delay must be >= 0",
       postCanaryStrategyInvalid: "postCanaryStrategy must be parallel or sequential",
+      commandScopeInvalid: "commandScope must be all or canary",
       canaryRequired: "canary device is required",
       canaryIncluded: "canary device must be included in target devices",
       executionModeAsync: "Execution mode: Async (/run/async)",
       canaryFlowSequential: "Canary -> Device-1 -> Device-2 -> ...",
       canaryFlowParallel: "Canary -> [Device-1, Device-2, ...] (parallel up to {limit})",
+      canaryFlowOnly: "Canary only",
       settingCanary: "Canary: {value}",
+      settingCommandScope: "Execution scope: {value}",
       settingVerify: "Verify: {value}",
       settingStopOnError: "Stop on error: {value}",
       settingStaggerDelay: "Stagger delay: {value}s",
       settingPostCanary: "Post-canary strategy: {value}",
+      settingNotApplicable: "not applicable",
       settingConcurrencyInput: "Concurrency input: {value}",
       settingConcurrencyDisabled: "disabled (sequential mode)",
       settingEffectiveConcurrency: "Effective concurrency: {value}",
@@ -581,6 +588,15 @@ function selectedVerifyMode() {
   return selected ? selected.value : "all";
 }
 
+function selectedCommandScope() {
+  const selected = commandScopeEls.find((el) => el.checked);
+  return selected ? selected.value : "all";
+}
+
+function describeCommandScope(scope) {
+  return scope === "canary" ? "Canary device only" : "Canary first, then all devices";
+}
+
 function describeVerifyMode(mode) {
   switch (mode) {
     case "canary":
@@ -589,7 +605,7 @@ function describeVerifyMode(mode) {
       return "Skip verify commands";
     case "all":
     default:
-      return "Canary first, then all devices";
+      return "All executed devices";
   }
 }
 
@@ -1116,7 +1132,12 @@ function resetCreateFormState() {
   globalVarsEl.value = globalVarsEl.defaultValue;
   commandsEl.value = commandsEl.defaultValue;
   verifyCommandsEl.value = verifyCommandsEl.defaultValue;
-  verifyModeEl.value = verifyModeEl.defaultValue;
+  commandScopeEls.forEach((el) => {
+    el.checked = el.defaultChecked;
+  });
+  verifyModeEls.forEach((el) => {
+    el.checked = el.defaultChecked;
+  });
   concurrencyLimitEl.value = concurrencyLimitEl.defaultValue;
   staggerDelayEl.value = staggerDelayEl.defaultValue;
   stopOnErrorEl.checked = stopOnErrorEl.defaultChecked;
@@ -1666,7 +1687,12 @@ function selectedPostCanaryStrategy() {
 
 function updatePostCanaryControls() {
   const strategy = selectedPostCanaryStrategy();
-  const isParallel = strategy === "parallel";
+  const isCanaryOnly = selectedCommandScope() === "canary";
+  const isParallel = strategy === "parallel" && !isCanaryOnly;
+  postCanaryStrategyEls.forEach((el) => {
+    el.disabled = isCanaryOnly;
+    el.setAttribute("aria-disabled", String(isCanaryOnly));
+  });
   concurrencyLimitEl.disabled = !isParallel;
   concurrencyLimitEl.setAttribute("aria-disabled", String(!isParallel));
 }
@@ -1682,6 +1708,7 @@ function collectRunInput() {
   const creator = document.getElementById("creator").value.trim();
   const globalVarsText = document.getElementById("globalVars").value;
   const commands = parseCommands(document.getElementById("commands").value);
+  const commandScope = selectedCommandScope();
   const verifyCommands = parseCommands(verifyCommandsEl.value);
   const verifyMode = selectedVerifyMode();
   const concurrencyLimit = Number(concurrencyLimitEl.value || "5");
@@ -1701,6 +1728,9 @@ function collectRunInput() {
   if (!["parallel", "sequential"].includes(postCanaryStrategy)) {
     throw new Error(t("messages.postCanaryStrategyInvalid"));
   }
+  if (!["all", "canary"].includes(commandScope)) {
+    throw new Error(t("messages.commandScopeInvalid"));
+  }
 
   const targets = resolveRunTargets();
   if (targets.targetDevices.length === 0) {
@@ -1719,13 +1749,19 @@ function collectRunInput() {
   const canary = { host: canaryHost, port: Number(canaryRawPort || "22") };
   const globalVars = parseGlobalVars(globalVarsText);
   const targetDeviceKeys = targets.importedDeviceKeys;
-  const effectiveConfig = resolveEffectiveExecutionConfig(concurrencyLimit, postCanaryStrategy);
+  const executionTargetDeviceKeys =
+    commandScope === "canary" ? [canaryKey] : targetDeviceKeys;
+  const effectiveConfig =
+    commandScope === "canary"
+      ? { strategy: postCanaryStrategy, effectiveConcurrencyLimit: 1 }
+      : resolveEffectiveExecutionConfig(concurrencyLimit, postCanaryStrategy);
 
   return {
     jobName,
     creator,
     globalVars,
     commands,
+    commandScope,
     verifyCommands,
     verifyMode,
     concurrencyLimit,
@@ -1735,6 +1771,7 @@ function collectRunInput() {
     canaryKey,
     targets,
     targetDeviceKeys,
+    executionTargetDeviceKeys,
     postCanaryStrategy,
     effectiveConcurrencyLimit: effectiveConfig.effectiveConcurrencyLimit,
   };
@@ -1754,29 +1791,40 @@ function appendListItems(el, values) {
 }
 
 function buildReviewModel(runInput) {
-  const remainingCount = Math.max(0, runInput.targetDeviceKeys.length - 1);
+  const executionDeviceKeys = runInput.executionTargetDeviceKeys || runInput.targetDeviceKeys;
+  const remainingCount = Math.max(0, executionDeviceKeys.length - 1);
   const strategyText =
-    runInput.postCanaryStrategy === "sequential"
+    runInput.commandScope === "canary"
+      ? t("messages.canaryFlowOnly")
+      : runInput.postCanaryStrategy === "sequential"
       ? t("messages.canaryFlowSequential")
       : t("messages.canaryFlowParallel", { limit: runInput.effectiveConcurrencyLimit });
   return {
     modeText: t("messages.executionModeAsync"),
-    hosts: runInput.targetDeviceKeys,
+    hosts: executionDeviceKeys,
     commands: runInput.commands,
     verifyCommands: runInput.verifyCommands.length > 0 ? runInput.verifyCommands : [t("labels.none")],
     settings: [
       t("messages.settingCanary", { value: runInput.canaryKey }),
+      t("messages.settingCommandScope", { value: describeCommandScope(runInput.commandScope) }),
       t("messages.settingVerify", { value: describeVerifyPlan(runInput.verifyMode, runInput.verifyCommands) }),
       t("messages.settingStopOnError", { value: runInput.stopOnError }),
       t("messages.settingStaggerDelay", { value: runInput.staggerDelay }),
-      t("messages.settingPostCanary", { value: runInput.postCanaryStrategy === "sequential" ? "Sequential" : "Parallel" }),
+      t("messages.settingPostCanary", {
+        value:
+          runInput.commandScope === "canary"
+            ? t("messages.settingNotApplicable")
+            : runInput.postCanaryStrategy === "sequential"
+            ? "Sequential"
+            : "Parallel",
+      }),
       t("messages.settingConcurrencyInput", {
-        value: runInput.postCanaryStrategy === "sequential"
+        value: runInput.commandScope === "canary" || runInput.postCanaryStrategy === "sequential"
           ? t("messages.settingConcurrencyDisabled")
           : runInput.concurrencyLimit,
       }),
       t("messages.settingEffectiveConcurrency", { value: runInput.effectiveConcurrencyLimit }),
-      t("messages.settingTargetDevices", { count: runInput.targetDeviceKeys.length, remaining: remainingCount }),
+      t("messages.settingTargetDevices", { count: executionDeviceKeys.length, remaining: remainingCount }),
       t("messages.settingTargetSource"),
     ],
     flowDiagram: strategyText,
@@ -1823,7 +1871,7 @@ async function executeRun(runInput) {
   try {
     const job = await client().createJob(runInput.jobName, runInput.creator, runInput.globalVars);
     selectedJobId = job.job_id;
-    beginMonitor(job, runInput.targetDeviceKeys, runInput.canaryKey);
+    beginMonitor(job, runInput.executionTargetDeviceKeys, runInput.canaryKey);
     appendLog(t("messages.jobCreated", { jobId: job.job_id }));
     openJobSocket(currentApiBase(), job.job_id);
 
@@ -1832,6 +1880,7 @@ async function executeRun(runInput) {
       runInput.commands,
       {
         verifyCommands: runInput.verifyCommands,
+        commandScope: runInput.commandScope,
         verifyMode: runInput.verifyMode,
         importedDeviceKeys: runInput.targets.importedDeviceKeys,
         canary: runInput.canary,
@@ -1903,6 +1952,9 @@ reviewToggleHostsBtn?.addEventListener("click", () => {
 });
 verifyModeEls.forEach((el) => {
   el.addEventListener("change", updateVerifyModeControls);
+});
+commandScopeEls.forEach((el) => {
+  el.addEventListener("change", updatePostCanaryControls);
 });
 postCanaryStrategyEls.forEach((el) => {
   el.addEventListener("change", updatePostCanaryControls);

@@ -110,10 +110,12 @@ make check-integration
   - 実行コマンド
   - 確認用コマンド
   - 実行設定（有効な同時実行数を含む）
+- `Execution commands apply to` で、実行コマンドを canary 成功後に全選択対象へ投入するか、
+  canary デバイスのみに投入するかを選択します。
 - `Canary success after` はラジオ選択です。
   - `Parallel`: 入力した `concurrency_limit` を使用
   - `Sequential (1 device at a time)`: `concurrency_limit=1` を強制し、入力欄は無効化されます
-- バックエンドAPIの変更はなく、方式の差分はフロントエンドで `concurrency_limit` に反映します。
+- 実行範囲が `Canary device only` の場合、post-canary strategy は適用されません。
 
 ## アプリ状態初期化（v2）
 

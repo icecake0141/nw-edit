@@ -167,12 +167,13 @@ export class NwEditApiClient {
   /**
    * @param {string} jobId
    * @param {string[]} commands
-   * @param {{ verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
+   * @param {{ commandScope?: string, verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
    * @returns {Promise<RunJobResponse>}
    */
   async runJob(jobId, commands, options = {}) {
     const payload = {
       commands,
+      command_scope: options.commandScope || "all",
       verify_commands: options.verifyCommands,
       verify_mode: options.verifyMode || "all",
       concurrency_limit: options.concurrencyLimit ?? 5,
@@ -193,12 +194,13 @@ export class NwEditApiClient {
   /**
    * @param {string} jobId
    * @param {string[]} commands
-   * @param {{ verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
+   * @param {{ commandScope?: string, verifyCommands?: string[], verifyMode?: string, importedDeviceKeys?: string[], canary?: DeviceTarget, concurrencyLimit?: number, staggerDelay?: number, stopOnError?: boolean }=} options
    * @returns {Promise<JobSummary>}
    */
   async runJobAsync(jobId, commands, options = {}) {
     const payload = {
       commands,
+      command_scope: options.commandScope || "all",
       verify_commands: options.verifyCommands,
       verify_mode: options.verifyMode || "all",
       concurrency_limit: options.concurrencyLimit ?? 5,

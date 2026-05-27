@@ -101,6 +101,13 @@ host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 ## 実行リクエスト拡張
 
 - `verify_commands`（任意）: 指定時は全対象デバイスへ共通適用。
+- `command_scope`（任意、デフォルト `all`）: 実行コマンドの適用範囲。
+  - `all`: canary を先に実行し、成功後に残りの選択対象へ投入。
+  - `canary`: canary デバイスのみに実行コマンドを投入。
+- `verify_mode`（任意、デフォルト `all`）: 確認用コマンドの適用範囲。
+  - `all`: 実行対象になった全デバイスで確認用コマンドを実行。
+  - `canary`: canary デバイスのみで確認用コマンドを実行。
+  - `none`: 確認用コマンドをスキップ。
 - `canary`（必須）: canary対象デバイス（`host`, `port`）を明示指定。
 - `imported_device_keys`（必須）: import済みデバイスの実行対象を `host:port` で明示。
   - 空配列は `HTTP 400`

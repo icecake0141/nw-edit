@@ -102,6 +102,13 @@ host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 ## Run request extensions
 
 - `verify_commands` (optional): if provided, used for all target devices.
+- `command_scope` (optional, default `all`): execution command scope.
+  - `all`: run the canary first, then run remaining selected targets after canary success.
+  - `canary`: run execution commands only on the canary device.
+- `verify_mode` (optional, default `all`): verify command scope.
+  - `all`: run verify commands on every executed device.
+  - `canary`: run verify commands only on the canary device.
+  - `none`: skip verify commands.
 - `canary` (required): explicit canary target (`host`, `port`).
 - `imported_device_keys` (required): explicit imported-device targets (`host:port` list).
   - empty list is rejected with `HTTP 400`

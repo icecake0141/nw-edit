@@ -57,6 +57,7 @@ class RunJobRequest(BaseModel):
 
     canary: Optional[DeviceTargetPayload] = None
     commands: List[str] = Field(min_length=1)
+    command_scope: str = Field(default="all")
     verify_commands: Optional[List[str]] = None
     verify_mode: str = Field(default="all")
     imported_device_keys: Optional[List[str]] = None
