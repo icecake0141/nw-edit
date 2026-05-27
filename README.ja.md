@@ -74,6 +74,9 @@ make check-integration
 - 実行コマンドで `{{var}}` プレースホルダを利用可能。
 - ジョブ単位の `global_vars` は `POST /api/v2/jobs` で指定。
 - ホスト単位の `host_vars` は CSV 取込の `host_vars` 列（JSONオブジェクト文字列）で指定。
+- インポートされた CSV 列は、ホスト単位のデフォルト変数として利用可能。組み込み変数は
+  `{{host}}`, `{{ip}}`, `{{hostname}}`, `{{port}}`, `{{device_type}}`, `{{name}}`,
+  `{{username}}`, `{{prod}}`。`password`, `host_vars`, `verify_cmds` は対象外。
 - 任意の CSV 列 `prod` で本番ホストを指定可能（`true` のとき本番、それ以外は `false` 扱い）。
 - 解決優先順位は `host_vars > global_vars`。
 - 未定義変数がある場合、デバイス実行前の preflight で `HTTP 400` を返す。

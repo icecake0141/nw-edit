@@ -177,7 +177,7 @@ const translations = {
     },
     messages: {
       verifyChoose: "Choose where verify commands run after the canary step.",
-      verifyIgnored: "No verify commands configured. This setting will be ignored.",
+      verifyIgnored: "No verify commands configured. You can still choose the canary rollout scope.",
       validatingDevices: "Validating devices... {processed}/{total}",
       csvImportFailed: "CSV import failed",
       globalVarsParseError: "global vars JSON parse error: {error}",
@@ -242,7 +242,7 @@ const translations = {
       jobCreated: "job created: {jobId}",
       runAsyncStarted: "run async started: {status}",
       helpHtml: `<h3>Command Variables Help</h3>
-        <p>Variables let you reuse command templates across devices. Use placeholders like <code>{{hostname}}</code> in command lines, then provide values from <code>global_vars</code> or CSV <code>host_vars</code>.</p>
+        <p>Variables let you reuse command templates across devices. Use placeholders like <code>{{hostname}}</code> in command lines, then provide values from <code>global_vars</code>, imported CSV columns, or CSV <code>host_vars</code>.</p>
         <h3>1) Placeholder Format</h3>
         <p>Use double braces in commands:</p>
         <pre>configure terminal
@@ -263,16 +263,36 @@ clock timezone JST {{tz_offset}}</pre>
     "tz_offset": "9"
   }
 }</pre>
-        <h3>3) Host Vars (per-device CSV)</h3>
+        <h3>3) Default Host Vars from CSV Columns</h3>
+        <p>Imported CSV columns are available automatically as per-host variables. You do not need to duplicate common fields in <code>host_vars</code>.</p>
+        <p>Built-in defaults:</p>
+        <pre>{{host}}        CSV host value
+{{ip}}          same value as host
+{{hostname}}    CSV name value, or host when name is empty
+{{port}}        resolved SSH port
+{{device_type}} normalized device type
+{{name}}        CSV name value
+{{username}}    CSV username value
+{{prod}}        true or false</pre>
+        <p>Additional CSV columns with valid variable names are also available. <code>password</code>, <code>host_vars</code>, and <code>verify_cmds</code> are excluded.</p>
+        <pre>host,port,device_type,username,password,name,site,prod
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,tokyo,true
+
+commands:
+hostname {{hostname}}
+snmp-server location {{site}}
+logging host {{ip}}</pre>
+        <h3>4) Explicit Host Vars (per-device CSV)</h3>
         <p>Use CSV column <code>host_vars</code> as a JSON object string:</p>
         <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 10.0.0.1,22,cisco_ios,admin,pass,edge-1,show run,"{""hostname"":""edge-1"",""tz_offset"":""9""}",true
 10.0.0.2,22,cisco_ios,admin,pass,edge-2,show run,"{""hostname"":""edge-2""}",false</pre>
-        <h3>4) Resolution Priority</h3>
-        <p>If the same key exists in both places, device-level CSV value wins: <code>host_vars &gt; global_vars</code>.</p>
-        <h3>5) Missing Variable Behavior</h3>
+        <p>Use explicit <code>host_vars</code> when you need to add values that are not CSV columns, or override default host variables.</p>
+        <h3>5) Resolution Priority</h3>
+        <p>If the same key exists in multiple places, explicit device-level values win: <code>host_vars &gt; default CSV host vars &gt; global_vars</code>.</p>
+        <h3>6) Missing Variable Behavior</h3>
         <p>If any placeholder has no value, preflight fails with <code>HTTP 400</code>. Device commands are not executed.</p>
-        <h3>6) Common Mistakes and Fixes</h3>
+        <h3>7) Common Mistakes and Fixes</h3>
         <pre>- Invalid JSON in Global Vars:
   wrong: {"timezone":"Asia/Tokyo",}
   fix:   {"timezone":"Asia/Tokyo"}
@@ -284,23 +304,29 @@ clock timezone JST {{tz_offset}}</pre>
 - CSV host_vars quoting:
   wrong: {"hostname":"edge-1"}   (not CSV-escaped)
   fix:   "{""hostname"":""edge-1""}"</pre>
-        <h3>7) End-to-End Mini Example</h3>
+        <h3>8) End-to-End Mini Example</h3>
         <p>Inputs:</p>
         <pre>global_vars:
 {"tz_offset":"9","ntp_server":"192.0.2.10"}
+
+CSV row:
+host,port,device_type,username,password,name,site
+10.0.0.1,22,cisco_ios,admin,pass,edge-1,tokyo
 
 command:
 clock timezone JST {{tz_offset}}
 ntp server {{ntp_server}}
 hostname {{hostname}}
+snmp-server location {{site}}
 
-host_vars for 10.0.0.1:
-{"hostname":"edge-1","ntp_server":"192.0.2.20"}</pre>
+explicit host_vars for 10.0.0.1:
+{"ntp_server":"192.0.2.20"}</pre>
         <p>Resolved commands for 10.0.0.1:</p>
         <pre>clock timezone JST 9
 ntp server 192.0.2.20
-hostname edge-1</pre>
-        <h3>8) Production Host Flag</h3>
+hostname edge-1
+snmp-server location tokyo</pre>
+        <h3>9) Production Host Flag</h3>
         <p>Optional CSV column <code>prod</code> marks production hosts. <code>true</code> enables production warning UI in Create/Monitor/Detail pages when selected targets include that host.</p>
         <pre>host,port,device_type,username,password,name,verify_cmds,host_vars,prod
 10.0.0.10,22,cisco_ios,admin,pass,core-prod,show run,"{""hostname"":""core-prod""}",true
@@ -583,7 +609,7 @@ function describeVerifyPlan(verifyMode, verifyCommands) {
 function updateVerifyModeControls() {
   const hasVerifyCommands = parseCommands(verifyCommandsEl.value).length > 0;
   verifyModeEls.forEach((el) => {
-    el.disabled = !hasVerifyCommands;
+    el.disabled = false;
   });
   if (verifyModeHintEl) {
     verifyModeHintEl.textContent = hasVerifyCommands
@@ -1256,7 +1282,7 @@ function buildDeviceCardsHtml(source, deviceNameMap = {}) {
           <h4>${escapeHtml(`${key} (${hostname})`)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
           <div class="meta">Attempts: ${attempts || "-"} ${error ? `/ Error: ${escapeHtml(error)}` : ""}</div>
           <div class="output-label">Command Stream</div>
-          <pre class="stream-output">${escapeHtml(streamText)}</pre>
+          <pre class="stream-output" data-device-key="${escapeHtml(key)}">${escapeHtml(streamText)}</pre>
           ${result?.pre_output ? `<div class="output-label">Verify Pre</div><pre class="verify-output">${escapeHtml(result.pre_output)}</pre>` : ""}
           ${result?.apply_output ? `<div class="output-label">Apply Output</div><pre class="verify-output">${escapeHtml(result.apply_output)}</pre>` : ""}
           ${result?.post_output ? `<div class="output-label">Verify Post</div><pre class="verify-output">${escapeHtml(result.post_output)}</pre>` : ""}
@@ -1268,9 +1294,38 @@ function buildDeviceCardsHtml(source, deviceNameMap = {}) {
     .join("");
 }
 
+function snapshotStreamScrollState(devicesEl) {
+  const scrollState = {};
+  devicesEl.querySelectorAll(".stream-output[data-device-key]").forEach((el) => {
+    const deviceKey = el.getAttribute("data-device-key");
+    if (!deviceKey) {
+      return;
+    }
+    scrollState[deviceKey] = {
+      scrollTop: el.scrollTop,
+      pinnedToBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 4,
+    };
+  });
+  return scrollState;
+}
+
+function restoreStreamScrollState(devicesEl, scrollState) {
+  devicesEl.querySelectorAll(".stream-output[data-device-key]").forEach((el) => {
+    const deviceKey = el.getAttribute("data-device-key");
+    const state = deviceKey ? scrollState[deviceKey] : null;
+    if (!state) {
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    el.scrollTop = state.pinnedToBottom ? el.scrollHeight : state.scrollTop;
+  });
+}
+
 function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0, deviceNameMap = {}) {
+  const streamScrollState = snapshotStreamScrollState(devicesEl);
   summaryEl.innerHTML = buildExecutionSummaryHtml(source, eventCount);
   devicesEl.innerHTML = buildDeviceCardsHtml(source, deviceNameMap);
+  restoreStreamScrollState(devicesEl, streamScrollState);
 }
 
 function renderMonitorState() {
