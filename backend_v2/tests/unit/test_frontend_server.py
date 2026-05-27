@@ -83,6 +83,16 @@ def test_repo_frontend_index_includes_locale_selector():
     assert 'data-i18n-text="locale.label"' in body
 
 
+def test_repo_frontend_index_has_no_inline_japanese_ui_copy():
+    repo_root = Path(__file__).resolve().parents[3]
+    index_path = repo_root / "frontend_v2" / "public" / "index.html"
+    body = index_path.read_text(encoding="utf-8")
+
+    assert not any(
+        "\u3040" <= char <= "\u30ff" or "\u4e00" <= char <= "\u9fff" for char in body
+    )
+
+
 def test_repo_frontend_index_versions_app_script():
     repo_root = Path(__file__).resolve().parents[3]
     index_path = repo_root / "frontend_v2" / "public" / "index.html"

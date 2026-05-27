@@ -134,6 +134,12 @@ const translations = {
         help: "Open command variable usage examples for global and host vars.",
       },
     },
+    commandCards: {
+      applyTitle: "Commands sent to devices",
+      applyCopy: "These commands change target device configuration and run in order, one line at a time.",
+      verifyTitle: "Verification commands",
+      verifyCopy: "Use these commands to check state before and after changes. This field can be blank.",
+    },
     labels: {
       prodWarning: "Production Environment",
       importedDevices: "imported devices: {count}",
