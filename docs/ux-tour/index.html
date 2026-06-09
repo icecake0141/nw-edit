@@ -353,18 +353,19 @@ You may obtain a copy of the License at
       margin-top: 16px;
     }
 
-    .lang-ja {
-      display: none;
-    }
-
+    body[data-lang="en"] .lang-ja,
     body[data-lang="ja"] .lang-en {
-      display: none;
+      display: none !important;
     }
 
+    body[data-lang="en"] .lang-en,
     body[data-lang="ja"] .lang-ja {
       display: revert;
     }
 
+    body[data-lang="en"] li.lang-en,
+    body[data-lang="en"] span.lang-en,
+    body[data-lang="en"] strong.lang-en,
     body[data-lang="ja"] li.lang-ja,
     body[data-lang="ja"] span.lang-ja,
     body[data-lang="ja"] strong.lang-ja {
