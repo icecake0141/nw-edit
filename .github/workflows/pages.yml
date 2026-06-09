@@ -47,4 +47,4 @@ jobs:
           path: docs
 
       - id: deployment
-        uses: actions/deploy-pages@d94c6a2ddb37bf38d06a9c6b6645231d6bdf5ee8 # v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
