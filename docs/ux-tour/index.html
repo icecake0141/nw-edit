@@ -220,7 +220,7 @@ You may obtain a copy of the License at
 
     .intro-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 16px;
       margin-bottom: 48px;
     }
@@ -396,10 +396,10 @@ You may obtain a copy of the License at
         <span class="eyebrow lang-ja">ネットワーク変更管理</span>
         <h1>nw-edit</h1>
         <p class="lead lang-en">
-          Plan, review, canary, execute, and verify multi-device network changes from one compact operations console.
+          Plan, review, canary, run in parallel, and verify multi-device network changes from one compact operations console.
         </p>
         <p class="lead lang-ja">
-          複数ネットワーク機器への変更を、計画、確認、Canary、実行、検証まで一つの運用コンソールで扱えます。
+          複数ネットワーク機器への変更を、計画、確認、Canary、並列実行、検証まで一つの運用コンソールで扱えます。
         </p>
         <div class="actions">
           <a class="button" href="#tour"><span class="lang-en">Start the tour</span><span class="lang-ja">ツアーを見る</span></a>
@@ -423,6 +423,12 @@ You may obtain a copy of the License at
         <strong class="lang-ja">Canaryから開始</strong>
         <p class="lang-en">Run the first device as a canary, then continue to the remaining devices only after the canary succeeds.</p>
         <p class="lang-ja">最初の1台をCanaryとして実行し、成功後に残りの機器へ展開できます。</p>
+      </div>
+      <div class="feature">
+        <strong class="lang-en">Fan out in parallel</strong>
+        <strong class="lang-ja">並列実行で展開</strong>
+        <p class="lang-en">After the canary passes, run the remaining targets in parallel with an explicit concurrency limit.</p>
+        <p class="lang-ja">Canary成功後、明示した同時実行数で残りの対象へ並列に展開できます。</p>
       </div>
       <div class="feature">
         <strong class="lang-en">Use variables in commands</strong>
@@ -468,17 +474,19 @@ You may obtain a copy of the License at
         <h2 class="lang-ja">実行前に最後の確認ポイント。</h2>
         <p class="lang-en">
           The pre-run review consolidates targets, execution commands, verification commands, and effective runtime settings.
-          Operators can confirm the fanout strategy before sending commands to devices.
+          Operators can confirm the fanout strategy and concurrency limit before sending commands to devices.
         </p>
         <p class="lang-ja">
           実行前確認では、対象、実行コマンド、検証コマンド、有効な実行設定をまとめて表示します。
-          機器へコマンドを送る前に展開方式を確認できます。
+          機器へコマンドを送る前に展開方式と同時実行数を確認できます。
         </p>
         <ul class="bullets">
           <li class="lang-en">Canary device is explicit.</li>
           <li class="lang-ja">Canary機器が明示されます。</li>
           <li class="lang-en">Parallel or sequential post-canary fanout is visible.</li>
           <li class="lang-ja">Canary後の並列/逐次展開が見えます。</li>
+          <li class="lang-en">The effective concurrency limit is shown before execution.</li>
+          <li class="lang-ja">有効な同時実行数を実行前に確認できます。</li>
         </ul>
       </div>
       <div>
@@ -492,21 +500,21 @@ You may obtain a copy of the License at
       <div class="section-copy">
         <span class="kicker lang-en">3. Canary</span>
         <span class="kicker lang-ja">3. Canary</span>
-        <h2 class="lang-en">Roll out only after the first device passes.</h2>
-        <h2 class="lang-ja">最初の1台が成功してから展開。</h2>
+        <h2 class="lang-en">Roll out in parallel after the first device passes.</h2>
+        <h2 class="lang-ja">最初の1台が成功してから並列展開。</h2>
         <p class="lang-en">
           During execution, the canary device is tagged in the monitor view.
-          Remaining targets continue only after the canary succeeds, reducing the blast radius of a bad command.
+          Remaining targets continue only after the canary succeeds, then fan out in parallel up to the configured concurrency limit.
         </p>
         <p class="lang-ja">
           実行中、Monitor画面ではCanary機器がタグ表示されます。
-          Canary成功後に残りの対象へ進むため、誤ったコマンドの影響範囲を抑えられます。
+          Canary成功後に残りの対象へ進み、設定した同時実行数を上限に並列展開します。
         </p>
       </div>
       <div>
         <img class="shot" src="assets/03-monitor-canary-fanout.jpg" alt="Monitor page showing canary execution and command stream for two devices" />
-        <p class="caption lang-en">Monitor view shows per-device progress, command stream, and variable-substituted commands.</p>
-        <p class="caption lang-ja">Monitor画面では機器ごとの進捗、コマンドストリーム、変数展開後のコマンドを確認できます。</p>
+        <p class="caption lang-en">Monitor view shows per-device progress, command stream, variable-substituted commands, and post-canary parallel fanout.</p>
+        <p class="caption lang-ja">Monitor画面では機器ごとの進捗、コマンドストリーム、変数展開後のコマンド、Canary後の並列展開を確認できます。</p>
       </div>
     </section>
 
