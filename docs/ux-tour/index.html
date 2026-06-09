@@ -244,6 +244,30 @@ You may obtain a copy of the License at
       color: var(--muted);
     }
 
+    .audience {
+      margin-bottom: 44px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      display: grid;
+      grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+      gap: 20px;
+      align-items: center;
+    }
+
+    .audience strong {
+      display: block;
+      font-size: clamp(1.4rem, 3vw, 2.15rem);
+      line-height: 1.16;
+    }
+
+    .audience p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
     .section {
       margin-top: 58px;
       display: grid;
@@ -325,6 +349,10 @@ You may obtain a copy of the License at
       font-size: 0.92rem;
     }
 
+    .zoom-shot {
+      margin-top: 16px;
+    }
+
     .lang-ja {
       display: none;
     }
@@ -359,7 +387,8 @@ You may obtain a copy of the License at
     @media (max-width: 900px) {
       .hero-inner,
       .section,
-      .intro-grid {
+      .intro-grid,
+      .audience {
         grid-template-columns: 1fr;
       }
 
@@ -411,6 +440,18 @@ You may obtain a copy of the License at
   </section>
 
   <main id="tour">
+    <section class="audience" aria-label="Audience">
+      <strong class="lang-en">Built for operators who need safer multi-device configuration changes.</strong>
+      <strong class="lang-ja">複数機器への設定変更を、より安全に進めたい運用者向けです。</strong>
+      <p class="lang-en">
+        nw-edit keeps the operational decision points visible: what will run, where it will run first,
+        how quickly it fans out, and what changed after execution.
+      </p>
+      <p class="lang-ja">
+        nw-edit は「何を実行するか」「最初にどこで実行するか」「どの速度で展開するか」「実行後に何が変わったか」を見える状態に保ちます。
+      </p>
+    </section>
+
     <section class="intro-grid" aria-label="Highlights">
       <div class="feature">
         <strong class="lang-en">See the before/after impact</strong>
@@ -515,6 +556,9 @@ You may obtain a copy of the License at
         <img class="shot" src="assets/03-monitor-canary-fanout.jpg" alt="Monitor page showing canary execution and command stream for two devices" />
         <p class="caption lang-en">Monitor view shows per-device progress, command stream, variable-substituted commands, and post-canary parallel fanout.</p>
         <p class="caption lang-ja">Monitor画面では機器ごとの進捗、コマンドストリーム、変数展開後のコマンド、Canary後の並列展開を確認できます。</p>
+        <img class="shot zoom-shot" src="assets/06-parallel-monitor-zoom.jpg" alt="Zoomed monitor view showing canary status and per-device command streams" />
+        <p class="caption lang-en">Zoomed view: the canary is marked separately, and the remaining devices show their own command streams after fanout.</p>
+        <p class="caption lang-ja">拡大表示: Canaryが明示され、展開後の各機器のコマンドストリームを個別に確認できます。</p>
       </div>
     </section>
 

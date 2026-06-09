@@ -21,6 +21,8 @@ limitations under the License.
 
 複数のネットワークデバイスに対して、SSH経由で複数行の設定コマンドを適用するための最小構成Webアプリケーションです。
 
+**ビジュアルUXツアー:** [https://icecake0141.github.io/nw-edit/ux-tour/](https://icecake0141.github.io/nw-edit/ux-tour/)
+
 ## 概要
 
 - v2 系（`backend_v2` + `frontend_v2`）をデフォルト運用とします。

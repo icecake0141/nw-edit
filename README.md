@@ -23,6 +23,8 @@ limitations under the License.
 
 A minimal web application for applying multi-line configuration commands to multiple network devices over SSH.
 
+**View the visual UX tour:** [https://icecake0141.github.io/nw-edit/ux-tour/](https://icecake0141.github.io/nw-edit/ux-tour/)
+
 ## Overview
 
 - v2 path (`backend_v2` + `frontend_v2`) is the default.
