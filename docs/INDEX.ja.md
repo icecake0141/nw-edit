@@ -17,6 +17,8 @@ You may obtain a copy of the License at
 
 ## 主要ドキュメント
 
+- ユーザーエクスペリエンスツアー（GitHub Pages）: [https://icecake0141.github.io/nw-edit/ux-tour/](https://icecake0141.github.io/nw-edit/ux-tour/)
+- ユーザーエクスペリエンスツアー（local docs）: [ux-tour/index.html](ux-tour/index.html)
 - v2 クイックスタート: [QUICKSTART-v2.ja.md](QUICKSTART-v2.ja.md) / [QUICKSTART-v2.md](QUICKSTART-v2.md)
 - 移行ノート: [MIGRATION-v1-to-v2.ja.md](MIGRATION-v1-to-v2.ja.md) / [MIGRATION-v1-to-v2.md](MIGRATION-v1-to-v2.md)
 - v0.1.0回帰再評価レポート: [V0_1_0-REGRESSION-REPORT.md](V0_1_0-REGRESSION-REPORT.md)

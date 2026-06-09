@@ -131,6 +131,8 @@ make check-integration
 
 ## ドキュメント
 
+- ユーザーエクスペリエンスツアー（GitHub Pages）: [https://icecake0141.github.io/nw-edit/ux-tour/](https://icecake0141.github.io/nw-edit/ux-tour/)
+- ユーザーエクスペリエンスツアー（local docs）: [docs/ux-tour/index.html](docs/ux-tour/index.html)
 - ドキュメント一覧（英日）: [docs/INDEX.ja.md](docs/INDEX.ja.md)
 - v2 クイックスタート: [docs/QUICKSTART-v2.ja.md](docs/QUICKSTART-v2.ja.md)
 - v2 quickstart（英語）: [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)

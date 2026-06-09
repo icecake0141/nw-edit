@@ -1,0 +1,568 @@
+<!--
+Copyright 2026 icecake0141
+SPDX-License-Identifier: Apache-2.0
+
+This file was created or modified with the assistance of an AI (Large Language Model).
+Please review for correctness and security.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>nw-edit UX Tour</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --ink: #172033;
+      --muted: #5c687f;
+      --line: #d7dfeb;
+      --surface: #ffffff;
+      --surface-soft: #eef4fb;
+      --accent: #1f4ea3;
+      --accent-soft: #e8f0ff;
+      --success: #1d7245;
+      --warning: #8a5a10;
+      --danger: #a02c2c;
+      --shadow: 0 16px 42px rgba(23, 32, 51, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+    }
+
+    a {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand strong {
+      font-size: 1rem;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .language-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .language-toggle button {
+      border: 0;
+      border-radius: 6px;
+      padding: 7px 11px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .language-toggle button[aria-pressed="true"] {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .hero {
+      background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 64px 20px 36px;
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(320px, 1.08fr);
+      gap: 36px;
+      align-items: center;
+    }
+
+    .hero-inner > *,
+    .section > * {
+      min-width: 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 6px 10px;
+      border: 1px solid #bdd0f4;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      letter-spacing: 0;
+      line-height: 1.12;
+    }
+
+    h1 {
+      margin-top: 18px;
+      max-width: 12ch;
+      font-size: clamp(2.6rem, 7vw, 5.8rem);
+    }
+
+    h2 {
+      font-size: clamp(2rem, 4vw, 3.4rem);
+    }
+
+    h3 {
+      font-size: clamp(1.25rem, 2vw, 1.7rem);
+    }
+
+    .lead {
+      max-width: 58ch;
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: clamp(1.05rem, 2vw, 1.28rem);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 10px 15px;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      background: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .button.secondary {
+      background: var(--surface);
+      color: var(--accent);
+    }
+
+    .hero-shot,
+    .shot {
+      width: 100%;
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      background: var(--surface);
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 44px 20px 72px;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .feature {
+      min-height: 180px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .feature strong {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 1.08rem;
+    }
+
+    .feature p,
+    .section p {
+      color: var(--muted);
+    }
+
+    .section {
+      margin-top: 58px;
+      display: grid;
+      grid-template-columns: minmax(0, 0.76fr) minmax(0, 1.24fr);
+      gap: 28px;
+      align-items: start;
+    }
+
+    .section-copy {
+      position: sticky;
+      top: 94px;
+    }
+
+    .kicker {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .bullets {
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .bullets li {
+      margin: 8px 0;
+    }
+
+    .diff-demo {
+      margin-top: 20px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #101827;
+      box-shadow: var(--shadow);
+    }
+
+    .diff-demo header {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      color: #dbe7ff;
+      font-weight: 800;
+    }
+
+    .diff-demo pre {
+      margin: 0;
+      padding: 16px;
+      max-width: 100%;
+      overflow-x: auto;
+      color: #dbe7ff;
+      font-size: 0.93rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .remove {
+      color: #ffb4b4;
+    }
+
+    .add {
+      color: #a9f5c8;
+    }
+
+    .note {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent);
+      background: var(--surface-soft);
+      color: var(--muted);
+    }
+
+    .caption {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .lang-ja {
+      display: none;
+    }
+
+    body[data-lang="ja"] .lang-en {
+      display: none;
+    }
+
+    body[data-lang="ja"] .lang-ja {
+      display: revert;
+    }
+
+    body[data-lang="ja"] li.lang-ja,
+    body[data-lang="ja"] span.lang-ja,
+    body[data-lang="ja"] strong.lang-ja {
+      display: revert;
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    footer .footer-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 900px) {
+      .hero-inner,
+      .section,
+      .intro-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-copy {
+        position: static;
+      }
+
+      .topbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body data-lang="en">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <strong>nw-edit UX Tour</strong>
+        <span class="lang-en">A visual walkthrough for network configuration changes.</span>
+        <span class="lang-ja">ネットワーク設定変更のためのビジュアルツアー。</span>
+      </div>
+      <div class="language-toggle" aria-label="Language">
+        <button type="button" data-set-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-set-lang="ja" aria-pressed="false">JA</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div>
+        <span class="eyebrow lang-en">Network change control</span>
+        <span class="eyebrow lang-ja">ネットワーク変更管理</span>
+        <h1>nw-edit</h1>
+        <p class="lead lang-en">
+          Plan, review, canary, execute, and verify multi-device network changes from one compact operations console.
+        </p>
+        <p class="lead lang-ja">
+          複数ネットワーク機器への変更を、計画、確認、Canary、実行、検証まで一つの運用コンソールで扱えます。
+        </p>
+        <div class="actions">
+          <a class="button" href="#tour"><span class="lang-en">Start the tour</span><span class="lang-ja">ツアーを見る</span></a>
+          <a class="button secondary" href="../../README.md"><span class="lang-en">Back to README</span><span class="lang-ja">READMEへ戻る</span></a>
+        </div>
+      </div>
+      <img class="hero-shot" src="assets/02-pre-run-review.jpg" alt="nw-edit pre-run review screen with target hosts, commands, and canary settings" />
+    </div>
+  </section>
+
+  <main id="tour">
+    <section class="intro-grid" aria-label="Highlights">
+      <div class="feature">
+        <strong class="lang-en">See the before/after impact</strong>
+        <strong class="lang-ja">実行前後の差分を確認</strong>
+        <p class="lang-en">Verify commands can capture pre-change and post-change output, then present the resulting diff in the job detail view.</p>
+        <p class="lang-ja">検証コマンドで変更前後の出力を取得し、ジョブ詳細画面で差分として確認できます。</p>
+      </div>
+      <div class="feature">
+        <strong class="lang-en">Start with a canary</strong>
+        <strong class="lang-ja">Canaryから開始</strong>
+        <p class="lang-en">Run the first device as a canary, then continue to the remaining devices only after the canary succeeds.</p>
+        <p class="lang-ja">最初の1台をCanaryとして実行し、成功後に残りの機器へ展開できます。</p>
+      </div>
+      <div class="feature">
+        <strong class="lang-en">Use variables in commands</strong>
+        <strong class="lang-ja">コマンド内で変数を利用</strong>
+        <p class="lang-en">Compose reusable commands with global variables, imported CSV fields, and per-host variables such as <code>{{hostname}}</code>.</p>
+        <p class="lang-ja"><code>{{hostname}}</code> などのホスト別変数、CSV項目、グローバル変数で再利用しやすいコマンドを作れます。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-copy">
+        <span class="kicker lang-en">1. Compose</span>
+        <span class="kicker lang-ja">1. 作成</span>
+        <h2 class="lang-en">Reusable commands, device-specific output.</h2>
+        <h2 class="lang-ja">再利用できるコマンドを、機器ごとの値で実行。</h2>
+        <p class="lang-en">
+          Command templates accept placeholders from global variables and imported device data.
+          The same command set can adapt to each host without hand-editing every line.
+        </p>
+        <p class="lang-ja">
+          コマンドテンプレートはグローバル変数とインポート済み機器データのプレースホルダーを受け付けます。
+          同じコマンドセットを各ホスト向けに展開できます。
+        </p>
+        <ul class="bullets">
+          <li class="lang-en"><code>{{timezone}}</code> comes from job-level global variables.</li>
+          <li class="lang-ja"><code>{{timezone}}</code> はジョブ単位のグローバル変数から取得されます。</li>
+          <li class="lang-en"><code>{{hostname}}</code> comes from host variables or imported CSV columns.</li>
+          <li class="lang-ja"><code>{{hostname}}</code> はホスト変数またはCSV列から取得されます。</li>
+        </ul>
+      </div>
+      <div>
+        <img class="shot" src="assets/01-create-command-variables.jpg" alt="Create page showing selected devices, canary, and command variables" />
+        <p class="caption lang-en">Create page with target selection, canary selection, execution commands, verify commands, and variable placeholders.</p>
+        <p class="caption lang-ja">対象選択、Canary選択、実行コマンド、検証コマンド、変数プレースホルダーを含む作成画面。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-copy">
+        <span class="kicker lang-en">2. Review</span>
+        <span class="kicker lang-ja">2. 確認</span>
+        <h2 class="lang-en">A final checkpoint before anything runs.</h2>
+        <h2 class="lang-ja">実行前に最後の確認ポイント。</h2>
+        <p class="lang-en">
+          The pre-run review consolidates targets, execution commands, verification commands, and effective runtime settings.
+          Operators can confirm the fanout strategy before sending commands to devices.
+        </p>
+        <p class="lang-ja">
+          実行前確認では、対象、実行コマンド、検証コマンド、有効な実行設定をまとめて表示します。
+          機器へコマンドを送る前に展開方式を確認できます。
+        </p>
+        <ul class="bullets">
+          <li class="lang-en">Canary device is explicit.</li>
+          <li class="lang-ja">Canary機器が明示されます。</li>
+          <li class="lang-en">Parallel or sequential post-canary fanout is visible.</li>
+          <li class="lang-ja">Canary後の並列/逐次展開が見えます。</li>
+        </ul>
+      </div>
+      <div>
+        <img class="shot" src="assets/02-pre-run-review.jpg" alt="Pre-run review panel showing targets, commands, and execution settings" />
+        <p class="caption lang-en">Pre-run review keeps operational intent visible at the moment of execution.</p>
+        <p class="caption lang-ja">実行直前に、運用意図を見える状態に保ちます。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-copy">
+        <span class="kicker lang-en">3. Canary</span>
+        <span class="kicker lang-ja">3. Canary</span>
+        <h2 class="lang-en">Roll out only after the first device passes.</h2>
+        <h2 class="lang-ja">最初の1台が成功してから展開。</h2>
+        <p class="lang-en">
+          During execution, the canary device is tagged in the monitor view.
+          Remaining targets continue only after the canary succeeds, reducing the blast radius of a bad command.
+        </p>
+        <p class="lang-ja">
+          実行中、Monitor画面ではCanary機器がタグ表示されます。
+          Canary成功後に残りの対象へ進むため、誤ったコマンドの影響範囲を抑えられます。
+        </p>
+      </div>
+      <div>
+        <img class="shot" src="assets/03-monitor-canary-fanout.jpg" alt="Monitor page showing canary execution and command stream for two devices" />
+        <p class="caption lang-en">Monitor view shows per-device progress, command stream, and variable-substituted commands.</p>
+        <p class="caption lang-ja">Monitor画面では機器ごとの進捗、コマンドストリーム、変数展開後のコマンドを確認できます。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-copy">
+        <span class="kicker lang-en">4. Verify</span>
+        <span class="kicker lang-ja">4. 検証</span>
+        <h2 class="lang-en">Compare before and after outputs.</h2>
+        <h2 class="lang-ja">実行前後の出力を比較。</h2>
+        <p class="lang-en">
+          With a Netmiko-backed run, verify commands are collected before and after the change.
+          The detail view renders pre-output, apply output, post-output, and a unified pre/post diff.
+        </p>
+        <p class="lang-ja">
+          Netmiko実行では、検証コマンドの出力を変更前後で取得します。
+          詳細画面には変更前出力、適用出力、変更後出力、統一形式の差分が表示されます。
+        </p>
+        <div class="note">
+          <span class="lang-en">The screenshot below was captured in simulated mode, so it shows the job result shell. The diff panel appears when the executor returns pre/post verification output.</span>
+          <span class="lang-ja">下のスクリーンショットはsimulatedモードで取得したため、ジョブ結果の外形を示しています。実行エンジンが変更前後の検証出力を返すと差分パネルが表示されます。</span>
+        </div>
+      </div>
+      <div>
+        <img class="shot" src="assets/04-before-after-diff.jpg" alt="Job detail page with per-device result cards and raw result summary" />
+        <div class="diff-demo" aria-label="Example pre and post diff">
+          <header class="lang-en">Pre/Post Diff example</header>
+          <header class="lang-ja">実行前後差分の例</header>
+          <pre><span class="remove">-description managed-by-nw-edit edge-1 UTC</span>
+<span class="add">+description managed-by-nw-edit edge-1 Asia/Tokyo</span>
+ interface Loopback100
+ no shutdown</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span class="lang-en">Published from the repository <code>docs/</code> directory through GitHub Pages.</span>
+      <span class="lang-ja">リポジトリの <code>docs/</code> ディレクトリからGitHub Pagesで公開されます。</span>
+    </div>
+  </footer>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll("[data-set-lang]"));
+    const setLanguage = (lang) => {
+      document.body.dataset.lang = lang;
+      document.documentElement.lang = lang;
+      buttons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.setLang === lang));
+      });
+    };
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => setLanguage(button.dataset.setLang));
+    });
+  </script>
+</body>
+</html>

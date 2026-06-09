@@ -133,6 +133,8 @@ make check-integration
 
 ## Documentation
 
+- User experience tour (GitHub Pages): [https://icecake0141.github.io/nw-edit/ux-tour/](https://icecake0141.github.io/nw-edit/ux-tour/)
+- User experience tour (local docs): [docs/ux-tour/index.html](docs/ux-tour/index.html)
 - Full index (EN/JA): [docs/INDEX.md](docs/INDEX.md)
 - v2 quickstart: [docs/QUICKSTART-v2.md](docs/QUICKSTART-v2.md)
 - v2 quickstart (JA): [docs/QUICKSTART-v2.ja.md](docs/QUICKSTART-v2.ja.md)

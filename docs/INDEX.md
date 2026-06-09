@@ -17,6 +17,8 @@ Japanese index: [INDEX.ja.md](INDEX.ja.md)
 
 ## Core docs
 
+- User experience tour (GitHub Pages): [https://icecake0141.github.io/nw-edit/ux-tour/](https://icecake0141.github.io/nw-edit/ux-tour/)
+- User experience tour (local docs): [ux-tour/index.html](ux-tour/index.html)
 - Quickstart v2: [QUICKSTART-v2.md](QUICKSTART-v2.md) / [QUICKSTART-v2.ja.md](QUICKSTART-v2.ja.md)
 - Migration notes: [MIGRATION-v1-to-v2.md](MIGRATION-v1-to-v2.md) / [MIGRATION-v1-to-v2.ja.md](MIGRATION-v1-to-v2.ja.md)
 - v0.1.0 regression re-evaluation report: [V0_1_0-REGRESSION-REPORT.md](V0_1_0-REGRESSION-REPORT.md)
