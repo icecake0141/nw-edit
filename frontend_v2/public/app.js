@@ -17,7 +17,6 @@
 import { NwEditApiClient } from "./api-client.js";
 import {
   escapeHtml,
-  formatDiffHtml,
   formatTimestamp,
   normalizedStatus,
 } from "./display-utils.js";
@@ -28,6 +27,15 @@ import {
   resolveInitialLocale,
   translate,
 } from "./i18n.js";
+import {
+  buildDeviceCardsHtml,
+  buildExecutionSummaryHtml,
+} from "./monitor-rendering.js";
+import {
+  buildRunInput,
+  parseCommands,
+} from "./run-input.js";
+import { buildReviewModel } from "./run-review.js";
 
 const statusEl = document.getElementById("status");
 const localeSelectEl = document.getElementById("localeSelect");
@@ -428,32 +436,6 @@ function formatImportErrorDetail(detail) {
     return `${detail.message || t("messages.csvImportFailed")} (${detail.failed_rows.length} rows)\n${lines.join("\n")}`;
   }
   return JSON.stringify(detail);
-}
-
-function parseCommands(text) {
-  return text
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function parseGlobalVars(text) {
-  const raw = text.trim();
-  if (!raw) {
-    return {};
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(t("messages.globalVarsParseError", { error: String(error) }));
-  }
-  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error(t("messages.globalVarsObject"));
-  }
-  return Object.fromEntries(
-    Object.entries(parsed).map(([key, value]) => [String(key), String(value)])
-  );
 }
 
 function importedDeviceKey(device) {
@@ -926,91 +908,6 @@ function beginMonitor(job, targetDeviceKeys, canaryKey) {
   refreshProdWarningOverlay();
 }
 
-function combineDeviceKeys(source) {
-  const ordered = [];
-  const seen = new Set();
-  const push = (key) => {
-    if (!key || seen.has(key)) {
-      return;
-    }
-    seen.add(key);
-    ordered.push(key);
-  };
-  (source.targetDeviceKeys || []).forEach(push);
-  Object.keys(source.deviceStatuses || {}).forEach(push);
-  Object.keys(source.streamLogs || {}).forEach(push);
-  Object.keys(source.result?.device_results || {}).forEach(push);
-  return ordered;
-}
-
-function buildExecutionSummaryHtml(source, eventCount) {
-  const keys = combineDeviceKeys(source);
-  let queue = 0;
-  let running = 0;
-  let complete = 0;
-  let failed = 0;
-  keys.forEach((key) => {
-    const resultStatus = source.result?.device_results?.[key]?.status;
-    const streamStatus = source.deviceStatuses?.[key];
-    const status = normalizedStatus(resultStatus || streamStatus || "queued");
-    if (status === "running") {
-      running += 1;
-    } else if (status === "completed") {
-      complete += 1;
-    } else if (status === "failed" || status === "cancelled") {
-      failed += 1;
-    } else {
-      queue += 1;
-    }
-  });
-  const status = source.job?.status || source.result?.status || "queued";
-  return `
-    <div><strong>${escapeHtml(source.job?.job_name || "job")} (${escapeHtml(source.job?.job_id || "-")})</strong></div>
-    <div class="muted">Status:
-      <span class="status-badge status-${normalizedStatus(status)}">${statusLabel(status)}</span>
-      / Created: ${escapeHtml(formatTimestamp(source.job?.created_at || "", currentLocale))}
-      / Devices: ${keys.length}
-      / Events: ${eventCount}
-    </div>
-    <div class="muted">Queue: ${queue} / Running: ${running} / Complete: ${complete} / Failed: ${failed}</div>
-  `;
-}
-
-function buildDeviceCardsHtml(source, deviceNameMap = {}) {
-  const keys = combineDeviceKeys(source);
-  if (keys.length === 0) {
-    return `<div class="muted">${escapeHtml(t("labels.noTargetDevicesYet"))}</div>`;
-  }
-  return keys
-    .map((key) => {
-      const result = source.result?.device_results?.[key];
-      const streamStatus = source.deviceStatuses?.[key];
-      const status = normalizedStatus(result?.status || streamStatus || "queued");
-      const attempts = result?.attempts || 0;
-      const error = result?.error || "";
-      const streamLines = source.streamLogs?.[key] || [];
-      const fallbackResultLines = (result?.logs || []).map((line) => `[result] ${line}`);
-      const mergedLines = streamLines.length > 0 ? streamLines : fallbackResultLines;
-      const streamText = mergedLines.length > 0 ? mergedLines.join("\n") : "No logs yet...";
-      const isCanary = source.canaryKey === key;
-      const hostname = String(deviceNameMap[key] || "").trim() || hostFromDeviceKey(key);
-      return `
-        <div class="device-card status-${status}" id="device-card-${key.replace(":", "-")}">
-          <h4>${escapeHtml(`${key} (${hostname})`)} ${isCanary ? '<span class="status-badge status-paused">CANARY</span>' : ""} <span class="status-badge status-${status}">${statusLabel(status)}</span></h4>
-          <div class="meta">Attempts: ${attempts || "-"} ${error ? `/ Error: ${escapeHtml(error)}` : ""}</div>
-          <div class="output-label">Command Stream</div>
-          <pre class="stream-output" data-device-key="${escapeHtml(key)}">${escapeHtml(streamText)}</pre>
-          ${result?.pre_output ? `<div class="output-label">Verify Pre</div><pre class="verify-output">${escapeHtml(result.pre_output)}</pre>` : ""}
-          ${result?.apply_output ? `<div class="output-label">Apply Output</div><pre class="verify-output">${escapeHtml(result.apply_output)}</pre>` : ""}
-          ${result?.post_output ? `<div class="output-label">Verify Post</div><pre class="verify-output">${escapeHtml(result.post_output)}</pre>` : ""}
-          ${result?.diff ? `<div class="output-label">Pre/Post Diff</div><div class="diff-output">${formatDiffHtml(result.diff)}</div>` : ""}
-          ${result?.diff_truncated ? `<div class="muted">diff truncated (original: ${result.diff_original_size} bytes)</div>` : ""}
-        </div>
-      `;
-    })
-    .join("");
-}
-
 function snapshotStreamScrollState(devicesEl) {
   const scrollState = {};
   devicesEl.querySelectorAll(".stream-output[data-device-key]").forEach((el) => {
@@ -1040,8 +937,14 @@ function restoreStreamScrollState(devicesEl, scrollState) {
 
 function renderExecutionPanel(summaryEl, devicesEl, source, eventCount = 0, deviceNameMap = {}) {
   const streamScrollState = snapshotStreamScrollState(devicesEl);
-  summaryEl.innerHTML = buildExecutionSummaryHtml(source, eventCount);
-  devicesEl.innerHTML = buildDeviceCardsHtml(source, deviceNameMap);
+  const renderOptions = {
+    hostFromDeviceKey,
+    locale: currentLocale,
+    statusLabel,
+    translate: t,
+  };
+  summaryEl.innerHTML = buildExecutionSummaryHtml(source, eventCount, renderOptions);
+  devicesEl.innerHTML = buildDeviceCardsHtml(source, deviceNameMap, renderOptions);
   restoreStreamScrollState(devicesEl, streamScrollState);
 }
 
@@ -1398,85 +1301,25 @@ function updatePostCanaryControls() {
   concurrencyLimitEl.disabled = !isParallel;
   concurrencyLimitEl.setAttribute("aria-disabled", String(!isParallel));
 }
-function resolveEffectiveExecutionConfig(concurrencyLimit, strategy) {
-  return {
-    strategy,
-    effectiveConcurrencyLimit: strategy === "sequential" ? 1 : concurrencyLimit,
-  };
-}
-
 function collectRunInput() {
-  const jobName = document.getElementById("jobName").value.trim();
-  const creator = document.getElementById("creator").value.trim();
-  const globalVarsText = document.getElementById("globalVars").value;
-  const commands = parseCommands(document.getElementById("commands").value);
-  const commandScope = selectedCommandScope();
-  const verifyCommands = parseCommands(verifyCommandsEl.value);
-  const verifyMode = selectedVerifyMode();
-  const concurrencyLimit = Number(concurrencyLimitEl.value || "5");
-  const staggerDelay = Number(staggerDelayEl.value || "1.0");
-  const stopOnError = stopOnErrorEl.checked;
-  const postCanaryStrategy = selectedPostCanaryStrategy();
-
-  if (commands.length === 0) {
-    throw new Error(t("messages.commandsEmpty"));
-  }
-  if (!Number.isFinite(concurrencyLimit) || concurrencyLimit < 1) {
-    throw new Error(t("messages.concurrencyLimitInvalid"));
-  }
-  if (!Number.isFinite(staggerDelay) || staggerDelay < 0) {
-    throw new Error(t("messages.staggerDelayInvalid"));
-  }
-  if (!["parallel", "sequential"].includes(postCanaryStrategy)) {
-    throw new Error(t("messages.postCanaryStrategyInvalid"));
-  }
-  if (!["all", "canary"].includes(commandScope)) {
-    throw new Error(t("messages.commandScopeInvalid"));
-  }
-
-  const targets = resolveRunTargets();
-  if (targets.targetDevices.length === 0) {
-    throw new Error(t("messages.importedTargetDevicesEmpty"));
-  }
-
-  const canaryKey = canaryDeviceEl.value.trim();
-  if (!canaryKey) {
-    throw new Error(t("messages.canaryRequired"));
-  }
-  if (!targets.targetDevices.some((device) => `${device.host}:${device.port}` === canaryKey)) {
-    throw new Error(t("messages.canaryIncluded"));
-  }
-
-  const [canaryHost, canaryRawPort] = canaryKey.split(":");
-  const canary = { host: canaryHost, port: Number(canaryRawPort || "22") };
-  const globalVars = parseGlobalVars(globalVarsText);
-  const targetDeviceKeys = targets.importedDeviceKeys;
-  const executionTargetDeviceKeys =
-    commandScope === "canary" ? [canaryKey] : targetDeviceKeys;
-  const effectiveConfig =
-    commandScope === "canary"
-      ? { strategy: postCanaryStrategy, effectiveConcurrencyLimit: 1 }
-      : resolveEffectiveExecutionConfig(concurrencyLimit, postCanaryStrategy);
-
-  return {
-    jobName,
-    creator,
-    globalVars,
-    commands,
-    commandScope,
-    verifyCommands,
-    verifyMode,
-    concurrencyLimit,
-    staggerDelay,
-    stopOnError,
-    canary,
-    canaryKey,
-    targets,
-    targetDeviceKeys,
-    executionTargetDeviceKeys,
-    postCanaryStrategy,
-    effectiveConcurrencyLimit: effectiveConfig.effectiveConcurrencyLimit,
-  };
+  return buildRunInput(
+    {
+      jobName: document.getElementById("jobName").value.trim(),
+      creator: document.getElementById("creator").value.trim(),
+      globalVarsText: document.getElementById("globalVars").value,
+      commandsText: document.getElementById("commands").value,
+      commandScope: selectedCommandScope(),
+      verifyCommandsText: verifyCommandsEl.value,
+      verifyMode: selectedVerifyMode(),
+      concurrencyLimit: Number(concurrencyLimitEl.value || "5"),
+      staggerDelay: Number(staggerDelayEl.value || "1.0"),
+      stopOnError: stopOnErrorEl.checked,
+      postCanaryStrategy: selectedPostCanaryStrategy(),
+      canaryKey: canaryDeviceEl.value.trim(),
+      targets: resolveRunTargets(),
+    },
+    { translate: t }
+  );
 }
 
 function clearElementChildren(el) {
@@ -1492,47 +1335,6 @@ function appendListItems(el, values) {
   });
 }
 
-function buildReviewModel(runInput) {
-  const executionDeviceKeys = runInput.executionTargetDeviceKeys || runInput.targetDeviceKeys;
-  const remainingCount = Math.max(0, executionDeviceKeys.length - 1);
-  const strategyText =
-    runInput.commandScope === "canary"
-      ? t("messages.canaryFlowOnly")
-      : runInput.postCanaryStrategy === "sequential"
-      ? t("messages.canaryFlowSequential")
-      : t("messages.canaryFlowParallel", { limit: runInput.effectiveConcurrencyLimit });
-  return {
-    modeText: t("messages.executionModeAsync"),
-    hosts: executionDeviceKeys,
-    commands: runInput.commands,
-    verifyCommands: runInput.verifyCommands.length > 0 ? runInput.verifyCommands : [t("labels.none")],
-    settings: [
-      t("messages.settingCanary", { value: runInput.canaryKey }),
-      t("messages.settingCommandScope", { value: describeCommandScope(runInput.commandScope) }),
-      t("messages.settingVerify", { value: describeVerifyPlan(runInput.verifyMode, runInput.verifyCommands) }),
-      t("messages.settingStopOnError", { value: runInput.stopOnError }),
-      t("messages.settingStaggerDelay", { value: runInput.staggerDelay }),
-      t("messages.settingPostCanary", {
-        value:
-          runInput.commandScope === "canary"
-            ? t("messages.settingNotApplicable")
-            : runInput.postCanaryStrategy === "sequential"
-            ? "Sequential"
-            : "Parallel",
-      }),
-      t("messages.settingConcurrencyInput", {
-        value: runInput.commandScope === "canary" || runInput.postCanaryStrategy === "sequential"
-          ? t("messages.settingConcurrencyDisabled")
-          : runInput.concurrencyLimit,
-      }),
-      t("messages.settingEffectiveConcurrency", { value: runInput.effectiveConcurrencyLimit }),
-      t("messages.settingTargetDevices", { count: executionDeviceKeys.length, remaining: remainingCount }),
-      t("messages.settingTargetSource"),
-    ],
-    flowDiagram: strategyText,
-  };
-}
-
 function setRunReviewVisible(visible) {
   runReviewPanelEl.classList.toggle("hidden", !visible);
 }
@@ -1543,7 +1345,11 @@ function updateReviewHostListVisibility() {
 }
 
 function renderRunReview(runInput) {
-  const review = buildReviewModel(runInput);
+  const review = buildReviewModel(runInput, {
+    describeCommandScope,
+    describeVerifyPlan,
+    translate: t,
+  });
   reviewModeTextEl.textContent = review.modeText;
   appendListItems(reviewTargetHostsEl, review.hosts);
   appendListItems(reviewCommandsEl, review.commands);
