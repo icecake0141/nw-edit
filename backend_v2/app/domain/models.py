@@ -33,6 +33,19 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+ACTIVE_JOB_STATUSES = frozenset({JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED})
+
+
+def is_active_job_status(status: JobStatus) -> bool:
+    """Return whether a status blocks starting another job."""
+    return status in ACTIVE_JOB_STATUSES
+
+
+def is_active_job(job: "JobRecord") -> bool:
+    """Return whether a job is queued, running, or paused."""
+    return is_active_job_status(job.status)
+
+
 class JobEvent(str, Enum):
     """Events that trigger state transitions."""
 

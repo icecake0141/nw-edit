@@ -29,6 +29,22 @@ from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from backend_v2.app.api.mappers import (
+    to_device_profile_response,
+    to_job_response,
+    to_preset_response,
+    to_run_response,
+)
+from backend_v2.app.api.run_execution import (
+    apply_control_action,
+    execute_prepared_run,
+    publish_job_status,
+    request_cancel,
+    request_pause,
+    request_resume,
+    reset_run_control,
+)
+from backend_v2.app.api.run_preparation import prepare_run
 from backend_v2.app.api.schemas import (
     AppResetCountsResponse,
     AppResetResponse,
@@ -36,7 +52,6 @@ from backend_v2.app.api.schemas import (
     CreateJobRequest,
     DeviceImportResponse,
     DeviceProfileResponse,
-    DeviceRunResponse,
     ExecutionEventResponse,
     RuntimeModesResponse,
     StatusCommandRequest,
@@ -53,21 +68,12 @@ from backend_v2.app.application.device_import_service import (
     DeviceConnectionValidator,
     DeviceImportService,
 )
-from backend_v2.app.application.command_template import render_commands
-from backend_v2.app.application.events import ExecutionEvent, utc_now
 from backend_v2.app.application.execution_engine import (
     DeviceWorker,
-    ExecutionConfig,
     ExecutionEngine,
 )
 from backend_v2.app.application.job_service import JobService
-from backend_v2.app.domain.models import (
-    DeviceTarget,
-    ExecutionPreset,
-    JobRecord,
-    JobRunSummary,
-    JobStatus,
-)
+from backend_v2.app.domain.models import is_active_job
 from backend_v2.app.domain.state_machine import JobStateMachine
 from backend_v2.app.infrastructure.device_connection_validators import (
     NetmikoConnectionValidator,
@@ -149,215 +155,6 @@ else:
 device_import_service = DeviceImportService(store=device_store, validator=validator)
 
 
-def to_response(job: JobRecord) -> JobResponse:
-    """Convert domain model to API response."""
-    return JobResponse(
-        job_id=job.job_id,
-        job_name=job.job_name,
-        creator=job.creator,
-        status=job.status.value,
-        created_at=job.created_at,
-        global_vars=job.global_vars,
-        started_at=job.started_at,
-        completed_at=job.completed_at,
-    )
-
-
-def _resolve_run_targets(
-    payload: RunJobRequest,
-) -> tuple[list[DeviceTarget], DeviceTarget]:
-    extra_fields = payload.model_extra or {}
-    if "devices" in extra_fields:
-        raise HTTPException(
-            status_code=400,
-            detail="devices is no longer supported; use imported_device_keys",
-        )
-    if payload.imported_device_keys is None:
-        raise HTTPException(
-            status_code=400,
-            detail="imported_device_keys is required",
-        )
-    if not payload.imported_device_keys:
-        raise HTTPException(
-            status_code=400,
-            detail="imported_device_keys cannot be empty",
-        )
-    imported_map = {d.key: d for d in device_store.list()}
-    missing_keys = [
-        key for key in payload.imported_device_keys if key not in imported_map
-    ]
-    if missing_keys:
-        missing = ", ".join(missing_keys)
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown imported_device_keys: {missing}",
-        )
-    devices = [
-        DeviceTarget(host=imported_map[key].host, port=imported_map[key].port)
-        for key in payload.imported_device_keys
-    ]
-
-    if payload.canary is None:
-        raise HTTPException(
-            status_code=400,
-            detail="canary is required",
-        )
-    canary = DeviceTarget(host=payload.canary.host, port=payload.canary.port)
-    if canary.key not in {device.key for device in devices}:
-        raise HTTPException(
-            status_code=400,
-            detail="Canary device must be in the device list",
-        )
-    return devices, canary
-
-
-def _to_run_response(summary: JobRunSummary) -> RunJobResponse:
-    return RunJobResponse(
-        job_id=summary.job_id,
-        status=summary.status.value,
-        commands=summary.commands,
-        verify_commands=summary.verify_commands,
-        target_device_keys=summary.target_device_keys,
-        device_results={
-            key: DeviceRunResponse(
-                status=result.status,
-                attempts=result.attempts,
-                error=result.error,
-                error_code=result.error_code,
-                logs=result.logs,
-                pre_output=result.pre_output or "",
-                apply_output=result.apply_output or "",
-                post_output=result.post_output or "",
-                diff=result.diff or "",
-                diff_truncated=result.diff_truncated,
-                diff_original_size=result.diff_original_size,
-                log_trimmed=result.log_trimmed,
-            )
-            for key, result in summary.device_results.items()
-        },
-    )
-
-
-def _prepare_run(job_id: str, payload: RunJobRequest) -> tuple[
-    JobRecord,
-    list[DeviceTarget],
-    DeviceTarget,
-    dict[str, list[str]],
-    dict[str, list[str]],
-    ExecutionConfig,
-]:
-    job = store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    devices, canary = _resolve_run_targets(payload)
-    command_scope = (payload.command_scope or "all").strip().lower()
-    if command_scope not in {"all", "canary"}:
-        raise HTTPException(
-            status_code=400,
-            detail="command_scope must be one of: all, canary",
-        )
-    if command_scope == "canary":
-        devices = [device for device in devices if device.key == canary.key]
-
-    verify_mode = (payload.verify_mode or "all").strip().lower()
-    if verify_mode not in {"all", "canary", "none"}:
-        raise HTTPException(
-            status_code=400,
-            detail="verify_mode must be one of: all, canary, none",
-        )
-    commands_by_device: dict[str, list[str]] = {}
-    verify_commands_by_device: dict[str, list[str]] = {}
-    for device in devices:
-        profile = device_store.get_by_key(device.key)
-        merged_vars = dict(job.global_vars)
-        if profile is not None:
-            merged_vars.update(profile.host_vars)
-        rendered, missing = render_commands(payload.commands, merged_vars)
-        if missing:
-            missing_vars = ", ".join(sorted(missing))
-            raise HTTPException(
-                status_code=400,
-                detail=(f"Missing command variables for {device.key}: {missing_vars}"),
-            )
-        commands_by_device[device.key] = rendered
-        if verify_mode == "none":
-            verify_commands_by_device[device.key] = []
-            continue
-
-        base_verify_commands = (
-            list(payload.verify_commands)
-            if payload.verify_commands is not None
-            else (list(profile.verify_cmds) if profile is not None else [])
-        )
-        if verify_mode == "canary" and device.key != canary.key:
-            verify_commands_by_device[device.key] = []
-        else:
-            verify_commands_by_device[device.key] = base_verify_commands
-
-    config = ExecutionConfig(
-        concurrency_limit=payload.concurrency_limit,
-        stagger_delay=payload.stagger_delay,
-        stop_on_error=payload.stop_on_error,
-        non_canary_retry_limit=payload.non_canary_retry_limit,
-        retry_backoff_seconds=payload.retry_backoff_seconds,
-    )
-    return job, devices, canary, commands_by_device, verify_commands_by_device, config
-
-
-def _execute_run_prepared(
-    job_id: str,
-    devices: list[DeviceTarget],
-    canary: DeviceTarget,
-    commands_by_device: dict[str, list[str]],
-    verify_commands_by_device: dict[str, list[str]],
-    config: ExecutionConfig,
-    commands: Optional[list[str]] = None,
-    verify_commands: Optional[list[str]] = None,
-) -> JobRunSummary:
-    control = control_store.get_or_create(job_id)
-    summary = engine.run_job(
-        job_id=job_id,
-        devices=devices,
-        canary=canary,
-        commands_by_device=commands_by_device,
-        verify_commands_by_device=verify_commands_by_device,
-        config=config,
-        commands=commands,
-        verify_commands=verify_commands,
-        control=control,
-    )
-    run_store.save(summary)
-    if summary.status.value == "completed":
-        try:
-            service.apply_event(job_id=job_id, event_name="complete")
-        except ValueError:
-            pass
-    elif summary.status.value == "cancelled":
-        try:
-            service.apply_event(job_id=job_id, event_name="cancel")
-        except ValueError:
-            pass
-    elif summary.status.value == "failed":
-        try:
-            service.apply_event(job_id=job_id, event_name="fail")
-        except ValueError:
-            pass
-    return summary
-
-
-def _to_preset_response(preset: ExecutionPreset) -> PresetResponse:
-    return PresetResponse(
-        preset_id=preset.preset_id,
-        name=preset.name,
-        os_model=preset.os_model,
-        commands=preset.commands,
-        verify_commands=preset.verify_commands,
-        created_at=preset.created_at,
-        updated_at=preset.updated_at,
-    )
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     """Simple health endpoint."""
@@ -395,22 +192,7 @@ def import_devices(
             },
         )
     return DeviceImportResponse(
-        devices=[
-            DeviceProfileResponse(
-                host=d.host,
-                port=d.port,
-                device_type=d.device_type,
-                username=d.username,
-                password=d.password,
-                name=d.name,
-                verify_cmds=d.verify_cmds,
-                host_vars=d.host_vars,
-                prod=d.prod,
-                connection_ok=d.connection_ok,
-                error_message=d.error_message,
-            )
-            for d in result.devices
-        ],
+        devices=[to_device_profile_response(d) for d in result.devices],
         failed_rows=[
             FailedRowResponse(
                 row_number=row.row_number,
@@ -463,19 +245,7 @@ def import_devices_with_progress(
                         "processed": len(result.devices),
                         "total": len(result.devices),
                         "devices": [
-                            DeviceProfileResponse(
-                                host=d.host,
-                                port=d.port,
-                                device_type=d.device_type,
-                                username=d.username,
-                                password=d.password,
-                                name=d.name,
-                                verify_cmds=d.verify_cmds,
-                                host_vars=d.host_vars,
-                                prod=d.prod,
-                                connection_ok=d.connection_ok,
-                                error_message=d.error_message,
-                            ).model_dump()
+                            to_device_profile_response(d).model_dump()
                             for d in result.devices
                         ],
                     }
@@ -501,33 +271,14 @@ def import_devices_with_progress(
 def list_devices() -> list[DeviceProfileResponse]:
     """List currently imported valid devices."""
     devices = device_store.list()
-    return [
-        DeviceProfileResponse(
-            host=d.host,
-            port=d.port,
-            device_type=d.device_type,
-            username=d.username,
-            password=d.password,
-            name=d.name,
-            verify_cmds=d.verify_cmds,
-            host_vars=d.host_vars,
-            prod=d.prod,
-            connection_ok=d.connection_ok,
-            error_message=d.error_message,
-        )
-        for d in devices
-    ]
+    return [to_device_profile_response(d) for d in devices]
 
 
 @app.post("/api/v2/app/reset", response_model=AppResetResponse)
 def reset_app_state() -> AppResetResponse:
     """Clear volatile in-memory application state."""
     jobs = store.list()
-    active_jobs = [
-        job
-        for job in jobs
-        if job.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}
-    ]
+    active_jobs = [job for job in jobs if is_active_job(job)]
     if active_jobs:
         raise HTTPException(
             status_code=409,
@@ -578,7 +329,7 @@ def execute_status_command(payload: StatusCommandRequest) -> StatusCommandRespon
 def list_presets(os_model: Optional[str] = None) -> list[PresetResponse]:
     """List execution presets with optional os_model filter."""
     return [
-        _to_preset_response(preset)
+        to_preset_response(preset)
         for preset in preset_store.list_presets(os_model=os_model)
     ]
 
@@ -601,7 +352,7 @@ def create_preset(payload: PresetCreateRequest) -> PresetResponse:
         )
     except PresetConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return _to_preset_response(preset)
+    return to_preset_response(preset)
 
 
 @app.put("/api/v2/presets/{preset_id}", response_model=PresetResponse)
@@ -619,7 +370,7 @@ def update_preset(preset_id: str, payload: PresetUpdateRequest) -> PresetRespons
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if preset is None:
         raise HTTPException(status_code=404, detail="Preset not found")
-    return _to_preset_response(preset)
+    return to_preset_response(preset)
 
 
 @app.post("/api/v2/jobs", response_model=JobResponse)
@@ -628,7 +379,7 @@ def create_job(payload: CreateJobRequest) -> JobResponse:
     jobs = store.list()
     jobs.sort(key=lambda item: item.created_at, reverse=True)
     for existing in jobs:
-        if existing.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}:
+        if is_active_job(existing):
             label = existing.job_name or existing.job_id
             raise HTTPException(
                 status_code=409,
@@ -642,7 +393,7 @@ def create_job(payload: CreateJobRequest) -> JobResponse:
         creator=payload.creator,
         global_vars=payload.global_vars,
     )
-    return to_response(job)
+    return to_job_response(job)
 
 
 @app.get("/api/v2/jobs", response_model=list[JobResponse])
@@ -650,7 +401,7 @@ def list_jobs() -> list[JobResponse]:
     """List created jobs in reverse chronological order."""
     jobs = store.list()
     jobs.sort(key=lambda item: item.created_at, reverse=True)
-    return [to_response(job) for job in jobs]
+    return [to_job_response(job) for job in jobs]
 
 
 @app.get("/api/v2/jobs/active", response_model=ActiveJobResponse)
@@ -659,8 +410,8 @@ def active_job() -> ActiveJobResponse:
     jobs = store.list()
     jobs.sort(key=lambda item: item.created_at, reverse=True)
     for job in jobs:
-        if job.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}:
-            return ActiveJobResponse(active=True, job=to_response(job))
+        if is_active_job(job):
+            return ActiveJobResponse(active=True, job=to_job_response(job))
     return ActiveJobResponse(active=False, job=None)
 
 
@@ -670,7 +421,7 @@ def get_job(job_id: str) -> JobResponse:
     job = store.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return to_response(job)
+    return to_job_response(job)
 
 
 @app.get("/api/v2/jobs/{job_id}/events", response_model=list[ExecutionEventResponse])
@@ -702,164 +453,129 @@ def apply_event(job_id: str, event_name: str) -> JobResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return to_response(job)
+    return to_job_response(job)
 
 
 @app.post("/api/v2/jobs/{job_id}/run", response_model=RunJobResponse)
 def run_job(job_id: str, payload: RunJobRequest) -> RunJobResponse:
     """Run job with simulated worker and return summary."""
-    _, devices, canary, commands_by_device, verify_commands_by_device, config = (
-        _prepare_run(
-            job_id=job_id,
-            payload=payload,
-        )
+    prepared = prepare_run(
+        job_id=job_id,
+        payload=payload,
+        job_store=store,
+        device_store=device_store,
     )
 
-    try:
-        service.apply_event(job_id=job_id, event_name="start")
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    control = control_store.get_or_create(job_id)
-    control.pause_event.clear()
-    control.cancel_event.clear()
-
-    summary = _execute_run_prepared(
+    reset_run_control(
         job_id=job_id,
-        devices=devices,
-        canary=canary,
-        commands_by_device=commands_by_device,
-        verify_commands_by_device=verify_commands_by_device,
-        config=config,
+        service=service,
+        control_store=control_store,
+    )
+
+    summary = execute_prepared_run(
+        job_id=job_id,
+        prepared=prepared,
+        engine=engine,
+        control_store=control_store,
+        run_store=run_store,
+        service=service,
         commands=payload.commands,
         verify_commands=list(payload.verify_commands or []),
     )
-    return _to_run_response(summary)
+    return to_run_response(summary)
 
 
 @app.post("/api/v2/jobs/{job_id}/run/async", response_model=JobResponse)
 def run_job_async(job_id: str, payload: RunJobRequest) -> JobResponse:
     """Run job in background thread."""
-    _, devices, canary, commands_by_device, verify_commands_by_device, config = (
-        _prepare_run(
-            job_id=job_id,
-            payload=payload,
-        )
+    prepared = prepare_run(
+        job_id=job_id,
+        payload=payload,
+        job_store=store,
+        device_store=device_store,
     )
-    try:
-        service.apply_event(job_id=job_id, event_name="start")
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    control = control_store.get_or_create(job_id)
-    control.pause_event.clear()
-    control.cancel_event.clear()
+    reset_run_control(
+        job_id=job_id,
+        service=service,
+        control_store=control_store,
+    )
 
     started = run_coordinator.start(
         job_id=job_id,
-        target=lambda: _execute_run_prepared(
+        target=lambda: execute_prepared_run(
             job_id=job_id,
-            devices=devices,
-            canary=canary,
-            commands_by_device=commands_by_device,
-            verify_commands_by_device=verify_commands_by_device,
-            config=config,
+            prepared=prepared,
+            engine=engine,
+            control_store=control_store,
+            run_store=run_store,
+            service=service,
             commands=payload.commands,
             verify_commands=list(payload.verify_commands or []),
         ),
     )
     if not started:
         raise HTTPException(status_code=409, detail="Job run already in progress")
-    event_store.publish(
-        ExecutionEvent(
-            type="job_status",
-            job_id=job_id,
-            timestamp=utc_now(),
-            status="running",
-            message="Async run started",
-        )
+    publish_job_status(
+        event_store=event_store,
+        job_id=job_id,
+        status="running",
+        message="Async run started",
     )
     fresh = store.get(job_id)
     if fresh is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return to_response(fresh)
+    return to_job_response(fresh)
 
 
 @app.post("/api/v2/jobs/{job_id}/pause", response_model=JobResponse)
 def pause_job(job_id: str) -> JobResponse:
     """Pause async run scheduling."""
-    job = store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    control = control_store.get(job_id)
-    if control is None:
-        raise HTTPException(status_code=409, detail="No run control available")
-    control.pause_event.set()
-    try:
-        job = service.apply_event(job_id=job_id, event_name="pause")
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    event_store.publish(
-        ExecutionEvent(
-            type="job_status",
-            job_id=job_id,
-            timestamp=utc_now(),
-            status="paused",
-            message="Pause requested",
-        )
+    job = apply_control_action(
+        job_id=job_id,
+        job_store=store,
+        control_store=control_store,
+        service=service,
+        event_store=event_store,
+        event_name="pause",
+        status="paused",
+        message="Pause requested",
+        mutate_control=request_pause,
     )
-    return to_response(job)
+    return to_job_response(job)
 
 
 @app.post("/api/v2/jobs/{job_id}/resume", response_model=JobResponse)
 def resume_job(job_id: str) -> JobResponse:
     """Resume paused async run."""
-    job = store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    control = control_store.get(job_id)
-    if control is None:
-        raise HTTPException(status_code=409, detail="No run control available")
-    control.pause_event.clear()
-    try:
-        job = service.apply_event(job_id=job_id, event_name="resume")
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    event_store.publish(
-        ExecutionEvent(
-            type="job_status",
-            job_id=job_id,
-            timestamp=utc_now(),
-            status="running",
-            message="Resume requested",
-        )
+    job = apply_control_action(
+        job_id=job_id,
+        job_store=store,
+        control_store=control_store,
+        service=service,
+        event_store=event_store,
+        event_name="resume",
+        status="running",
+        message="Resume requested",
+        mutate_control=request_resume,
     )
-    return to_response(job)
+    return to_job_response(job)
 
 
 @app.post("/api/v2/jobs/{job_id}/cancel", response_model=JobResponse)
 def cancel_job(job_id: str) -> JobResponse:
     """Cancel async run."""
-    job = store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    control = control_store.get(job_id)
-    if control is None:
-        raise HTTPException(status_code=409, detail="No run control available")
-    control.cancel_event.set()
-    control.pause_event.clear()
-    try:
-        job = service.apply_event(job_id=job_id, event_name="cancel")
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    event_store.publish(
-        ExecutionEvent(
-            type="job_status",
-            job_id=job_id,
-            timestamp=utc_now(),
-            status="cancelled",
-            message="Cancel requested",
-        )
+    job = apply_control_action(
+        job_id=job_id,
+        job_store=store,
+        control_store=control_store,
+        service=service,
+        event_store=event_store,
+        event_name="cancel",
+        status="cancelled",
+        message="Cancel requested",
+        mutate_control=request_cancel,
     )
-    return to_response(job)
+    return to_job_response(job)
 
 
 @app.post("/api/v2/jobs/{job_id}/terminate", response_model=JobResponse)
@@ -874,7 +590,7 @@ def get_job_result(job_id: str) -> RunJobResponse:
     summary = run_store.get(job_id)
     if summary is None:
         raise HTTPException(status_code=404, detail="Run result not found")
-    return _to_run_response(summary)
+    return to_run_response(summary)
 
 
 @app.websocket("/ws/v2/jobs/{job_id}")
