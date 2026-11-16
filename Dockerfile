@@ -10,7 +10,7 @@
 # This file was created or modified with the assistance of an AI (Large Language Model).
 # Review required for correctness, security, and licensing.
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 WORKDIR /app
 
